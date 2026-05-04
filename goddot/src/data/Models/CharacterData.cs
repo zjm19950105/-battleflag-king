@@ -13,6 +13,7 @@ namespace BattleKing.Data
         public List<string> InnateValorSkillIds { get; set; } = new();
         public Dictionary<string, int> BaseStats { get; set; } = new();
         public string GrowthType { get; set; }
+        public string Description { get; set; } // 角色特性描述（占位符，待手动填充）
         public List<TraitData> Traits { get; set; } = new();
         public List<string> InitialEquipmentIds { get; set; } = new();
         public List<string> CcInitialEquipmentIds { get; set; } = new();

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BattleKing.Ai;
 using BattleKing.Data;
+using BattleKing.Events;
 using BattleKing.Pipeline;
 using BattleKing.Skills;
 
@@ -13,8 +14,10 @@ namespace BattleKing.Core
         private BattleContext _ctx;
         private StrategyEvaluator _strategyEvaluator;
         private DamageCalculator _damageCalculator;
+        private EventBus _eventBus = new EventBus();
 
         public Action<string> OnLog { get; set; }
+        public EventBus EventBus => _eventBus;
 
         public BattleEngine(BattleContext ctx)
         {
@@ -36,6 +39,8 @@ namespace BattleKing.Core
             Log("=== 战斗开始 ===");
             PrintTeamStatus();
 
+            _eventBus.Publish(new BattleStartEvent { Context = _ctx });
+
             while (true)
             {
                 _ctx.TurnCount++;
@@ -45,7 +50,7 @@ namespace BattleKing.Core
                 if (aliveUnits.Count == 0)
                 {
                     Log("双方全灭，平局！");
-                    return BattleResult.Draw;
+                    return EndBattle(BattleResult.Draw);
                 }
 
                 // Sort by speed descending
@@ -59,7 +64,7 @@ namespace BattleKing.Core
                     // Check win condition before each action
                     var preCheck = CheckBattleEnd();
                     if (preCheck.HasValue)
-                        return preCheck.Value;
+                        return EndBattle(preCheck.Value);
 
                     ExecuteUnitTurn(unit);
                 }
@@ -67,13 +72,19 @@ namespace BattleKing.Core
                 // Check win condition after the round
                 var postCheck = CheckBattleEnd();
                 if (postCheck.HasValue)
-                    return postCheck.Value;
+                    return EndBattle(postCheck.Value);
 
                 // Check AP exhaustion
                 var apCheck = CheckApExhaustion();
                 if (apCheck.HasValue)
-                    return apCheck.Value;
+                    return EndBattle(apCheck.Value);
             }
+        }
+
+        private BattleResult EndBattle(BattleResult result)
+        {
+            _eventBus.Publish(new BattleEndEvent { Context = _ctx, Result = result });
+            return result;
         }
 
         private void ExecuteUnitTurn(BattleUnit unit)
@@ -92,12 +103,16 @@ namespace BattleKing.Core
                 return;
             }
 
+            _eventBus.Publish(new BeforeActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
+
             unit.ConsumeAp(skill.ApCost);
 
             foreach (var target in targets)
             {
                 if (!target.IsAlive)
                     continue;
+
+                _eventBus.Publish(new BeforeHitEvent { Attacker = unit, Defender = target, Skill = skill, Context = _ctx });
 
                 var result = _damageCalculator.Calculate(unit, target, skill, _ctx);
 
@@ -120,14 +135,22 @@ namespace BattleKing.Core
                     target.TakeDamage(damage);
                 }
 
-                Log($"{unit.Data.Name} 对 {target.Data.Name} 使用 {skill.Data.Name}，造成 {damage} 伤害{statusText}");
+                _eventBus.Publish(new AfterHitEvent { Attacker = unit, Defender = target, Skill = skill, DamageDealt = damage, IsHit = result.IsHit, Context = _ctx });
+
+                string aftermath = $"{target.Data.Name} 剩余 HP:{target.CurrentHp}";
+                if (result.AppliedAilments.Count > 0)
+                    aftermath += $", 附加状态: {string.Join(",", result.AppliedAilments)}";
+
+                Log($"{unit.Data.Name} → {target.Data.Name} [{skill.Data.Name}] {damage}伤害{statusText} | {aftermath}");
             }
+
+            _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
         }
 
         private BattleResult? CheckBattleEnd()
         {
-            bool playerAlive = _ctx.PlayerUnits.Any(u => u.IsAlive);
-            bool enemyAlive = _ctx.EnemyUnits.Any(u => u.IsAlive);
+            bool playerAlive = _ctx.PlayerUnits.Any(u => u != null && u.IsAlive);
+            bool enemyAlive = _ctx.EnemyUnits.Any(u => u != null && u.IsAlive);
 
             if (playerAlive && !enemyAlive)
             {
@@ -149,8 +172,8 @@ namespace BattleKing.Core
 
         private BattleResult? CheckApExhaustion()
         {
-            bool playerHasAp = _ctx.PlayerUnits.Any(u => u.IsAlive && u.CurrentAp > 0);
-            bool enemyHasAp = _ctx.EnemyUnits.Any(u => u.IsAlive && u.CurrentAp > 0);
+            bool playerHasAp = _ctx.PlayerUnits.Any(u => u != null && u.IsAlive && u.CurrentAp > 0);
+            bool enemyHasAp = _ctx.EnemyUnits.Any(u => u != null && u.IsAlive && u.CurrentAp > 0);
 
             if (!playerHasAp && !enemyHasAp)
             {
@@ -182,6 +205,7 @@ namespace BattleKing.Core
             int totalCurrentHp = 0;
             foreach (var u in units)
             {
+                if (u == null) continue;
                 totalMaxHp += u.Data.BaseStats.GetValueOrDefault("HP", 1);
                 totalCurrentHp += u.CurrentHp;
             }
@@ -192,10 +216,10 @@ namespace BattleKing.Core
         private void PrintTeamStatus()
         {
             Log("玩家队伍:");
-            foreach (var u in _ctx.PlayerUnits)
+            foreach (var u in _ctx.PlayerUnits.Where(u => u != null))
                 Log($"  {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
             Log("敌方队伍:");
-            foreach (var u in _ctx.EnemyUnits)
+            foreach (var u in _ctx.EnemyUnits.Where(u => u != null))
                 Log($"  {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
         }
     }

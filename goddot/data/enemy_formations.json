@@ -1,0 +1,53 @@
+[
+  {
+    "id": "fmt_frontline_infantry",
+    "name": "前排步兵",
+    "description": "3个步兵系敌人占据前排，倾向物理攻击",
+    "difficulty": 1,
+    "units": [
+      { "characterId": "fighter", "position": 1, "strategyPresetId": "preset_aggressive" },
+      { "characterId": "soldier", "position": 2, "strategyPresetId": "preset_aggressive" },
+      { "characterId": "warrior", "position": 3, "strategyPresetId": "preset_aggressive" }
+    ]
+  },
+  {
+    "id": "fmt_mixed_assault",
+    "name": "混合突击",
+    "description": "近战前排+远程后排的混合编队",
+    "difficulty": 2,
+    "units": [
+      { "characterId": "swordsman", "position": 1, "strategyPresetId": "preset_target_weak" },
+      { "characterId": "mercenary", "position": 2, "strategyPresetId": "preset_aggressive" },
+      { "characterId": "hunter", "position": 5, "strategyPresetId": "preset_target_weak" }
+    ]
+  },
+  {
+    "id": "fmt_heavy_defense",
+    "name": "重装防线",
+    "description": "高防御前排，擅长消耗战",
+    "difficulty": 2,
+    "units": [
+      { "characterId": "lord", "position": 1, "strategyPresetId": "preset_cautious" },
+      { "characterId": "hoplite", "position": 2, "strategyPresetId": "preset_cautious" },
+      { "characterId": "huskarl", "position": 3, "strategyPresetId": "preset_aggressive" }
+    ]
+  },
+  {
+    "id": "fmt_skirmishers",
+    "name": "游击小队",
+    "description": "高速高回避的游击编队，后排为主",
+    "difficulty": 1,
+    "units": [
+      { "characterId": "thief", "position": 4, "strategyPresetId": "preset_target_weak" },
+      { "characterId": "hunter", "position": 5, "strategyPresetId": "preset_target_weak" },
+      { "characterId": "shooter", "position": 6, "strategyPresetId": "preset_target_weak" }
+    ]
+  },
+  {
+    "id": "fmt_random",
+    "name": "随机配置",
+    "description": "从剩余角色中随机选3人",
+    "difficulty": 0,
+    "units": []
+  }
+]

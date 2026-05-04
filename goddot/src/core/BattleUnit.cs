@@ -40,6 +40,7 @@ namespace BattleKing.Core
         public List<Buff> Buffs { get; private set; } = new List<Buff>();
         public List<StatusAilment> Ailments { get; private set; } = new List<StatusAilment>();
         public List<Strategy> Strategies { get; set; } = new List<Strategy>();
+        public List<string> EquippedPassiveSkillIds { get; set; } = new List<string>();
 
         public BattleUnit(CharacterData data, GameDataRepository gameData, bool isPlayer, bool isCc = false)
         {
@@ -132,6 +133,35 @@ namespace BattleKing.Core
 
         public bool CanUseActiveSkill(ActiveSkill skill) => CurrentAp >= skill.Data.ApCost;
         public bool CanUsePassiveSkill(PassiveSkill skill) => CurrentPp >= skill.Data.PpCost && State != UnitState.Charging;
+
+        public List<PassiveSkillData> GetEquippedPassiveSkills()
+        {
+            var result = new List<PassiveSkillData>();
+            foreach (var id in EquippedPassiveSkillIds)
+            {
+                if (GameData.PassiveSkills.TryGetValue(id, out var skill))
+                    result.Add(skill);
+            }
+            return result;
+        }
+
+        public int GetUsedPp()
+        {
+            int total = 0;
+            foreach (var id in EquippedPassiveSkillIds)
+            {
+                if (GameData.PassiveSkills.TryGetValue(id, out var skill))
+                    total += skill.PpCost;
+            }
+            return total;
+        }
+
+        public bool CanEquipPassive(string skillId)
+        {
+            if (EquippedPassiveSkillIds.Contains(skillId)) return false;
+            if (!GameData.PassiveSkills.TryGetValue(skillId, out var skill)) return false;
+            return GetUsedPp() + skill.PpCost <= MaxPp;
+        }
 
         public void ConsumeAp(int amount) => CurrentAp = Math.Max(0, CurrentAp - amount);
         public void ConsumePp(int amount) => CurrentPp = Math.Max(0, CurrentPp - amount);

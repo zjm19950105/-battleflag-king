@@ -1,0 +1,44 @@
+[
+  {
+    "id": "preset_aggressive",
+    "name": "激进进攻",
+    "strategies": [
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": null, "condition2": null, "mode1": "Only", "mode2": "Only" }
+    ]
+  },
+  {
+    "id": "preset_target_weak",
+    "name": "优先残血",
+    "strategies": [
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" },
+      { "skillIndex": 0, "condition1": null, "condition2": { "category": "Hp", "operator": "lowest", "value": null }, "mode1": "Only", "mode2": "Priority" }
+    ]
+  },
+  {
+    "id": "preset_cautious",
+    "name": "保守打法",
+    "strategies": [
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
+      { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" }
+    ]
+  }
+]

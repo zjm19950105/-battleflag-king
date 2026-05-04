@@ -81,7 +81,17 @@
   - 猎人（弓）：基础 `[Bow, Accessory, Accessory]`，CC后 `[Bow, Accessory, Accessory, Accessory]`
 - **CC必须提供 tangible benefit**：所有角色CC后都比基础多1个饰品槽。
 
-### 8. 无盾格挡也减25%
+### 8. 批量修改时不要被同一对象的其他字段干扰判断
+**问题**：批量修正12角色的 `equippableCategories` 时，swordsman 被漏改。原因是 swordsman 的 `ccEquippableCategories` 是双 Sword（特殊值），让我在潜意识里把它从"单武器基础"组中排除，误以为它基础状态不需要再加 Accessory。
+**根因**：
+- 批量修改时，被同一对象的**其他字段**（尤其是 CC/高级状态数据）干扰了对目标字段的判断。
+- swordsman 的 `ccEquippableCategories` 有 `Sword, Sword`，但基础 `equippableCategories` 和其他单武器职业一样只有 `Sword, Accessory`，需要再加一个 `Accessory` 才能满足统一规则。
+**通用规则**：
+1. 批量修改时，**只看目标字段的原始值**，不要被同一对象的其他字段干扰。
+2. 修改前先列出所有对象的"目标字段原始值 → 应有值"对照表，逐个打勾确认。
+3. 修改后必须用脚本验证（如检查所有对象的列表长度是否一致），不能只靠目视检查文件内容。
+
+### 9. 无盾格挡也减25%
 **问题**：`GetBlockReduction()` 在无盾时返回0%，但参考文档确认所有角色都有基础格挡能力，无盾成功格挡也应减伤25%。
 **规则**：
 - 无盾格挡：减免 **25%**

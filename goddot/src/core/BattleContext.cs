@@ -12,7 +12,7 @@ namespace BattleKing.Core
         public int TurnCount { get; set; } = 0;
         public bool IsDaytime { get; set; } = true;
 
-        public List<BattleUnit> AllUnits => PlayerUnits.Concat(EnemyUnits).ToList();
+        public List<BattleUnit> AllUnits => PlayerUnits.Concat(EnemyUnits).Where(u => u != null).ToList();
 
         public BattleContext(GameDataRepository gameData)
         {
@@ -20,13 +20,13 @@ namespace BattleKing.Core
         }
 
         public List<BattleUnit> GetAliveUnits(bool isPlayer) =>
-            (isPlayer ? PlayerUnits : EnemyUnits).Where(u => u.IsAlive).ToList();
+            (isPlayer ? PlayerUnits : EnemyUnits).Where(u => u != null && u.IsAlive).ToList();
 
         public BattleUnit GetUnitAtPosition(bool isPlayer, int position) =>
-            (isPlayer ? PlayerUnits : EnemyUnits).FirstOrDefault(u => u.Position == position);
+            (isPlayer ? PlayerUnits : EnemyUnits).FirstOrDefault(u => u != null && u.Position == position);
 
         public bool HasEnemyClass(UnitClass unitClass) =>
-            EnemyUnits.Any(u => u.IsAlive && u.Data.Classes.Contains(unitClass));
+            EnemyUnits.Any(u => u != null && u.IsAlive && u.Data.Classes.Contains(unitClass));
 
         public int GetAliveCount(bool isPlayer) =>
             GetAliveUnits(isPlayer).Count;

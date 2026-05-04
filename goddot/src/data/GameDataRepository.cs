@@ -11,6 +11,8 @@ namespace BattleKing.Data
         public Dictionary<string, ActiveSkillData> ActiveSkills { get; private set; }
         public Dictionary<string, PassiveSkillData> PassiveSkills { get; private set; }
         public Dictionary<string, EquipmentData> Equipments { get; private set; }
+        public Dictionary<string, EnemyFormationData> EnemyFormations { get; private set; }
+        public Dictionary<string, StrategyPresetData> StrategyPresets { get; private set; }
 
         public void LoadAll(string dataPath)
         {
@@ -25,6 +27,12 @@ namespace BattleKing.Data
 
             Equipments = LoadJsonFile<List<EquipmentData>>(Path.Combine(dataPath, "equipments.json"))
                 .ToDictionary(e => e.Id);
+
+            EnemyFormations = LoadJsonFile<List<EnemyFormationData>>(Path.Combine(dataPath, "enemy_formations.json"))
+                .ToDictionary(f => f.Id);
+
+            StrategyPresets = LoadJsonFile<List<StrategyPresetData>>(Path.Combine(dataPath, "strategy_presets.json"))
+                .ToDictionary(p => p.Id);
         }
 
         private static T LoadJsonFile<T>(string filePath)
@@ -41,5 +49,7 @@ namespace BattleKing.Data
         public ActiveSkillData GetActiveSkill(string id) => ActiveSkills[id];
         public PassiveSkillData GetPassiveSkill(string id) => PassiveSkills[id];
         public EquipmentData GetEquipment(string id) => Equipments[id];
+        public EnemyFormationData GetEnemyFormation(string id) => EnemyFormations[id];
+        public StrategyPresetData GetStrategyPreset(string id) => StrategyPresets[id];
     }
 }

@@ -27,6 +27,8 @@ namespace BattleKing.Ai
                 ConditionCategory.ApPp => EvaluateApPp(condition, subject, target),
                 ConditionCategory.Status => EvaluateStatus(condition, subject, target),
                 ConditionCategory.SelfState => EvaluateSelfState(condition, subject),
+                ConditionCategory.SelfHp => EvaluateSelfHp(condition, subject),
+                ConditionCategory.SelfApPp => EvaluateSelfApPp(condition, subject),
                 ConditionCategory.EnemyClassExists => EvaluateEnemyClassExists(condition),
                 ConditionCategory.AttributeRank => EvaluateAttributeRank(condition, subject, target),
                 _ => true
@@ -150,6 +152,34 @@ namespace BattleKing.Ai
             {
                 "equals" => exists,
                 "contains" => exists,
+                _ => true
+            };
+        }
+
+        private bool EvaluateSelfHp(Condition c, BattleUnit subject)
+        {
+            if (subject?.Data == null) return true;
+            int maxHp = subject.Data.BaseStats.ContainsKey("HP") ? subject.Data.BaseStats["HP"] : 1;
+            if (maxHp <= 0) maxHp = 1;
+            float hpRatio = (float)subject.CurrentHp / maxHp;
+            return c.Operator switch
+            {
+                "less_than" => hpRatio < Convert.ToSingle(c.Value),
+                "greater_than" => hpRatio > Convert.ToSingle(c.Value),
+                "equals" => Math.Abs(hpRatio - Convert.ToSingle(c.Value)) < 0.001f,
+                _ => true
+            };
+        }
+
+        private bool EvaluateSelfApPp(Condition c, BattleUnit subject)
+        {
+            if (subject == null) return true;
+            int threshold = c.Value != null ? Convert.ToInt32(c.Value) : 0;
+            return c.Operator switch
+            {
+                "less_than" => subject.CurrentAp < threshold,
+                "greater_than" => subject.CurrentAp > threshold,
+                "equals" => subject.CurrentAp == threshold,
                 _ => true
             };
         }

@@ -1,128 +1,206 @@
 # 开发进度日志
 
 ## 当前阶段
-Phase 1.1 — 1v1 普攻对战（12/12角色数据已填充，CC框架已调整，等待未CC状态Godot验证）
+**Phase 1.2 — 战前配置与 3v3 自动战斗（已完成）**
+
+目标：玩家在 Godot 控制台中完成队伍组建、阵型布置、被动技能配置、策略编程，然后启动 3v3 自动对战。
+
+---
 
 ## 已完成
+
+### 基础设施
 - [x] 确定技术栈：Godot 4 + C#
 - [x] 确定核心设计方向：大巴扎节点 + 圣兽之王自动战斗
 - [x] 确定架构原则：数据驱动、正交系统、文档外置
-- [x] 建立文档体系（CLAUDE.md + progress.md + docs/csharp-architecture.md）
-- [x] 完整框架设计（基于圣兽之王资料分析）
-  - [x] 14项核心机制框架
-  - [x] C#技术架构文档（类设计、接口、枚举、数据流）
-  - [x] 伤害计算Pipeline设计
-  - [x] 条件系统12大类设计
+- [x] 建立文档体系（CLAUDE.md + progress.md + roadmap.md + docs/csharp-architecture.md + docs/dev-mistakes.md）
+- [x] 完整框架设计（基于圣兽之王资料分析）：14项核心机制框架
 - [x] Memory系统记录项目上下文
-- [x] Subagent并行编码（第一批+第二批全部完成）
-  - [x] Data层：18个枚举 + 8个数据类 + GameDataRepository
-  - [x] JSON数据文件：characters.json、active_skills.json、passive_skills.json、equipments.json
-  - [x] 事件系统：EventBus + 6个战斗事件
-  - [x] 接口定义：ISkillEffect、ITrait、SkillEffectFactory
-  - [x] 工具类：RandUtil、JsonLoader
-  - [x] Pipeline层：DamageCalculator（命中/回避/暴击/格挡全阶段）
-  - [x] Equipment层：Buff、BuffManager、EquipmentSlot、TraitApplier
-  - [x] AI层：Strategy、Condition、StrategyEvaluator、TargetSelector、ConditionEvaluator
-  - [x] Core层：BattleUnit（完整公共接口）、BattleContext、ActiveSkill、PassiveSkill
-- [x] Godot 4 项目骨架搭建
-  - [x] 项目创建在 `战旗之王/goddot/`
-  - [x] Main.cs / main.tscn / project.godot 配置正确
-  - [x] src/ 和 data/ 已复制到项目内
-  - [x] 全部 .cs 文件生成 .uid，Godot 编辑器识别正常
-- [x] Core层最终代码
-  - [x] BattleEngine（回合循环、速度排序、胜负判定、AP耗尽兜底）
-  - [x] Main.cs 入口脚本（加载数据→创建单位→启动战斗→打印结果）
-  - [x] DamageCalculator 补全命中判定（RollHit）和回避判定（RollEvasion）
-- [x] **CC（Class Change）框架接入**
-  - [x] CharacterData 增加 CcClassId、CcName、CcEquippableCategories、CcInnateActiveSkillIds、CcInnatePassiveSkillIds
-  - [x] BattleUnit 根据 isCc 自动切换装备槽和技能池
-  - [x] Main.cs 默认创建 CC 后角色（剑士→剑圣、佣兵→兰茨克内希特）
-- [x] **角色数据填充（12/12基础职业）**
-  - [x] 剑士/剑圣、佣兵/兰茨克内希特：完整数据验证通过
-  - [x] Subagent 批量填充：领主、战士、士兵、家臣、重装步兵、角斗士、勇士、猎人、射手、盗贼
-  - [x] Subagent 修正：技能名称/描述/威力/命中率、被动技能触发时机、角色装备配置
-  - [x] 斗士武器误改修正（Sword→Axe，已恢复）
-  - [x] 删除旧占位技能（skill_basic_attack、skill_block）
-  - [x] 补充 PassiveTriggerTiming 枚举值（SelfBeforeMeleeHit、SelfBeforePhysicalHit、AllyOnAttacked、SelfOnActiveUse）
-- [x] **CC框架调整**
-  - [x] `CharacterData` 新增 `CcInitialEquipmentIds`：CC后新增/变化装备槽必须带装备
-  - [x] `Main.cs` 默认 `isCc: false`（角色出场未CC）
-  - [x] `EquipmentSlot.Equip` 支持副手武器（双持）
-  - [x] `EquipmentSlot.ValidateWeaponEquipped()`：武器槽永不为空
-  - [x] `CreateUnit` 根据CC状态加载不同装备列表
-- [x] **装备槽统一规则（3基础 → 4 CC）**
-  - [x] 所有12角色基础3槽、CC后4槽已配置
-  - [x] 单武器角色（弓/枪/斧单手）：基础2饰品，CC后3饰品
-  - [x] 双持/剑盾角色：基础1饰品，CC后2饰品
-- [x] **格挡规则修正**
-  - [x] `GetBlockReduction()`：无盾格挡减25%，大盾减50%
-- [x] **文档体系**
-  - [x] 创建 `docs/dev-mistakes.md`：记录 Subagent 调用规范、机制规则
-  - [x] 同步 `docs/csharp-architecture.md`：CharacterData/BattleUnit/EquipmentSlot/PassiveTriggerTiming 与代码一致
-  - [x] 更新 `CLAUDE.md`：装备槽规则、格挡规则、文档索引
-- [ ] **Godot 运行验证（未CC状态）**
-  - [ ] 等待玛奇玛重新 Build + F5 验证未CC角色数据加载
+- [x] GitHub 仓库初始化并记录地址（`git@github.com:zjm19950105/-battleflag-king.git`）
+
+### Phase 1.0 — 环境就绪
+- [x] Godot 4 C# 项目创建并配置完毕（`战旗之王/goddot/`）
+- [x] 全部 .cs 文件生成 .uid，Godot 编辑器识别正常
+- [x] 能 F5 跑起场景
+- [x] 能正常 commit 到 git
+
+### Phase 1.1 — 1v1 普攻对战
+- [x] Data层：角色/主动技能/被动技能/装备 JSON + GameDataRepository
+- [x] Pipeline层：DamageCalculator（命中/回避/暴击/格挡/兵种克制）
+- [x] AI层：StrategyEvaluator + ConditionEvaluator + TargetSelector
+- [x] Core层：BattleUnit + BattleContext + BattleEngine
+- [x] Main.cs 入口脚本（加载数据 → 创建单位 → 启动战斗）
+- [x] 1v1 普攻代码闭环完成（逻辑层）
+- [x] **CC框架接入**：CharacterData/BattleUnit/Main.cs 支持CC状态切换，默认未CC
+- [x] **12/12角色数据已填充**（Subagent批量填充+修正），JSON格式验证通过
+- [x] `CcInitialEquipmentIds` 配置：CC后新增装备槽强制带装备
+- [x] `EquipmentSlot` 武器槽校验：MainHand永不为空
+- [x] 装备槽统一规则（3基础 → 4 CC）：所有12角色基础3槽、CC后4槽已配置
+- [x] 格挡规则修正：`GetBlockReduction()` 无盾格挡减25%，大盾减50%
+- [x] Godot 运行验证通过（未CC状态）：1v1 战斗循环正常，AP消耗、HP变化、胜负判定正确
+
+### Phase 1.2 — 战前配置与 3v3 自动战斗
+- [x] **控制台输入改造**：`Console.ReadLine` → Godot `LineEdit` UI（`async/await` + `ToSignal`）
+  - 解决 Windows GUI 程序无法接收 stdin 的问题
+  - 新增 `SetupUi()` 创建 CanvasLayer + Panel + Label + LineEdit
+  - 新增 `ReadInputAsync(string prompt, string defaultValue)` 方法
+  - 新增 `RunGameLoopWithErrorHandlingAsync()` 捕获异步异常
+- [x] **队伍组建控制台（TeamBuilder）**
+  - 打印12角色摘要表（编号/名称/兵种/HP/Str/Def/Spd）
+  - 玩家输入3个编号，去重+越界校验
+  - 敌方从预设阵型或随机配置中选择
+  - 创建6个 BattleUnit，应用 `DayProgression.Apply(unit, 1)` 设置 Lv1 未CC
+- [x] **阵型布置系统**
+  - 6位置网格（前排1-3，后排4-6）
+  - 逐个角色选择位置，已占用位置不可重复选择
+  - `PrintFormationGrid` 可视化当前阵型
+- [x] **敌人配置框架**
+  - 新增 `data/enemy_formations.json`（敌人阵型模板）
+  - 新增 `data/strategy_presets.json`（敌人策略预设）
+  - 新增 `EnemyFormationData.cs`、`StrategyPresetData.cs`
+  - 支持预设阵型选择和随机敌人生成
+- [x] **被动技能选择系统**
+  - `BattleUnit.EquippedPassiveSkillIds` + `GetUsedPp()` + `CanEquipPassive()`
+  - 玩家为每个己方角色选择被动技能，受 PP 上限约束
+  - 敌方被动技能由系统随机分配（在 PP 上限内随机选择）
+- [x] **策略编程控制台（8条策略栏位）**
+  - 显示当前8条策略摘要（技能名 | 条件1 | 条件2）
+  - 支持按编号编辑（1-8）、0确认、d恢复默认
+  - 条件1：无条件/自身HP>50%/自身AP>=2/优先HP最低/目标前排/目标步兵
+  - 条件2：优先HP最低/优先前排
+  - 支持跳过剩余栏位（直接回车结束）
+- [x] **条件系统 MVP**
+  - `ConditionEvaluator` 新增 `SelfHp`（HP比例判定）和 `SelfApPp`（AP阈值判定）分支
+  - `TargetSelector.ApplyCondition` 支持 `lowest`/`highest` 排序操作符
+  - `TargetSelector.GetDefaultTargetList` 修复 NullReferenceException（`u != null &&` 过滤）
+- [x] **EventBus 接入 BattleEngine**
+  - 新增 `src/Events/BattleEvents.cs`：6个战斗事件（`BattleStartEvent`, `BeforeActiveUseEvent`, `BeforeHitEvent`, `AfterHitEvent`, `AfterActiveUseEvent`, `BattleEndEvent`）
+  - `BattleEngine.StartBattle()` 发布 `BattleStartEvent`
+  - `ExecuteUnitTurn()` 发布 `BeforeActiveUseEvent` → `BeforeHitEvent` → `AfterHitEvent` → `AfterActiveUseEvent`
+  - `EndBattle()` 发布 `BattleEndEvent`
+- [x] **被动技能处理器（PassiveSkillProcessor）**
+  - 订阅全部6个战斗事件，按 `TriggerTiming` 匹配被动技能
+  - 实现12个触发时机：`BattleStart`, `SelfOnActiveUse`, `SelfBeforeAttack`, `AllyBeforeAttack`, `AllyOnActiveUse`, `SelfBeforeHit`, `SelfBeforePhysicalHit`, `SelfBeforeMeleeHit`, `AllyBeforeHit`, `OnBeingHit`, `AllyOnAttacked`, `AfterAction`, `BattleEnd`
+  - 同時発動制限：`HashSet<string>` 跟踪各时机的已触发状态
+  - 按速度降序排列候选者
+- [x] **被动技能效果执行（ExecuteSimpleEffect）**
+  - `ApPlus1`：自身 AP+1
+  - `DefUp20`/`AtkUp20`/`SpdUp20`/`SpdUp30`/`EvaUp30`/`CritDamageUp50`：自身 BUFF（无限回合）
+  - `AtkUp20Stackable`：可叠加物攻 BUFF
+  - `Heal25`：回复 25% 最大 HP
+  - 复杂效果标记为"待实现"并打印日志（Counter, CoverAlly, SureHit, EvasionSkill 等）
+- [x] **战斗日志改进**
+  - 每次攻击显示被攻击者剩余 HP
+  - 显示附加异常状态（`AppliedAilments`）
+  - 被动技能触发时打印实际效果（如 `→ 效果: AP+1, 物攻+20%`）
+- [x] **完整角色属性展示**
+  - `PrintUnitDetail` 显示：HP/AP/PP、Str/Def/Spd/Mag/MDef/Hit/Eva/Crit/Block、已装备被动
+- [x] **3v3 完整对战验证**
+  - Godot 中 F5 运行，完整流程：角色选择 → 阵型布置 → 敌人选择 → 被动配置 → 策略配置 → 自动战斗
+  - 战斗按速度顺序执行，AP 耗尽后按 HP 比例判定胜负
+  - 多轮对战支持（"是否再来一局? y/n"）
+- [x] **关键 Bug 修复**
+  - C# string interpolation 单引号导致 CS1012 → 改用 `string.Format`
+  - TargetSelector NRE（PlayerUnits/EnemyUnits 含 null 占位）→ 添加 `u != null &&` 过滤
+  - Godot scene `unique_id` 导致加载错误 → 移除该属性
+  - UI anchor/size 冲突 → 改用 Offset 替代 Size/Position
+  - `BattleContext.AllUnits` / `GetAliveUnits` / `GetUnitAtPosition` 添加 null 过滤
+- [x] **被动技能架构文档**
+  - 创建 `被动技能实现融入现有框架.md`
+  - 分析5大架构改造模块：DamageCalculation可变上下文、PendingActionQueue、TemporalState、友方目标选择、效果结构化
+  - 制定5阶段实施路线图
+
+---
 
 ## 进行中
-- [ ] Godot 运行验证（未CC状态）：等待玛奇玛 Build + F5
+
+### Phase 1.3 — 被动技能完整实现与架构改造
+- [ ] **模块1：DamageCalculation 可变上下文**（最高优先级）
+  - `BeforeHitEvent` 增加 `DamageCalculation Calc` 属性
+  - `DamageCalculation` 扩展：ForceHit/ForceEvasion/ForceBlock/SkillPowerMultiplier/DamageMultiplier/IgnoreDefenseRatio/NullifyDamage/CoverTarget
+  - `DamageCalculator.Calculate` 签名改为接收 `DamageCalculation`
+  - `BattleEngine` 在 BeforeHit 前创建 Calc 并传给事件
+- [ ] **模块2：PendingActionQueue 行动队列**
+  - 新增 `PendingAction` / `PendingActionType`
+  - `BattleEngine` 核心循环支持队列（反击/追击/先制攻击/战斗结束时攻击）
+  - 被动处理器在 `AfterHit` / `BattleStart` / `BattleEnd` 中入队额外攻击
+- [ ] **模块3：TemporalState 临时标记系统**
+  - `BattleUnit` 增加 `TemporalStates` 列表
+  - 管理"1次魔法无效"、"1hit变0"、"致死耐"、"必中下一次"等标记
+- [ ] **模块4：友方目标选择 + 效果结构化**
+  - `PassiveSkillProcessor` 支持选择友方目标（randomAlly/lowestHpAlly/allAllies/columnAllies）
+  - 逐步把 JSON Tags 迁移到结构化的 `Effects` 字段
+- [ ] **模块5：逐个职业实现完整被动技能效果**
+  - 按 wiki 文档填充 `passive_skills.json` 的 `Effects` 数组
+  - 验证：格挡/回避/必中/反击/追击/掩护/先制攻击
+
+---
 
 ## 待办（按优先级排序）
-### 🔴 当前聚焦
-1. **Godot 运行验证（未CC状态）**
-   - 等待玛奇玛 Build + F5 验证未CC角色数据加载
-   - 验证武器槽是否有装备、饰品槽是否为空
-   - 验证战斗循环正常（AP消耗、HP变化、胜负判定）
 
-### 🟡 验证完成后
-2. **运行 1v1 战斗验证（不同职业对战）**
-   - 测试多种职业组合（高攻vs高防、高速vs低速等）
-   - 验证伤害计算是否符合预期
-   - 验证 CC 后装备槽变化是否正确生效
+### 🔴 当前聚焦（Phase 1.3）
+1. **DamageCalculation 可变上下文改造**
+   - 这是所有伤害干预类被动（格挡/回避/必中/免疫/掩护）的基础
+   - 预计影响：BeforeHitEvent.cs, DamageCalculation.cs, DamageCalculator.cs, BattleEngine.cs
 
-3. **技能系统解耦设计**
-   - 确定技能持有 vs 技能解锁的架构
-   - 初始解锁数量配置化（当前：2主动+1被动）
-   - 后续奖励/装备解锁更多技能的机制
+2. **TemporalState 系统**
+   - 实现"1次免疫"类被动（招架、魔法屏障、纯净领域）
+   - 在 BeforeHit 中检查并消耗标记
 
-### 🟢 后续扩展
-3. **给 BattleEngine 接入 EventBus**
-   - 战斗开始时触发 OnBattleStartEvent
-   - 攻击前触发 BeforeAttackEvent
-   - 攻击后触发 AfterAttackEvent
-   - 让被动技能真正生效
-4. **2D 视觉表现（占位即可）**
-   - 场景里放两个 Sprite 代表敌我角色
-   - 血条（ProgressBar 或自定义）
-   - 战斗日志显示在屏幕上（RichTextLabel）
-5. **站位/射程系统**
-   - 前排 3 位置 + 后排 3 位置
-   - 近战只能打前排，远程可以打后排
+3. **PendingActionQueue**
+   - 实现反击/追击/先制攻击（追击斩、广域反击、快速打击、终结打击）
+   - 改造 BattleEngine 核心循环
+
+### 🟡 近期（Phase 1.4）
+4. **条件系统完整实现**
+   - 当前只实现了 SelfHp / SelfApPp / lowest/highest 排序
+   - 需要：Position（前排/后排）、UnitClass（兵种判定）、Status（异常状态）、EnemyClassExists（敌兵种存在）
+5. **策略默认配置**
+   - 用户将提供默认策略文档
+   - 为每个职业的8条策略栏设置合理的默认策略
+6. **玩家策略持久化**
+   - 记住玩家的策略选择（JSON save/load）
+7. **6v6 完整竞技场**
+   - 从3v3扩展到6v6
+   - 完整的 if/条件/执行/优先级 编程系统验证
+
+### 🟢 后续扩展（Phase 2+）
+8. **2D 视觉表现**
+   - 占位 Sprite、血条、战斗动画
+   - 战斗日志 RichTextLabel 显示
+9. **站位/射程系统深化**
+   - 近战只能打前排的完整逻辑（当前 TargetSelector 已有前排优先）
    - 前排全灭后才能打后排
-6. **策略编程 UI**
-   - 给角色设置 8 条策略
-   - 条件选择器（HP 比例、兵种、距离等）
-   - 目标选择器
-7. **城镇购买系统框架**
-   - 商店数据结构
-   - 装备购买逻辑
-   - 经济系统（金币）
+10. **大巴扎循环（Phase 2）**
+    - 节点地图、抽牌机制、天数系统、经济系统
+11. **局外成长（Phase 2.3）**
+    - 解锁新角色/技能、难度选择
+12. **本地化与合规（Phase 3）**
+    - 角色/技能名称原创化、资产清理
+
+---
 
 ## 已知问题/待优化
-- **Lv50 数据导致 1v1 不平衡**：当前所有角色使用 Lv50 数值，高攻职业（佣兵物攻79）对低防职业（剑士物防15）可造成100+伤害，几乎秒杀。这是参考文档的真实设计，非bug。如需平衡测试，需调整为 Lv1 等效值（但参考文档未提供 Lv1 数据）。
-- **PassiveSkill 未接入**：BattleEngine 最小版没有触发任何被动技能（EventBus 未接入战斗循环）。快速打击、招架、追击斩等被动当前不生效。
-- **回避判定未完成**：`RollEvasion` 只是框架，没有实际判定逻辑（因为没有回避系技能数据）。
+- **大量被动技能仍为"待实现"**：当前只有简单 BUFF/AP/HP 效果已实现。反击/追击/先制攻击/掩护/必中/回避/格挡封印/伤害免疫等复杂效果需要架构改造后才能实现。
 - **DamageCalculator 黑暗判定 MVP 简化**：黑暗状态直接 miss，没有做冻结/气绝/被掩护/蓄力中的例外。
-- **核心装备不可卸下机制**：当前 EquipmentSlot 没有校验，角色可以裸装。需在后续版本中加"武器/防具槽位不可空"的限制。
+- **双持装备逻辑**：`EquipmentSlot.Equip` 当前只支持单武器，CC后剑圣双持第二把剑会覆盖主手。需后续完善 Equip 方法支持双持。
+- **条件系统不完整**：只实现了 SelfHp / SelfApPp / lowest / highest，Position / UnitClass / Status / EnemyClassExists 等条件返回 true（不阻塞MVP）。
+- **被动技能 Tags 与 Effects 脱节**：`passive_skills.json` 中 `Effects` 数组为空，大量 Tags 是占位符（如 `Crit100`、`DefDown15Random`），无法直接映射到执行逻辑。
+- **敌方 AI 策略较简单**：当前敌方使用预设策略模板（preset_aggressive），策略条件固定为"无条件"。
+- **未做蓄力（Charge）状态机**：蓄力行动、连续待机限制等机制未实现。
+
+---
 
 ## 最近会话记录
-- 2026/05/02：MCP连接解决（HTTP transport + 8000端口）。用户确认 Godot 编辑器、项目、插件均已就绪。
-- 2026/05/02：修复 BattleEngine 日志输出（Console.WriteLine → GD.Print 回调）。验证 1v1 战斗循环正常（AP消耗、HP变化、胜负判定）。
-- 2026/05/02：用户指出框架问题——角色应有初始装备、无"普攻"概念、每次行动必须消耗AP使用技能、数值以参考文档为准。
-- 2026/05/02：找到参考文档（`Music/圣兽之王资料整理/`）。确认剑士无盾（双剑职业）、佣兵CC前无盾。
-- 2026/05/02：用户要求 CC 无缝接入现有框架。修改 CharacterData、BattleUnit、Main.cs 支持 CC。
-- 2026/05/02：Subagent 填充剑士+佣兵数据。修复 PassiveTriggerTiming 枚举缺失值。Godot 运行验证通过。
-- 2026/05/02：用户要求角色默认未CC、武器槽永不为空、CC后新增槽位必须有装备。创建 `dev-mistakes.md`，修改 `CharacterData`/`EquipmentSlot`/`Main.cs`，新增 `CcInitialEquipmentIds`。
-- 2026/05/02：Subagent 批量填充+修正剩余10角色数据。斗士武器被误改为Sword，已手动修正回Axe。
-- 2026/05/02：同步 `csharp-architecture.md` 到当前代码状态。更新 `progress.md` 和 `roadmap.md`。
-- 2026/05/02：用户提出技能系统解耦设计——全持有+部分解锁 vs 渐进获得，待决策。
-- 2026/05/02：用户确定装备槽统一规则（基础3槽→CC后4槽）和无盾格挡减25%。已修改所有12角色JSON、BattleUnit.GetBlockReduction、同步4份文档。
+- **2026/05/02**：MCP连接解决。用户确认 Godot 编辑器就绪。修复 BattleEngine 日志输出。CC框架接入。12角色数据填充完成。装备槽统一规则（3→4）和无盾格挡减25%。
+- **2026/05/03**：启动 Phase 1.2 实施。计划8步：队伍组建、阵型布置、敌人配置、被动技能选择、策略编程、条件系统、被动接入战斗、3v3验证。
+- **2026/05/03**：实现角色选择控制台 + 阵型布置。遇到 Windows GUI stdin 问题，改用 Godot LineEdit UI。实现 async/await 输入流程。
+- **2026/05/03**：实现敌人配置框架（enemy_formations.json + strategy_presets.json）。敌方随机分配3人并赋予预设策略。
+- **2026/05/03**：实现被动技能选择系统（PP上限控制）。实现策略编程控制台（8条策略栏位，支持编辑/确认/默认）。
+- **2026/05/03**：修复 TargetSelector NullReferenceException。修复 C# string interpolation 单引号 CS1012。
+- **2026/05/04**：实现 EventBus 接入 BattleEngine（6个战斗事件）。创建 PassiveSkillProcessor.cs，实现12个触发时机和同時発動制限。
+- **2026/05/04**：实现被动技能效果打印（ExecuteSimpleEffect）。战斗日志显示剩余HP和debuff。完整角色属性展示。
+- **2026/05/04**：3v3完整对战验证通过。修复 Godot scene unique_id 错误。修复 UI anchor/size 冲突。
+- **2026/05/05**：用户要求分析被动技能对框架的影响。对照 wiki 完整被动技能资料，发现需要5大架构改造：DamageCalculation可变上下文、PendingActionQueue、TemporalState、友方目标选择、效果结构化。
+- **2026/05/05**：创建 `被动技能实现融入现有框架.md` 架构文档，详细记录改造方案、文件修改清单、5阶段实施路线图、关键设计决策。
+- **2026/05/05**：用户不小心还原 progress.md / roadmap.md / CLAUDE.md，从 git 历史恢复并更新到最新状态。准备上传代码到 GitHub。
