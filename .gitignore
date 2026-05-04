@@ -35,5 +35,9 @@ temp/
 *.tmp
 *.cache
 
+# Claude Code session data
+.claude/
+battle_log.txt
+
 # Assets (large binaries, keep structure but ignore actual files if needed)
 # 视具体技术栈调整，暂不过度忽略

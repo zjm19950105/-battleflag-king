@@ -1,0 +1,673 @@
+[
+  {
+    "id": "act_sharp_slash",
+    "name": "锐利斩击",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": null,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体高会心攻击（会心+50%），必中",
+    "tags": [
+      "SureHit",
+      "CritUp50"
+    ],
+    "effects": [],
+    "learnCondition": "剑士/剑圣 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_pierce",
+    "name": "贯穿",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，击倒时PP+1",
+    "tags": [
+      "KillPpPlus1"
+    ],
+    "effects": [],
+    "learnCondition": "剑士/剑圣 Lv15",
+    "unlockLevel": 15
+  },
+  {
+    "id": "act_meteor_slash",
+    "name": "陨石斩",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 20,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体高会心连续攻击（9hit，会心+30%）",
+    "tags": [
+      "MultiHit9",
+      "CritUp30"
+    ],
+    "effects": [],
+    "learnCondition": "剑圣 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_mega_slash",
+    "name": "mega斩",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 150,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击",
+    "tags": [],
+    "effects": [],
+    "learnCondition": "佣兵/兰茨克内希特 Lv1，无畏舰 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_kill_chain",
+    "name": "杀戮连锁",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，击倒时AP+1",
+    "tags": [
+      "KillApPlus1"
+    ],
+    "effects": [],
+    "learnCondition": "佣兵/兰茨克内希特 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_bastard_cross",
+    "name": "混蛋十字",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 70,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体2连击，对象HP越多威力越大（最大+60）",
+    "tags": [
+      "MultiHit2",
+      "HpMorePowerUp"
+    ],
+    "effects": [],
+    "learnCondition": "兰茨克内希特 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_lord_slash",
+    "name": "利刃斩",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": null,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，命中时HP回复25%，击倒时HP回复25%",
+    "tags": [
+      "SureHit",
+      "HitHeal25",
+      "KillHeal25",
+      "HpBelow50Priority"
+    ],
+    "effects": [],
+    "learnCondition": "领主/君主 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_cavalry_bane",
+    "name": "骑兵斩杀",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，对骑兵系AP-1、PP-1、格挡封印",
+    "tags": [
+      "CavalryApMinus1",
+      "CavalryPpMinus1",
+      "BlockSeal"
+    ],
+    "effects": [],
+    "learnCondition": "领主/君主 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_spiral_blade",
+    "name": "旋转利刃",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 60,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击，无视50%防御力，击倒时PP+1",
+    "tags": [
+      "MultiHit2",
+      "IgnoreDef50",
+      "KillPpPlus1"
+    ],
+    "effects": [],
+    "learnCondition": "君主 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_arrow_cover",
+    "name": "格挡斩",
+    "apCost": 1,
+    "type": "Assist",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleAlly",
+    "effectDescription": "敌单体攻击，自身物防+20%",
+    "tags": [
+      "RangedCover"
+    ],
+    "effects": [],
+    "learnCondition": "斗士/先锋 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_shield_bash",
+    "name": "盾击",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 50,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，赋予气绝",
+    "tags": [
+      "StunLowChance"
+    ],
+    "effects": [],
+    "learnCondition": "斗士/先锋 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_attract_attention",
+    "name": "防御者",
+    "apCost": 1,
+    "type": "Assist",
+    "attackType": "Melee",
+    "power": 75,
+    "hitRate": 100,
+    "targetType": "AllEnemies",
+    "effectDescription": "敌单体2连击，自身物防+50%，命中时PP+1",
+    "tags": [
+      "Taunt"
+    ],
+    "effects": [],
+    "learnCondition": "先锋 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_enhanced_spear",
+    "name": "长枪突刺",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌前后列贯通攻击，对骑兵系格挡不可且威力+50",
+    "tags": [
+      "CavalryBonus"
+    ],
+    "effects": [],
+    "learnCondition": "兵士/士官 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_spear_pierce",
+    "name": "标枪",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，对飞行系威力+50",
+    "tags": [
+      "CavalryBonus"
+    ],
+    "effects": [],
+    "learnCondition": "兵士/士官 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_throwing_spear",
+    "name": "强化长枪",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 130,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌前后列贯通攻击，自身有buff时威力+50，对骑兵系格挡不可",
+    "tags": [
+      "FlyingBonus",
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "军士 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_finishing_thrust",
+    "name": "终结戳刺",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体远程攻击，击倒时基础攻击力+50%",
+    "tags": [
+      "KillAtkUp50"
+    ],
+    "effects": [],
+    "learnCondition": "士官 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_smash",
+    "name": "粉碎",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，对象物防-20%",
+    "tags": [
+      "DefDown"
+    ],
+    "effects": [],
+    "learnCondition": "近卫/维京 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_whirlwind_slash",
+    "name": "回旋斧",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 40,
+    "hitRate": 75,
+    "targetType": "AllEnemies",
+    "effectDescription": "敌一列多段攻击（3hit），对象物防-15%",
+    "tags": [
+      "AoE",
+      "DefDown"
+    ],
+    "effects": [],
+    "learnCondition": "近卫/维京 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_break_formation",
+    "name": "广域破坏者",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击，对象物防-30%，对象有debuff时威力+50",
+    "tags": [
+      "DefDown30",
+      "DebuffBonusDamage"
+    ],
+    "effects": [],
+    "learnCondition": "维京 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_spike",
+    "name": "刺击",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，自身HP50%以下时威力+50",
+    "tags": [
+      "HpBelow50DamageUp"
+    ],
+    "effects": [],
+    "learnCondition": "重装步兵/铁甲卫士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_line_defense",
+    "name": "列保护",
+    "apCost": 1,
+    "type": "Assist",
+    "attackType": "Melee",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "SingleAlly",
+    "effectDescription": "同列友方物防+50%",
+    "tags": [
+      "DefUpAlly"
+    ],
+    "effects": [],
+    "learnCondition": "铁甲卫士 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "act_great_shield",
+    "name": "大盾",
+    "apCost": 1,
+    "type": "Assist",
+    "attackType": "Melee",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "Self",
+    "effectDescription": "自身物防+50%，PP+2",
+    "tags": [
+      "DefUpSelf",
+      "PpPlus2"
+    ],
+    "effects": [],
+    "learnCondition": "铁甲卫士 Lv30",
+    "unlockLevel": 30
+  },
+  {
+    "id": "act_full_assault",
+    "name": "广域粉碎",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 150,
+    "hitRate": 80,
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击，自身HP100%时威力+50",
+    "tags": [
+      "AoE",
+      "FullHpDamageUp50"
+    ],
+    "effects": [],
+    "learnCondition": "角斗士/狂战士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_formation_breaker",
+    "name": "巨大蓄力",
+    "apCost": 2,
+    "type": "Assist",
+    "attackType": "Melee",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "Self",
+    "effectDescription": "自身HP回复30%，物攻+30%",
+    "tags": [
+      "FullHpDamageUp50"
+    ],
+    "effects": [],
+    "learnCondition": "角斗士/狂战士 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_accumulate",
+    "name": "大满贯",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 80,
+    "targetType": "AllEnemies",
+    "effectDescription": "敌全体攻击，自身HP100%时威力+50",
+    "tags": [
+      "Heal30",
+      "AtkUp"
+    ],
+    "effects": [],
+    "learnCondition": "狂战士 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_heavy_slayer",
+    "name": "重破坏者",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，对重装系无视100%防御力",
+    "tags": [
+      "IgnoreDef100VsHeavy",
+      "Unblockable"
+    ],
+    "effects": [],
+    "learnCondition": "战士/扫荡者 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_charge_strike",
+    "name": "突击打击",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，击倒时AP+1",
+    "tags": [
+      "Unblockable"
+    ],
+    "effects": [],
+    "learnCondition": "战士/扫荡者 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_line_destruction",
+    "name": "列破坏者",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击，对重装系无视100%防御力",
+    "tags": [
+      "Unblockable",
+      "Uncoverable"
+    ],
+    "effects": [],
+    "learnCondition": "扫荡者 Lv30",
+    "unlockLevel": 30
+  },
+  {
+    "id": "act_single_shot",
+    "name": "单体射击",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击",
+    "tags": [
+      "Ranged",
+      "FlyingNoEvaPenalty"
+    ],
+    "effects": [],
+    "learnCondition": "猎人/神射手 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_dual_shot",
+    "name": "双重射击",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 70,
+    "hitRate": 100,
+    "targetType": "TwoEnemies",
+    "effectDescription": "敌2体攻击",
+    "tags": [
+      "Ranged",
+      "MultiTarget2"
+    ],
+    "effects": [],
+    "learnCondition": "猎人/神射手 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_array_shot",
+    "name": "列射击",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击",
+    "tags": [
+      "Ranged",
+      "CritDependent"
+    ],
+    "effects": [],
+    "learnCondition": "神射手 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_heavy_bolt",
+    "name": "强力弩箭",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 120,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击",
+    "tags": [
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "射手/盾射手 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_poison_bolt",
+    "name": "毒性弩箭",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 80,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，赋予毒",
+    "tags": [
+      "Ranged",
+      "Poison"
+    ],
+    "effects": [],
+    "learnCondition": "射手/盾射手 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_frontline_heavy_bolt",
+    "name": "重型弩箭",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，前列发动时威力+100",
+    "tags": [
+      "Ranged",
+      "FrontRowPowerUp"
+    ],
+    "effects": [],
+    "learnCondition": "盾射手 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_passive_steal",
+    "name": "被动偷取",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 50,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体2连击，夺取对象全部PP（第1hit被格挡则无法夺取）",
+    "tags": [
+      "StealAllPp"
+    ],
+    "effects": [],
+    "learnCondition": "盗贼/恶棍 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_poison_throw",
+    "name": "毒性投掷",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 25,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体2连击，赋予毒",
+    "tags": [
+      "Ranged",
+      "Poison",
+      "FlyingNoHitPenalty"
+    ],
+    "effects": [],
+    "learnCondition": "盗贼/恶棍 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_shadow_bite",
+    "name": "暗影撕咬",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 15,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列2连击，赋予黑暗，对象速度-20、回避-20",
+    "tags": [
+      "Darkness",
+      "SpdDown20",
+      "EvaDown20"
+    ],
+    "effects": [],
+    "learnCondition": "恶棍 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "act_active_steal",
+    "name": "主动偷取",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 25,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体4连击，夺取对象1AP（第1hit被格挡则无法夺取）",
+    "tags": [
+      "StealAp1"
+    ],
+    "effects": [],
+    "learnCondition": "恶棍 Lv30",
+    "unlockLevel": 30
+  }
+]

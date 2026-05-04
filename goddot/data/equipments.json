@@ -1,0 +1,295 @@
+[
+  {
+    "id": "equ_bronze_sword",
+    "name": "青铜剑",
+    "category": "Sword",
+    "baseStats": {
+      "phys_atk": 8,
+      "mag_atk": 0
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "部分角色初期装备，待确认是否为剑士/佣兵初始装备"
+  },
+  {
+    "id": "equ_recruit_sword",
+    "name": "新兵剑",
+    "category": "Sword",
+    "baseStats": {
+      "phys_atk": 11,
+      "mag_atk": 0,
+      "HP": 3
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": ["取得经验值+20%"],
+    "note": "武具屋可购买"
+  },
+  {
+    "id": "equ_mercenary_wood_shield",
+    "name": "佣兵木盾",
+    "category": "Shield",
+    "baseStats": {
+      "phys_def": 2,
+      "block_rate": 10
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": ["pas_vengeance_guard"],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "佣兵CC后可装备，CC前佣兵无盾槽"
+  },
+  {
+    "id": "equ_bronze_shield",
+    "name": "青铜盾",
+    "category": "Shield",
+    "baseStats": {
+      "phys_def": 3,
+      "block_rate": 15
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "部分角色初期装备"
+  },
+  {
+    "id": "equ_lord_sword",
+    "name": "领主剑",
+    "category": "Sword",
+    "baseStats": {
+      "phys_atk": 10,
+      "mag_atk": 0,
+      "HP": 5
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "领主/君主初期装备"
+  },
+  {
+    "id": "equ_lord_shield",
+    "name": "领主盾",
+    "category": "Shield",
+    "baseStats": {
+      "phys_def": 4,
+      "block_rate": 20
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "领主/君主初期装备"
+  },
+  {
+    "id": "equ_fighter_axe",
+    "name": "斗士斧",
+    "category": "Axe",
+    "baseStats": {
+      "phys_atk": 9,
+      "mag_atk": 0
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "斗士/先锋初期装备"
+  },
+  {
+    "id": "equ_fighter_shield",
+    "name": "斗士盾",
+    "category": "Shield",
+    "baseStats": {
+      "phys_def": 3,
+      "block_rate": 15
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "斗士/先锋初期装备"
+  },
+  {
+    "id": "equ_soldier_spear",
+    "name": "兵士枪",
+    "category": "Spear",
+    "baseStats": {
+      "phys_atk": 9,
+      "mag_atk": 0,
+      "hit": 2
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Heavy"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "兵士/士官初期装备"
+  },
+  {
+    "id": "equ_huskarl_axe",
+    "name": "近卫斧",
+    "category": "Axe",
+    "baseStats": {
+      "phys_atk": 11,
+      "mag_atk": 0
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "近卫/维京初期装备"
+  },
+  {
+    "id": "equ_huskarl_shield",
+    "name": "近卫盾",
+    "category": "Shield",
+    "baseStats": {
+      "phys_def": 2,
+      "block_rate": 10
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "近卫/维京初期装备"
+  },
+  {
+    "id": "equ_hoplite_spear",
+    "name": "重装枪",
+    "category": "Spear",
+    "baseStats": {
+      "phys_atk": 8,
+      "mag_atk": 0,
+      "phys_def": 2
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "重装步兵/铁甲卫士初期装备"
+  },
+  {
+    "id": "equ_hoplite_greatshield",
+    "name": "重装大盾",
+    "category": "GreatShield",
+    "baseStats": {
+      "phys_def": 5,
+      "block_rate": 25
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "重装步兵/铁甲卫士初期装备"
+  },
+  {
+    "id": "equ_gladiator_axe",
+    "name": "角斗士斧",
+    "category": "Axe",
+    "baseStats": {
+      "phys_atk": 12,
+      "mag_atk": 0,
+      "HP": 3
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "角斗士/狂战士初期装备"
+  },
+  {
+    "id": "equ_warrior_axe",
+    "name": "战士斧",
+    "category": "Axe",
+    "baseStats": {
+      "phys_atk": 13,
+      "mag_atk": 0
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "战士/扫荡者初期装备"
+  },
+  {
+    "id": "equ_hunter_bow",
+    "name": "猎人弓",
+    "category": "Bow",
+    "baseStats": {
+      "phys_atk": 9,
+      "mag_atk": 0,
+      "hit": 3
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Archer", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "猎人/神射手初期装备"
+  },
+  {
+    "id": "equ_shooter_bow",
+    "name": "射手弩",
+    "category": "Bow",
+    "baseStats": {
+      "phys_atk": 10,
+      "mag_atk": 0,
+      "phys_def": 1
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Archer", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "射手/盾射手初期装备"
+  },
+  {
+    "id": "equ_shooter_greatshield",
+    "name": "射手大盾",
+    "category": "GreatShield",
+    "baseStats": {
+      "phys_def": 4,
+      "block_rate": 20
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Heavy", "Archer"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "盾射手CC后可装备大盾，CC前无大盾槽"
+  },
+  {
+    "id": "equ_thief_dagger",
+    "name": "盗贼短剑",
+    "category": "Sword",
+    "baseStats": {
+      "phys_atk": 7,
+      "mag_atk": 0,
+      "Spd": 3
+    },
+    "grantedActiveSkillIds": [],
+    "grantedPassiveSkillIds": [],
+    "usableByClasses": ["Infantry", "Cavalry", "Flying", "Scout"],
+    "restrictedClassIds": [],
+    "specialEffects": [],
+    "note": "盗贼/恶棍初期装备"
+  }
+]
