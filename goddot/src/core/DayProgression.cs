@@ -32,13 +32,12 @@ namespace BattleKing.Core
         }
 
         /// <summary>
-        /// 将天数配置应用到单位：设置 CurrentLevel 和 IsCc。
+        /// Apply day config: set CurrentLevel (controls skill unlocks). CC state is set separately by user toggle.
         /// </summary>
         public static void Apply(BattleUnit unit, int day)
         {
             var cfg = GetConfig(day);
             unit.CurrentLevel = cfg.MaxSkillLevel;
-            unit.SetCcState(cfg.UnlockCc);
         }
     }
 }

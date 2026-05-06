@@ -37,6 +37,8 @@ public partial class Main : Node2D
 	private string[] _enemySlots = new string[6];
 	private bool _enemyUseDrag;
 	private int _minSlots = 3;
+	private int _selectedDay = 1;
+	private bool _selectedCc = false;
 
 	private BattleContext _ctx;
 	private BattleEngine _engine;
@@ -140,12 +142,13 @@ public partial class Main : Node2D
 		{
 			case GamePhase.ModeSelect:        Phase_ModeSelect(); break;
 			case GamePhase.PlayerFormation:   Phase_PlayerFormation(); break;
-			case GamePhase.EnemyChoice:       Phase_EnemyChoice(); break;
-			case GamePhase.EnemyDragFormation: Phase_EnemyDragFormation(); break;
 			case GamePhase.PassiveSetup:       Phase_PassiveSetup(); break;
 			case GamePhase.StrategySetup:      Phase_StrategySetup(); break;
 			case GamePhase.Battle:             Phase_Battle(); break;
 			case GamePhase.Result:             Phase_Result(); break;
+			case GamePhase.EnemyChoice:       Phase_EnemyChoice(); break;
+			case GamePhase.EnemyDragFormation: Phase_EnemyDragFormation(); break;
+
 		}
 	}
 
@@ -156,13 +159,26 @@ public partial class Main : Node2D
 		_statusLabel.Text = "▶  选择对战模式";
 		ClearLog();
 		_leftPanel.AddChild(new Label { Text = "选择对战模式:\n" });
+
+		// Day & CC conditions
+		var dayLabel = new Label { Text = "天数:" };
+		_leftPanel.AddChild(dayLabel);
+		var dayOpt = new OptionButton();
+		for (int d = 1; d <= 6; d++) dayOpt.AddItem($"第{d}天 — Lv{d*10}技能{(d>=5?",可转职":"")}");
+		dayOpt.ItemSelected += (long idx) => { int d = (int)idx + 1; _selectedDay = d; };
+		_leftPanel.AddChild(dayOpt);
+
+		var ccCheck = new CheckBox { Text = "转职 (第5天起)", Disabled = true };
+		ccCheck.Toggled += (on) => { _selectedCc = on; };
+		_leftPanel.AddChild(ccCheck);
+		dayOpt.ItemSelected += (long idx) => { int d = (int)idx + 1; ccCheck.Disabled = (d < 5); if (d < 5) { ccCheck.ButtonPressed = false; _selectedCc = false; } };
 		_leftPanel.AddChild(Btn("[1v1 对战] — 双方各上场1人", () => {
 			_minSlots = 1;
-			Go(GamePhase.PlayerFormation);
+			Go(GamePhase.PassiveSetup);  // skip conditions for speed
 		}));
 		_leftPanel.AddChild(Btn("[3v3 对战] — 双方各上场3人", () => {
 			_minSlots = 3;
-			Go(GamePhase.PlayerFormation);
+			Go(GamePhase.PassiveSetup);  // skip conditions for speed
 		}));
 	}
 
@@ -175,7 +191,7 @@ public partial class Main : Node2D
 		BuildDragUI("我方", _playerSlots, () => {
 			int n = _playerSlots.Count(s => s != null);
 			if (n < _minSlots) { Log($"至少需要{_minSlots}人 (当前{n})"); return; }
-			Log($"我方阵型确认 ({n}人): {string.Join(",", _playerSlots.Where(s => s != null))}");
+			Log($"我方阵型确认 ({n}人) Day{_selectedDay} CC:{_selectedCc}: {string.Join(",", _playerSlots.Where(s => s != null))}");
 			Go(GamePhase.EnemyChoice);
 		});
 	}
@@ -296,7 +312,8 @@ public partial class Main : Node2D
 		{
 			if (_playerSlots[i] != null)
 			{
-				var u = NewUnit(_playerSlots[i], true, i + 1);
+				var u = NewUnit(_playerSlots[i], true, i + 1, isCc: _selectedCc);
+				DayProgression.Apply(u, _selectedDay);
 				_playerUnits.Add(u);
 				_ctx.PlayerUnits.Add(u);
 			}
@@ -307,7 +324,8 @@ public partial class Main : Node2D
 		{
 			for (int i = 0; i < _enemyConfig.Count; i++)
 			{
-				var u = NewUnit(_enemyConfig[i].Item1, false, _enemyConfig[i].Item2);
+				var u = NewUnit(_enemyConfig[i].Item1, false, _enemyConfig[i].Item2, isCc: _selectedCc);
+				DayProgression.Apply(u, _selectedDay);
 				_enemyUnits.Add(u);
 				_ctx.EnemyUnits.Add(u);
 			}
@@ -319,7 +337,8 @@ public partial class Main : Node2D
 			{
 				if (_enemySlots[i] != null)
 				{
-					var u = NewUnit(_enemySlots[i], false, i + 1);
+					var u = NewUnit(_enemySlots[i], false, i + 1, isCc: _selectedCc);
+					DayProgression.Apply(u, _selectedDay);
 					_enemyUnits.Add(u);
 					_ctx.EnemyUnits.Add(u);
 				}
@@ -344,11 +363,12 @@ public partial class Main : Node2D
 		}
 	}
 
-	private BattleUnit NewUnit(string charId, bool isPlayer, int pos)
+	private BattleUnit NewUnit(string charId, bool isPlayer, int pos, bool isCc = false)
 	{
 		var cd = _gameData.GetCharacter(charId);
 		var u = new BattleUnit(cd, _gameData, isPlayer) { IsPlayer = isPlayer, Position = pos };
-		DayProgression.Apply(u, 1);
+		DayProgression.Apply(u, _selectedDay);
+		u.SetCcState(isCc);
 		var eq = u.IsCc && cd.CcInitialEquipmentIds?.Count > 0 ? cd.CcInitialEquipmentIds : cd.InitialEquipmentIds;
 		if (eq != null) foreach (var eid in eq) { var ed = _gameData.GetEquipment(eid); if (ed != null) u.Equipment.Equip(ed); }
 		var firstId = u.GetAvailableActiveSkillIds().FirstOrDefault();
