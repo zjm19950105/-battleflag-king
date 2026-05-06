@@ -467,15 +467,22 @@ public partial class Main : Node2D
 	private void Phase_Battle()
 	{
 		ClearAll();
-		_statusLabel.Text = "▶  战斗 — 点击「下一回合」逐步推进";
+		_statusLabel.Text = "▶  战斗 — 点击「下一步」逐行动推进";
 
-		// Left: unit status
+		// Left: unit status — fill panel height
+		var unitScroll = new ScrollContainer();
+		unitScroll.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		unitScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_leftPanel.AddChild(unitScroll);
 		var unitLabel = new RichTextLabel { BbcodeEnabled = true };
-		unitLabel.AddThemeFontSizeOverride("normal_font_size", 18);
+		unitLabel.AddThemeFontSizeOverride("normal_font_size", 16);
 		unitLabel.AddThemeColorOverride("default_color", new Color(0.9f, 0.9f, 0.9f));
-		_leftPanel.AddChild(unitLabel);
+		unitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		unitLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		unitLabel.ScrollFollowing = true;
+		unitScroll.AddChild(unitLabel);
 
-		// Right: reparent log TextEdit from bottom to right panel
+		// Right: reparent log TextEdit — full height
 		_logOriginalParent = _logLabel.GetParent();
 		if (_logOriginalParent != null) _logOriginalParent.RemoveChild(_logLabel);
 		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -494,7 +501,7 @@ public partial class Main : Node2D
 		ClearLog();
 		RefreshBattleStatus(unitLabel);
 
-		AddBtn("▶ 下一回合", () => StepOneTurn(unitLabel));
+		AddBtn("▶ 下一步", () => StepOneAction(unitLabel));
 	}
 
 	private void RefreshBattleStatus(RichTextLabel label)
@@ -509,8 +516,9 @@ public partial class Main : Node2D
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
 			string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
 			var pv = u.GetEquippedPassiveSkills();
+			string classStr = u.Data.Classes?.Count > 0 ? "(" + string.Join(",", u.Data.Classes) + ") " : "";
 			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
-			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
+			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
 		}
 		label.AppendText("\n[color=orange]▸ 敌方[/color]\n");
 		foreach (var u in _enemyUnits)
@@ -520,22 +528,23 @@ public partial class Main : Node2D
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
 			string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
 			var pv = u.GetEquippedPassiveSkills();
+			string classStr = u.Data.Classes?.Count > 0 ? "(" + string.Join(",", u.Data.Classes) + ") " : "";
 			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
-			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
+			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
 		}
 	}
 
-	private void StepOneTurn(RichTextLabel label)
+	private void StepOneAction(RichTextLabel label)
 	{
-		var result = _engine.StepBattle();
+		var result = _engine.StepOneAction();
 		RefreshBattleStatus(label);
-		if (result != BattleStepResult.Continue)
+		if (result == SingleActionResult.PlayerWin || result == SingleActionResult.EnemyWin || result == SingleActionResult.Draw)
 		{
 			ClearButtons();
 			_battleResult = result switch
 			{
-				BattleStepResult.PlayerWin => BattleResult.PlayerWin,
-				BattleStepResult.EnemyWin => BattleResult.EnemyWin,
+				SingleActionResult.PlayerWin => BattleResult.PlayerWin,
+				SingleActionResult.EnemyWin => BattleResult.EnemyWin,
 				_ => BattleResult.Draw
 			};
 			Log("\n=== " + _battleResult + " ===");

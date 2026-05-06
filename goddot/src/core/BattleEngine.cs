@@ -19,10 +19,13 @@ namespace BattleKing.Core
         public Action<string> OnLog { get; set; }
         public EventBus EventBus => _eventBus;
 
-        // Module 2: Pending action queue (counter-attacks, pursuit, preemptive)
+        // Module 2: Pending action queue
         private Queue<PendingAction> _pendingActions = new Queue<PendingAction>();
-
         public void EnqueueAction(PendingAction action) => _pendingActions.Enqueue(action);
+
+        // Per-action stepping
+        private Queue<BattleUnit> _turnQueue = new Queue<BattleUnit>();
+        private int _actionsThisTurn = 0;
 
         public BattleEngine(BattleContext ctx)
         {
@@ -99,6 +102,65 @@ namespace BattleKing.Core
                     : apCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
 
             return BattleStepResult.Continue;
+        }
+
+        /// <summary>Execute ONE action (one unit's turn). Returns ActionDone/TurnDone/Win/Lose/Draw.</summary>
+        public SingleActionResult StepOneAction()
+        {
+            // If queue is empty, start a new turn
+            if (_turnQueue.Count == 0)
+            {
+                _ctx.TurnCount++;
+                Log($"--- 第 {_ctx.TurnCount} 回合 ---");
+                _actionsThisTurn = 0;
+
+                var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
+                if (aliveUnits.Count == 0)
+                {
+                    Log("双方全灭，平局！");
+                    return SingleActionResult.Draw;
+                }
+
+                var ordered = aliveUnits.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
+                foreach (var u in ordered) _turnQueue.Enqueue(u);
+            }
+
+            // Pop next alive unit
+            BattleUnit unit = null;
+            while (_turnQueue.Count > 0)
+            {
+                unit = _turnQueue.Dequeue();
+                if (unit.IsAlive) break;
+                unit = null;
+            }
+            if (unit == null || !unit.IsAlive) { _turnQueue.Clear(); return StepOneAction(); }
+
+            // Pre-check
+            var preCheck = CheckBattleEnd();
+            if (preCheck.HasValue)
+                return preCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
+                    : preCheck.Value == BattleResult.EnemyWin ? SingleActionResult.EnemyWin : SingleActionResult.Draw;
+
+            _actionsThisTurn++;
+            ExecuteUnitTurn(unit);
+            ProcessPendingActions();
+
+            // Post-check
+            var postCheck = CheckBattleEnd();
+            if (postCheck.HasValue)
+                return postCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
+                    : postCheck.Value == BattleResult.EnemyWin ? SingleActionResult.EnemyWin : SingleActionResult.Draw;
+
+            if (_turnQueue.Count == 0)
+            {
+                var apCheck = CheckApExhaustion();
+                if (apCheck.HasValue)
+                    return apCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
+                        : apCheck.Value == BattleResult.EnemyWin ? SingleActionResult.EnemyWin : SingleActionResult.Draw;
+                return SingleActionResult.TurnDone;
+            }
+
+            return SingleActionResult.ActionDone;
         }
 
         private BattleResult EndBattle(BattleResult result)

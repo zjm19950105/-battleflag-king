@@ -118,8 +118,7 @@
     "id": "lord",
     "name": "领主",
     "classes": [
-      "Infantry",
-      "Cavalry"
+      "Infantry"
     ],
     "equippableCategories": [
       "Sword",
