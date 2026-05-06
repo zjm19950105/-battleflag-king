@@ -192,7 +192,10 @@ namespace BattleKing.Skills
             }
 
             if (effects.Count > 0)
-                _log?.Invoke($"    → 效果: {string.Join(", ", effects)}");
+            {
+                string summary = DumpUnitBrief(unit);
+                _log?.Invoke($"    → {string.Join(", ", effects)} | {unit.Data.Name}: {summary}");
+            }
         }
 
         private void ExecuteStructuredEffect(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
@@ -517,6 +520,18 @@ namespace BattleKing.Skills
                 default:
                     return new List<BattleUnit> { owner };
             }
+        }
+
+        private static string DumpUnitBrief(BattleUnit u)
+        {
+            if (u == null || !u.IsAlive) return "[阵亡]";
+            string s = $"HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp}";
+            var buffs = u.Buffs.Where(b => b.Ratio != 0).Select(b => {
+                string sign = b.Ratio > 0 ? "+" : "";
+                return $"{b.TargetStat}{sign}{(int)(b.Ratio*100)}%";
+            }).ToList();
+            if (buffs.Count > 0) s += " Buffs:[" + string.Join(", ", buffs) + "]";
+            return s;
         }
 
         private List<BattleUnit> GetAllies(BattleUnit unit, BattleContext ctx)

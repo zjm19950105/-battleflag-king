@@ -169,8 +169,10 @@ namespace BattleKing.Core
         {
             _eventBus.Publish(new BeforeActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
 
-            if (unit.State != UnitState.Charging)  // AP already consumed for Charge skills
+            if (unit.State != UnitState.Charging)
                 unit.ConsumeAp(skill.ApCost);
+
+            Log($"--- {unit.Data.Name} 发动 {skill.Data.Name} (AP{skill.ApCost} 威力{skill.Power}) [{DumpUnitBrief(unit)}] ---");
 
             foreach (var target in targets)
             {
@@ -197,27 +199,36 @@ namespace BattleKing.Core
 
                 var result = _damageCalculator.Calculate(calc);
 
-                string statusText = "";
+                // --- Detailed damage log ---
+                string hitDetail;
                 if (!result.IsHit)
-                    statusText = "（未命中）";
+                {
+                    hitDetail = "MISS";
+                }
                 else if (result.IsEvaded)
-                    statusText = "（被回避）";
+                {
+                    hitDetail = "EVADE";
+                }
                 else
                 {
-                    if (result.IsCritical)
-                        statusText += "（暴击）";
-                    if (result.IsBlocked)
-                        statusText += "（格挡）";
+                    string flags = "";
+                    if (result.IsCritical) flags += "CRIT! ";
+                    if (result.IsBlocked) flags += $"BLOCK(-{calc.BlockReduction*100:F0}%) ";
+                    hitDetail = $"{flags}{result.TotalDamage}伤害 [{calc.FinalAttackPower}ATK vs {calc.FinalDefense}DEF]";
                 }
 
-                int damage = result.TotalDamage;
+                bool killed = false;
                 if (result.IsHit && !result.IsEvaded)
                 {
-                    target.TakeDamage(damage);
+                    int hpBefore = target.CurrentHp;
+                    target.TakeDamage(result.TotalDamage);
+                    int hpLost = hpBefore - target.CurrentHp;
+                    hitDetail += $" | {target.Data.Name} HP:{hpBefore}→{target.CurrentHp}(-{hpLost})";
 
-                    // Publish OnKnockdown if target died
                     if (!target.IsAlive)
                     {
+                        killed = true;
+                        hitDetail += " [击倒!]";
                         _eventBus.Publish(new OnKnockdownEvent
                         {
                             Victim = target,
@@ -232,19 +243,24 @@ namespace BattleKing.Core
                     Attacker = unit,
                     Defender = target,
                     Skill = skill,
-                    DamageDealt = damage,
+                    DamageDealt = result.TotalDamage,
                     IsHit = result.IsHit,
                     Context = _ctx
                 });
 
-                string aftermath = $"{target.Data.Name} 剩余 HP:{target.CurrentHp}";
-                if (result.AppliedAilments.Count > 0)
-                    aftermath += $", 附加状态: {string.Join(",", result.AppliedAilments)}";
+                // After-hit: show buffs/debuffs that were applied to defender
+                string stateAfter = DumpUnitBrief(target);
+                if (result.AppliedAilments.Count > 0 || killed)
+                    stateAfter += $" | 异常:{string.Join(",", result.AppliedAilments)}";
 
-                Log($"{unit.Data.Name} → {target.Data.Name} [{skill.Data.Name}] {damage}伤害{statusText} | {aftermath}");
+                Log($"  {unit.Data.Name} → {target.Data.Name} [{skill.Data.Name}] {hitDetail}");
+                if (result.IsHit && !result.IsEvaded)
+                    Log($"    {target.Data.Name}: {stateAfter}");
             }
 
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
+
+            Log($"  {unit.Data.Name} 行动结束: {DumpUnitBrief(unit)}");
         }
 
         private void ProcessPendingActions()
@@ -408,6 +424,21 @@ namespace BattleKing.Core
             Log("敌方队伍:");
             foreach (var u in _ctx.EnemyUnits.Where(u => u != null))
                 Log($"  {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
+        }
+
+        /// <summary>One-line unit summary: HP, AP, active buffs</summary>
+        private static string DumpUnitBrief(BattleUnit u)
+        {
+            if (u == null || !u.IsAlive) return "[阵亡]";
+            string s = $"HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp}";
+            var buffs = u.Buffs.Where(b => b.Ratio != 0).Select(b => {
+                string sign = b.Ratio > 0 ? "+" : "";
+                return $"{b.TargetStat}{sign}{(int)(b.Ratio*100)}%";
+            }).ToList();
+            if (buffs.Count > 0) s += " Buffs:[" + string.Join(", ", buffs) + "]";
+            if (u.State != UnitState.Normal) s += $" [{u.State}]";
+            if (u.CustomCounters.Count > 0) s += " Counters:" + string.Join(",", u.CustomCounters.Select(kv => $"{kv.Key}={kv.Value}"));
+            return s;
         }
     }
 }
