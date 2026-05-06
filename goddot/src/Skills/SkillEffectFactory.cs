@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using BattleKing.Core;
 using BattleKing.Data;
+using BattleKing.Pipeline;
 
 namespace BattleKing.Skills
 {
@@ -17,10 +19,17 @@ namespace BattleKing.Skills
                     "Buff" => new BuffEffect(data.Parameters),
                     "Heal" => new HealEffect(data.Parameters),
                     "StatusAilment" => new StatusAilmentEffect(data.Parameters),
-                    _ => throw new NotSupportedException($"Unknown effect type: {data.EffectType}")
+                    // Structured types handled by PassiveSkillProcessor — no-op wrapper
+                    _ => new NoOpEffect()
                 });
             }
             return effects;
         }
+    }
+
+    /// <summary>Placeholder for structured effect types handled by PassiveSkillProcessor directly</summary>
+    public class NoOpEffect : ISkillEffect
+    {
+        public void Apply(BattleContext ctx, BattleUnit caster, List<BattleUnit> targets, DamageCalculation calc = null) { }
     }
 }
