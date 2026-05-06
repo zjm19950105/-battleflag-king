@@ -90,12 +90,19 @@ public partial class Main : Node2D
 		_buttonBar.AddThemeConstantOverride("separation", 8);
 		root.AddChild(_buttonBar);
 
-		// 4) Scrollable log
+		// 4) Scrollable log — dark background for visibility
 		_logScroll = new ScrollContainer();
 		_logScroll.CustomMinimumSize = new Vector2(0, 200);
-		root.AddChild(_logScroll);
+		var logBg = new Panel();
+		logBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.05f, 0.05f, 0.08f) });
+		logBg.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		logBg.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_logScroll.AddChild(logBg);
 		_logLabel = new RichTextLabel { BbcodeEnabled = true, ScrollFollowing = true };
-		_logScroll.AddChild(_logLabel);
+		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		logBg.AddChild(_logLabel);
+		root.AddChild(_logScroll);
 	}
 
 	// ── HELPERS ──────────────────────────────────────────────
@@ -507,12 +514,32 @@ public partial class DropSlot : Panel
 		_label.Text = _slots[_idx] != null ? $"[{_idx + 1}]\n{_slots[_idx]}" : $"[{_idx + 1}]\n空";
 	}
 
+	public override Variant _GetDragData(Vector2 atPosition)
+	{
+		if (_slots[_idx] == null) return default;
+		SetDragPreview(new Label { Text = $"[{_idx + 1}] {_slots[_idx]}" });
+		return $"SLOT:{_idx}:{_slots[_idx]}";
+	}
+
 	public override bool _CanDropData(Vector2 atPosition, Variant data)
 		=> data.VariantType == Variant.Type.String;
 
 	public override void _DropData(Vector2 atPosition, Variant data)
 	{
-		_slots[_idx] = (string)data;
+		string raw = (string)data;
+		if (raw.StartsWith("SLOT:"))
+		{
+			var parts = raw.Split(':', 3);
+			int srcIdx = int.Parse(parts[1]);
+			string srcChar = parts[2];
+			string myChar = _slots[_idx];
+			_slots[srcIdx] = myChar;
+			_slots[_idx] = srcChar;
+		}
+		else
+		{
+			_slots[_idx] = raw;
+		}
 		UpdateDisplay();
 		_onChanged?.Invoke();
 	}
