@@ -415,37 +415,79 @@ public partial class Main : Node2D
 
 	private void Phase_Battle()
 	{
-		// Hide formation area, log fills screen
+		// Two-panel: left unit status, right battle log
 		_formationArea.Visible = false;
-		_logLabel.SizeFlagsStretchRatio = 5;
-
 		ClearLog();
-		Log("=== 队伍信息 ===\n[己方]");
-		foreach (var u in _playerUnits.Where(u => u != null))
-			Log($"  [{u.Position}] {u.Data.Name} HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}");
-		Log("[敌方]");
-		foreach (var u in _enemyUnits.Where(u => u != null))
-			Log($"  [{u.Position}] {u.Data.Name} HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}");
-		Log("");
 
-		var engine = new BattleEngine(_ctx);
-		engine.OnLog = msg => { _logLabel.InsertTextAtCaret(msg + "\n"); ScrollToBottom(); };
-		var proc = new BattleKing.Skills.PassiveSkillProcessor(engine.EventBus, _gameData,
-			msg => { _logLabel.InsertTextAtCaret(msg + "\n"); ScrollToBottom(); },
-			engine.EnqueueAction);
-		proc.SubscribeAll();
-		_battleResult = engine.StartBattle();
+		// Add unit panel to left
+		var unitBg = new Panel();
+		unitBg.CustomMinimumSize = new Vector2(300, 0);
+		unitBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.06f, 0.06f, 0.16f) });
+		_formationArea.AddChild(unitBg);
+		var _unitLabel = new RichTextLabel { BbcodeEnabled = true };
+		_unitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_unitLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_unitLabel.AddThemeFontSizeOverride("normal_font_size", 16);
+		unitBg.AddChild(_unitLabel);
 
-		_formationArea.Visible = true;
-		_logLabel.SizeFlagsStretchRatio = 1;
+		// Log fills remaining space
+		_logLabel.SizeFlagsStretchRatio = 3;
 
-		Go(GamePhase.Result);
+		// Init battle
+		_engine = new BattleEngine(_ctx);
+		_engine.OnLog = msg => { _logLabel.InsertTextAtCaret(msg + "\n"); };
+		_passiveProc = new BattleKing.Skills.PassiveSkillProcessor(_engine.EventBus, _gameData,
+			msg => { _logLabel.InsertTextAtCaret(msg + "\n"); },
+			_engine.EnqueueAction);
+		_passiveProc.SubscribeAll();
+		_engine.InitBattle();
+		RefreshUnitPanel(_unitLabel);
+
+		AddBtn("▶ 下一回合", () => StepOneTurn(_unitLabel));
 	}
 
-	/// <summary>Scroll log to bottom</summary>
-	private void ScrollToBottom()
+	private void RefreshUnitPanel(RichTextLabel label)
 	{
-		_logLabel.SetCaretLine(_logLabel.GetLineCount() - 1);
+		label.Clear();
+		label.AppendText("[color=yellow]══ 战场 ══[/color]\n");
+		label.AppendText("[color=cyan]▸ 己方[/color]\n");
+		foreach (var u in _playerUnits)
+		{
+			if (u == null) continue;
+			if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); continue; }
+			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
+			string hpBar = new string('|', hpPct / 5) + new string('.', (100 - hpPct) / 5);
+			label.AppendText($"  [color=white][{u.Position}][/color] {u.Data.Name} {hpBar} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
+		}
+		label.AppendText("[color=orange]▸ 敌方[/color]\n");
+		foreach (var u in _enemyUnits)
+		{
+			if (u == null) continue;
+			if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); continue; }
+			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
+			string hpBar = new string('|', hpPct / 5) + new string('.', (100 - hpPct) / 5);
+			label.AppendText($"  [color=white][{u.Position}][/color] {u.Data.Name} {hpBar} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
+		}
+	}
+
+	private void StepOneTurn(RichTextLabel unitLabel)
+	{
+		var result = _engine.StepBattle();
+		RefreshUnitPanel(unitLabel);
+		if (result != BattleStepResult.Continue)
+		{
+			ClearButtons();
+			_formationArea.Visible = true;
+			_logLabel.SizeFlagsStretchRatio = 1;
+			_battleResult = result switch
+			{
+				BattleStepResult.PlayerWin => BattleResult.PlayerWin,
+				BattleStepResult.EnemyWin => BattleResult.EnemyWin,
+				_ => BattleResult.Draw
+			};
+			Log("\n=== " + _battleResult + " ===");
+			AddBtn("查看结果", () => Go(GamePhase.Result));
+		}
 	}
 
 	// ── PHASE 6: RESULT ──────────────────────────────────────
