@@ -452,35 +452,39 @@ public partial class Main : Node2D
 
 		var unit = units[_strategySetupIdx];
 		var avail = unit.GetAvailableActiveSkillIds().Select(id => _gameData.GetActiveSkill(id)).Where(s => s != null).ToList();
-		_statusLabel.Text = $"▶  策略配置 [{unit.Data.Name}] — 点击栏位选择技能";
-		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 8条策略栏位:\n" });
+		_statusLabel.Text = "▶  策略配置 [" + unit.Data.Name + "] — 下拉选择技能";
+		_leftPanel.AddChild(new Label { Text = unit.Data.Name + " 8条策略栏位:" });
 
 		for (int i = 0; i < 8; i++)
 		{
 			int slot = i;
 			var s = unit.Strategies.Count > i ? unit.Strategies[i] : null;
-			string name = s != null ? avail.FirstOrDefault(sk => sk.Id == s.SkillId)?.Name ?? s.SkillId : "(空)";
-			_leftPanel.AddChild(Btn($"[{slot + 1}] {name}", () => EditSlot(unit, slot, avail)));
+
+			var row = new HBoxContainer();
+			row.AddChild(new Label { Text = "[" + (slot + 1) + "]" });
+			var opt = new OptionButton();
+			opt.AddItem("(空)");
+			int selected = 0;
+			for (int j = 0; j < avail.Count; j++)
+			{
+				opt.AddItem(avail[j].Name + " (AP" + avail[j].ApCost + ")");
+				if (s != null && avail[j].Id == s.SkillId) selected = j + 1;
+			}
+			opt.Selected = selected;
+			int cap = slot;
+			opt.ItemSelected += (long idx) => {
+				while (unit.Strategies.Count <= cap) unit.Strategies.Add(new Strategy { SkillId = avail[0].Id });
+				unit.Strategies[cap].SkillId = (int)idx == 0 ? avail[0].Id : avail[(int)idx - 1].Id;
+			};
+			row.AddChild(opt);
+			_leftPanel.AddChild(row);
 		}
 
 		AddBtn("→ 确认/下一个", () => { _strategySetupIdx++; ShowStrategy(); });
 		AddBtn("→ 全部默认跳过", () => { _strategySetupIdx = units.Count; ShowStrategy(); });
 	}
 
-	private void EditSlot(BattleUnit unit, int slot, List<ActiveSkillData> avail)
-	{
-		ClearAll();
-		_statusLabel.Text = $"[{unit.Data.Name}] 栏位[{slot + 1}] — 选择技能";
-		foreach (var s in avail)
-			_leftPanel.AddChild(Btn($"{s.Name} AP{s.ApCost} 威力{s.Power}", () => {
-				while (unit.Strategies.Count <= slot) unit.Strategies.Add(new Strategy { SkillId = avail[0].Id });
-				unit.Strategies[slot].SkillId = s.Id;
-				ShowStrategy();
-			}));
-		AddBtn("← 返回", () => ShowStrategy());
-	}
-
-	// ── PHASE 5: BATTLE ──────────────────────────────────────
+// ── PHASE 5: BATTLE ──────────────────────────────────────
 
 	// ── PHASE 5: BATTLE (step-by-step) ─────────────────────
 
