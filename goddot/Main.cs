@@ -37,6 +37,8 @@ public partial class Main : Node2D
 	private bool _enemyUseDrag;
 
 	private BattleContext _ctx;
+	private BattleEngine _engine;
+	private BattleKing.Skills.PassiveSkillProcessor _passiveProc;
 	private List<BattleUnit> _playerUnits;
 	private List<BattleUnit> _enemyUnits;
 	private List<(string, int, string)> _enemyConfig;

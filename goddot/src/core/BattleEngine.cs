@@ -41,51 +41,64 @@ namespace BattleKing.Core
 
         public BattleResult StartBattle()
         {
-            Log("=== 战斗开始 ===");
-            PrintTeamStatus();
-
-            _eventBus.Publish(new BattleStartEvent { Context = _ctx });
-
-            // Process preemptive actions queued during BattleStart (e.g. Quick Strike)
-            ProcessPendingActions();
-
+            InitBattle();
             while (true)
             {
-                _ctx.TurnCount++;
-                Log($"--- 第 {_ctx.TurnCount} 回合 ---");
-
-                var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
-                if (aliveUnits.Count == 0)
-                {
-                    Log("双方全灭，平局！");
-                    return EndBattle(BattleResult.Draw);
-                }
-
-                var turnOrder = aliveUnits.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
-
-                foreach (var unit in turnOrder)
-                {
-                    if (!unit.IsAlive)
-                        continue;
-
-                    var preCheck = CheckBattleEnd();
-                    if (preCheck.HasValue)
-                        return EndBattle(preCheck.Value);
-
-                    ExecuteUnitTurn(unit);
-
-                    // Process any pending counter/pursuit actions from this turn
-                    ProcessPendingActions();
-                }
-
-                var postCheck = CheckBattleEnd();
-                if (postCheck.HasValue)
-                    return EndBattle(postCheck.Value);
-
-                var apCheck = CheckApExhaustion();
-                if (apCheck.HasValue)
-                    return EndBattle(apCheck.Value);
+                var r = StepBattle();
+                if (r != BattleStepResult.Continue)
+                    return EndBattle(r == BattleStepResult.PlayerWin ? BattleResult.PlayerWin
+                        : r == BattleStepResult.EnemyWin ? BattleResult.EnemyWin : BattleResult.Draw);
             }
+        }
+
+        /// <summary>Initialize battle — call once before stepping</summary>
+        public void InitBattle()
+        {
+            Log("=== 战斗开始 ===");
+            PrintTeamStatus();
+            _eventBus.Publish(new BattleStartEvent { Context = _ctx });
+            ProcessPendingActions();
+        }
+
+        /// <summary>Execute ONE turn. Returns Continue if battle still ongoing.</summary>
+        public BattleStepResult StepBattle()
+        {
+            _ctx.TurnCount++;
+            Log($"--- 第 {_ctx.TurnCount} 回合 ---");
+
+            var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
+            if (aliveUnits.Count == 0)
+            {
+                Log("双方全灭，平局！");
+                return BattleStepResult.Draw;
+            }
+
+            var turnOrder = aliveUnits.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
+
+            foreach (var unit in turnOrder)
+            {
+                if (!unit.IsAlive) continue;
+
+                var preCheck = CheckBattleEnd();
+                if (preCheck.HasValue)
+                    return preCheck.Value == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
+                        : preCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
+
+                ExecuteUnitTurn(unit);
+                ProcessPendingActions();
+            }
+
+            var postCheck = CheckBattleEnd();
+            if (postCheck.HasValue)
+                return postCheck.Value == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
+                    : postCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
+
+            var apCheck = CheckApExhaustion();
+            if (apCheck.HasValue)
+                return apCheck.Value == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
+                    : apCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
+
+            return BattleStepResult.Continue;
         }
 
         private BattleResult EndBattle(BattleResult result)

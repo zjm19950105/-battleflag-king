@@ -36,29 +36,27 @@ namespace BattleKing.Pipeline
             baseDmgPerHit *= calc.ClassTraitMultiplier;
             baseDmgPerHit *= calc.CharacterTraitMultiplier;
 
-            // Run multi-hit pipeline: each hit independently checks hit/evasion/block/crit
-            int totalPhysical = 0;
-            int totalMagical = 0;
+            // Run multi-hit pipeline: all damage kept as float, only rounded at end
+            float totalPhysical = 0f;
+            float totalMagical = 0f;
             bool anyHit = false;
             bool anyCritical = false;
             bool anyBlocked = false;
             bool anyEvaded = false;
             int hitsLanded = 0;
-            int blocksTriggered = 0;
 
             for (int hit = 0; hit < calc.HitCount; hit++)
             {
-                // Split physical / magical damage per hit
-                int hitPhysical, hitMagical;
+                float hitPhysical, hitMagical;
                 if (skill.HasMixedDamage)
                 {
-                    hitPhysical = (int)(baseDmgPerHit * 0.7f);
-                    hitMagical = (int)(baseDmgPerHit * 0.3f);
+                    hitPhysical = baseDmgPerHit * 0.7f;
+                    hitMagical = baseDmgPerHit * 0.3f;
                 }
                 else
                 {
-                    hitPhysical = (int)baseDmgPerHit;
-                    hitMagical = 0;
+                    hitPhysical = baseDmgPerHit;
+                    hitMagical = 0f;
                 }
 
                 // Stage 7: Hit check (skip if ForceHit)
@@ -94,11 +92,11 @@ namespace BattleKing.Pipeline
                     calc.IsCritical = true;
                     anyCritical = true;
                     calc.CritMultiplier = Math.Min(3.0f, 1.5f + attacker.Buffs.Where(b => b.TargetStat == "CritDmg").Sum(b => b.Ratio));
-                    hitPhysical = (int)(hitPhysical * calc.CritMultiplier);
-                    hitMagical = (int)(hitMagical * calc.CritMultiplier);
+                    hitPhysical *= calc.CritMultiplier;
+                    hitMagical *= calc.CritMultiplier;
                 }
 
-                // Stage 10: Block (physical only, respect CannotBeBlocked and ForceBlock)
+                // Stage 10: Block (physical only)
                 bool blockThisHit = false;
                 if (skill.HasPhysicalComponent && !calc.CannotBeBlocked && calc.ForceBlock != false)
                 {
@@ -106,21 +104,17 @@ namespace BattleKing.Pipeline
                     {
                         blockThisHit = true;
                         anyBlocked = true;
-                        blocksTriggered++;
                         calc.BlockReduction = hitDefender.GetBlockReduction();
-                        hitPhysical = (int)(hitPhysical * (1 - calc.BlockReduction));
+                        hitPhysical *= (1f - calc.BlockReduction);
                     }
                 }
 
-                // Hit-dependent conditional: first hit blocked can cancel special effects
-                // (e.g. "passive steal" — first hit blocked prevents PP steal)
-                // This flag lets skill effects check after damage resolution
                 if (hit == 0 && blockThisHit)
-                    calc.IsBlocked = true;  // "first hit was blocked" flag for skill effects
+                    calc.IsBlocked = true;
 
                 // Damage immunity
-                if (calc.NullifyPhysicalDamage) hitPhysical = 0;
-                if (calc.NullifyMagicalDamage) hitMagical = 0;
+                if (calc.NullifyPhysicalDamage) hitPhysical = 0f;
+                if (calc.NullifyMagicalDamage) hitMagical = 0f;
 
                 totalPhysical += hitPhysical;
                 totalMagical += hitMagical;
@@ -129,15 +123,12 @@ namespace BattleKing.Pipeline
             }
 
             // Final damage multiplier
-            totalPhysical = (int)(totalPhysical * calc.DamageMultiplier);
-            totalMagical = (int)(totalMagical * calc.DamageMultiplier);
+            totalPhysical *= calc.DamageMultiplier;
+            totalMagical *= calc.DamageMultiplier;
 
-            // Round
-            totalPhysical = (int)Math.Round((double)totalPhysical);
-            totalMagical = (int)Math.Round((double)totalMagical);
-
-            calc.PhysicalDamage = totalPhysical;
-            calc.MagicalDamage = totalMagical;
+            // Round once at the very end (四捨五入 is the final step per original game formula)
+            calc.PhysicalDamage = (int)Math.Round((double)totalPhysical);
+            calc.MagicalDamage = (int)Math.Round((double)totalMagical);
             calc.IsHit = anyHit;
             calc.IsCritical = anyCritical;
             if (!anyBlocked && calc.HitCount == 1)
