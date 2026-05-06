@@ -62,6 +62,23 @@ namespace BattleKing.Core
             MaxPp = CurrentPp;
         }
 
+        /// <summary>Effective unit classes based on CC state (e.g. Lord→Cavalry after CC)</summary>
+        public List<UnitClass> GetEffectiveClasses()
+        {
+            return IsCc && Data.CcClasses != null && Data.CcClasses.Count > 0
+                ? Data.CcClasses
+                : Data.Classes;
+        }
+
+        /// <summary>Effective traits based on CC state</summary>
+        public List<TraitData> GetEffectiveTraits()
+        {
+            var traits = new List<TraitData>(Data.Traits ?? new());
+            if (IsCc && Data.CcTraits != null)
+                traits.AddRange(Data.CcTraits);
+            return traits;
+        }
+
         // CC-aware equippable categories
         public List<EquipmentCategory> GetEquippableCategories()
         {

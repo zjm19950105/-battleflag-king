@@ -61,7 +61,7 @@ namespace BattleKing.Ai
 			// Ranged, Magic, Piercing, and Flying-unit attacks hit any row
 			// (Original game: flying unit attacks are treated as ranged)
 			if (skill.AttackType == AttackType.Ranged || skill.AttackType == AttackType.Magic
-				|| caster.Data?.Classes?.Contains(UnitClass.Flying) == true
+				|| caster.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true
 				|| skill.TargetType == TargetType.FrontAndBack || skill.TargetType == TargetType.Column)
 			{
 				return aliveUnits.OrderBy(u => u.Position).ToList();

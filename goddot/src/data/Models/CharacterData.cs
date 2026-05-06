@@ -13,7 +13,7 @@ namespace BattleKing.Data
         public List<string> InnateValorSkillIds { get; set; } = new();
         public Dictionary<string, int> BaseStats { get; set; } = new();
         public string GrowthType { get; set; }
-        public string Description { get; set; } // 角色特性描述（占位符，待手动填充）
+        public string Description { get; set; }
         public List<TraitData> Traits { get; set; } = new();
         public List<string> InitialEquipmentIds { get; set; } = new();
         public List<string> CcInitialEquipmentIds { get; set; } = new();
@@ -21,8 +21,10 @@ namespace BattleKing.Data
         // CC (Class Change) data
         public string CcClassId { get; set; }
         public string CcName { get; set; }
+        public List<UnitClass> CcClasses { get; set; } = new();  // CC后兵种变化(如领主→骑兵)
         public List<EquipmentCategory> CcEquippableCategories { get; set; } = new();
         public List<string> CcInnateActiveSkillIds { get; set; } = new();
         public List<string> CcInnatePassiveSkillIds { get; set; } = new();
+        public List<TraitData> CcTraits { get; set; } = new();  // CC后特性(如领主"物理对步兵2倍")
     }
 }

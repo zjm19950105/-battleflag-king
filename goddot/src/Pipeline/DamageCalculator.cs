@@ -160,14 +160,15 @@ namespace BattleKing.Pipeline
 
         private float GetClassTraitMultiplier(BattleUnit attacker, BattleUnit defender)
         {
-            if (attacker.Data?.Classes == null || defender.Data?.Classes == null)
-                return 1.0f;
+            var aClasses = attacker?.GetEffectiveClasses();
+            var dClasses = defender?.GetEffectiveClasses();
+            if (aClasses == null || dClasses == null) return 1.0f;
 
-            if (attacker.Data.Classes.Contains(UnitClass.Cavalry) && defender.Data.Classes.Contains(UnitClass.Infantry))
+            if (aClasses.Contains(UnitClass.Cavalry) && dClasses.Contains(UnitClass.Infantry))
                 return 2.0f;
-            if (attacker.Data.Classes.Contains(UnitClass.Flying) && defender.Data.Classes.Contains(UnitClass.Cavalry))
+            if (aClasses.Contains(UnitClass.Flying) && dClasses.Contains(UnitClass.Cavalry))
                 return 2.0f;
-            if (attacker.Data.Classes.Contains(UnitClass.Archer) && defender.Data.Classes.Contains(UnitClass.Flying))
+            if (aClasses.Contains(UnitClass.Archer) && dClasses.Contains(UnitClass.Flying))
                 return 2.0f;
 
             return 1.0f;
@@ -208,8 +209,8 @@ namespace BattleKing.Pipeline
             int hitRate = skillHitRate + attacker.GetCurrentHitRate() - defender.GetCurrentEvasion();
 
             // 飞行系防御特性：地上近接攻击命中率半减
-            bool defenderIsFlying = defender.Data?.Classes?.Contains(UnitClass.Flying) == true;
-            bool attackerIsGrounded = attacker.Data?.Classes?.Contains(UnitClass.Flying) != true;
+            bool defenderIsFlying = defender?.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true;
+            bool attackerIsGrounded = attacker?.GetEffectiveClasses()?.Contains(UnitClass.Flying) != true;
             bool isMelee = skill.AttackType == AttackType.Melee;
             if (defenderIsFlying && attackerIsGrounded && isMelee)
                 hitRate /= 2;

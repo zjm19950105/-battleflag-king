@@ -516,7 +516,7 @@ public partial class Main : Node2D
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
 			string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
 			var pv = u.GetEquippedPassiveSkills();
-			string classStr = u.Data.Classes?.Count > 0 ? "(" + string.Join(",", u.Data.Classes) + ") " : "";
+			string classStr = u.GetEffectiveClasses()?.Count > 0 ? "(" + string.Join(",", u.GetEffectiveClasses()) + ") " : "";
 			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
 			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
 		}
@@ -528,7 +528,7 @@ public partial class Main : Node2D
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
 			string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
 			var pv = u.GetEquippedPassiveSkills();
-			string classStr = u.Data.Classes?.Count > 0 ? "(" + string.Join(",", u.Data.Classes) + ") " : "";
+			string classStr = u.GetEffectiveClasses()?.Count > 0 ? "(" + string.Join(",", u.GetEffectiveClasses()) + ") " : "";
 			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
 			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
 		}
