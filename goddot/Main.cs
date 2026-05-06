@@ -327,13 +327,20 @@ public partial class Main : Node2D
 			}
 		}
 
-		// Give enemies random passives
+		// Give enemies additional random passives (on top of auto-equipped defaults)
 		foreach (var u in _enemyUnits.Where(u => u != null))
 		{
-			var avail = u.GetAvailablePassiveSkillIds().Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null).OrderBy(_ => _rnd.Next()).ToList();
-			var eq = new List<string>(); int pp = 0;
-			foreach (var s in avail) { if (pp + s.PpCost > u.MaxPp) break; eq.Add(s.Id); pp += s.PpCost; }
-			u.EquippedPassiveSkillIds = eq;
+			int usedPp = u.GetUsedPp();
+			var avail = u.GetAvailablePassiveSkillIds()
+				.Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null)
+				.Where(s => !u.EquippedPassiveSkillIds.Contains(s.Id))
+				.OrderBy(_ => _rnd.Next()).ToList();
+			foreach (var s in avail)
+			{
+				if (usedPp + s.PpCost > u.MaxPp) break;
+				u.EquippedPassiveSkillIds.Add(s.Id);
+				usedPp += s.PpCost;
+			}
 		}
 	}
 
