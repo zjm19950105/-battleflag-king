@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using BattleKing.Core;
 using BattleKing.Data;
 
@@ -12,6 +13,18 @@ namespace BattleKing.Ai
         public ConditionEvaluator(BattleContext ctx)
         {
             _ctx = ctx;
+        }
+
+        /// <summary>Condition.Value is `object` — System.Text.Json stores numbers as JsonElement</summary>
+        private static float ToFloat(object value)
+        {
+            if (value is JsonElement je) return je.GetSingle();
+            return Convert.ToSingle(value);
+        }
+        private static int ToInt(object value)
+        {
+            if (value is JsonElement je) return je.GetInt32();
+            return Convert.ToInt32(value);
         }
 
         public bool Evaluate(Condition condition, BattleUnit subject, BattleUnit target = null)
@@ -77,9 +90,9 @@ namespace BattleKing.Ai
 
             return c.Operator switch
             {
-                "less_than" => hpRatio < Convert.ToSingle(c.Value),
-                "greater_than" => hpRatio > Convert.ToSingle(c.Value),
-                "equals" => Math.Abs(hpRatio - Convert.ToSingle(c.Value)) < 0.001f,
+                "less_than" => hpRatio < ToFloat(c.Value),
+                "greater_than" => hpRatio > ToFloat(c.Value),
+                "equals" => Math.Abs(hpRatio - ToFloat(c.Value)) < 0.001f,
                 _ => true
             };
         }
@@ -164,9 +177,9 @@ namespace BattleKing.Ai
             float hpRatio = (float)subject.CurrentHp / maxHp;
             return c.Operator switch
             {
-                "less_than" => hpRatio < Convert.ToSingle(c.Value),
-                "greater_than" => hpRatio > Convert.ToSingle(c.Value),
-                "equals" => Math.Abs(hpRatio - Convert.ToSingle(c.Value)) < 0.001f,
+                "less_than" => hpRatio < ToFloat(c.Value),
+                "greater_than" => hpRatio > ToFloat(c.Value),
+                "equals" => Math.Abs(hpRatio - ToFloat(c.Value)) < 0.001f,
                 _ => true
             };
         }
@@ -174,7 +187,7 @@ namespace BattleKing.Ai
         private bool EvaluateSelfApPp(Condition c, BattleUnit subject)
         {
             if (subject == null) return true;
-            int threshold = c.Value != null ? Convert.ToInt32(c.Value) : 0;
+            int threshold = c.Value != null ? ToInt(c.Value) : 0;
             return c.Operator switch
             {
                 "less_than" => subject.CurrentAp < threshold,
