@@ -243,7 +243,7 @@ namespace BattleKing.Skills
                 case "AddBuff":
                     var buffStat = GetStringParam(p, "stat", "Str");
                     float buffRatio = GetFloatParam(p, "ratio", 0.2f);
-                    int buffTurns = GetIntParam(p, "turns", -1);
+                    int buffTurns = GetIntParam(p, "turns", 1);  // default 1 turn; use -1 for battle-long
                     var buffTarget = GetTargetType(p, "target", "Self");
                     var buffUnits = SelectPassiveTargets(unit, buffTarget, attacker, defender);
                     foreach (var t in buffUnits)
@@ -399,37 +399,37 @@ namespace BattleKing.Skills
             }
             if (tags.Contains("DefUp20"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "Def", Ratio = 0.20f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "Def", Ratio = 0.20f, RemainingTurns = 1 });
                 effects.Add("防御+20%");
             }
             if (tags.Contains("AtkUp20"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "Str", Ratio = 0.20f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "Str", Ratio = 0.20f, RemainingTurns = 1 });
                 effects.Add("物攻+20%");
             }
             if (tags.Contains("AtkUp20Stackable"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "Str", Ratio = 0.20f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "Str", Ratio = 0.20f, RemainingTurns = 1 });
                 effects.Add("物攻+20%(可叠加)");
             }
             if (tags.Contains("SpdUp20"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "Spd", Ratio = 0.20f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "Spd", Ratio = 0.20f, RemainingTurns = 1 });
                 effects.Add("速度+20");
             }
             if (tags.Contains("SpdUp30"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "Spd", Ratio = 0.30f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "Spd", Ratio = 0.30f, RemainingTurns = 1 });
                 effects.Add("速度+30");
             }
             if (tags.Contains("EvaUp30"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "Eva", Ratio = 0.30f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "Eva", Ratio = 0.30f, RemainingTurns = 1 });
                 effects.Add("回避+30");
             }
             if (tags.Contains("CritDamageUp50"))
             {
-                unit.Buffs.Add(new Buff { TargetStat = "CritDmg", Ratio = 0.50f, RemainingTurns = -1 });
+                unit.Buffs.Add(new Buff { TargetStat = "CritDmg", Ratio = 0.50f, RemainingTurns = 1 });
                 effects.Add("暴击伤害+50%");
             }
             if (tags.Contains("MediumGuard") && calc != null)

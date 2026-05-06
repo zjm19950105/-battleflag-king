@@ -145,6 +145,9 @@ namespace BattleKing.Core
             ExecuteUnitTurn(unit);
             ProcessPendingActions();
 
+            // Cleanup one-time buffs after this unit acted
+            BattleKing.Equipment.BuffManager.CleanupAfterAction(unit);
+
             // Post-check
             var postCheck = CheckBattleEnd();
             if (postCheck.HasValue)
@@ -153,6 +156,10 @@ namespace BattleKing.Core
 
             if (_turnQueue.Count == 0)
             {
+                // End of turn: cleanup turn-duration buffs
+                foreach (var u in _ctx.AllUnits.Where(u => u != null && u.IsAlive))
+                    BattleKing.Equipment.BuffManager.CleanupEndOfTurn(u);
+
                 var apCheck = CheckApExhaustion();
                 if (apCheck.HasValue)
                     return apCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
