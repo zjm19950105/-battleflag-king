@@ -661,6 +661,28 @@ namespace BattleKing.Skills
     }
 
     // ==================== SkillEffectFactory ====================
+    //
+    // TWO-PATH ARCHITECTURE for skill effects:
+    //
+    // Path A — ISkillEffect (generic, context-free):
+    //   DamageEffect / BuffEffect / HealEffect / StatusAilmentEffect
+    //   Executed via ISkillEffect.Apply(ctx, caster, targets, calc)
+    //   Used by: active skill execution in BattleEngine
+    //
+    // Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (phase-aware):
+    //   ModifyDamageCalc / CounterAttack / TemporalMark / CoverAlly /
+    //   ModifyCounter / ConsumeCounter / PreemptiveAttack / PursuitAttack /
+    //   RecoverAp / RecoverPp / RecoverHp / AddBuff / AddDebuff / etc.
+    //   Executed directly by PassiveSkillProcessor with full battle-phase context
+    //   (DamageCalculation before a hit, PendingActionQueue, TemporalState, CustomCounters)
+    //   These create PassiveOnlyEffect in the factory — Apply() is a no-op.
+    //
+    // WHY TWO PATHS: Passive skill effects are not fire-and-forget. They need to
+    // intercept the damage pipeline at specific timings, queue extra actions, manage
+    // temporary state, and read/write custom counters. ISkillEffect.Apply() cannot
+    // provide this context. Rather than bloating the interface, passive effects are
+    // dispatched in PassiveSkillProcessor where all context is naturally available.
+    //
     public static class SkillEffectFactory
     {
         public static List<ISkillEffect> CreateEffects(List<SkillEffectData> effectDatas)
@@ -674,11 +696,20 @@ namespace BattleKing.Skills
                     "Buff" => new BuffEffect(data.Parameters),
                     "Heal" => new HealEffect(data.Parameters),
                     "StatusAilment" => new StatusAilmentEffect(data.Parameters),
-                    _ => throw new NotSupportedException($"Unknown effect type: {data.EffectType}")
+                    // All other effect types → PassiveOnlyEffect (handled by PassiveSkillProcessor)
+                    _ => new PassiveOnlyEffect(data.EffectType)
                 });
             }
             return effects;
         }
+    }
+
+    // Sentinel: effects dispatched by PassiveSkillProcessor, not via ISkillEffect
+    public class PassiveOnlyEffect : ISkillEffect
+    {
+        public readonly string EffectType;
+        public PassiveOnlyEffect(string et) => EffectType = et;
+        public void Apply(BattleContext ctx, BattleUnit caster, List<BattleUnit> targets, DamageCalculation calc = null) { }
     }
 }
 ```
