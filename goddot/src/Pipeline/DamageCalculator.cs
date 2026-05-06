@@ -31,7 +31,7 @@ namespace BattleKing.Pipeline
             baseDmgPerHit *= calc.SkillPowerMultiplier;
 
             calc.ClassTraitMultiplier = GetClassTraitMultiplier(attacker, defender);
-            calc.CharacterTraitMultiplier = GetCharacterTraitMultiplier(attacker, defender, skill);
+            Equipment.TraitApplier.ApplyTraitsToDamage(calc);  // CC traits (PhysAtkVsInfantry2x, BowVsFlying, etc.)
 
             baseDmgPerHit *= calc.ClassTraitMultiplier;
             baseDmgPerHit *= calc.CharacterTraitMultiplier;
@@ -176,7 +176,9 @@ namespace BattleKing.Pipeline
 
         private float GetCharacterTraitMultiplier(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
         {
-            return 1.0f;
+            // Wired through TraitApplier which reads GetEffectiveTraits()
+            // Called from Calculate() via calc.CharacterTraitMultiplier assignment
+            return 1.0f;  // TraitApplier.ApplyTraitsToDamage sets calc.CharacterTraitMultiplier directly
         }
 
         private bool RollCrit(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)

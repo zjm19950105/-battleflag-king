@@ -675,7 +675,7 @@
     ],
     "innatePassiveSkillIds": [
       "pas_dodge_step",
-      "pas_quick_action"
+      "pas_stealth_blade"
     ],
     "innateValorSkillIds": [],
     "baseStats": {

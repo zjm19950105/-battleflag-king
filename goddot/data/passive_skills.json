@@ -846,5 +846,39 @@
     "hasSimultaneousLimit": false,
     "learnCondition": "流氓 Lv25",
     "unlockLevel": 25
+  },
+  {
+    "id": "pas_stealth_blade",
+    "name": "潜行利刃",
+    "ppCost": 1,
+    "triggerTiming": "BattleStart",
+    "type": "Physical",
+    "power": 50,
+    "hitRate": null,
+    "effectDescription": "战斗开始时，敌单体2连击先制攻击，赋予格挡封印+被动封印",
+    "tags": [
+      "Preemptive",
+      "SureHit",
+      "BlockSealEnemy",
+      "MultiHit2",
+      "SimultaneousLimit"
+    ],
+    "effects": [
+      {
+        "effectType": "PreemptiveAttack",
+        "parameters": {
+          "power": 50,
+          "hitRate": 100,
+          "tags": [
+            "SureHit",
+            "CannotBeBlocked",
+            "CannotBeCovered"
+          ]
+        }
+      }
+    ],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "潜行者 Lv25",
+    "unlockLevel": 25
   }
 ]
