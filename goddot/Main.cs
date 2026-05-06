@@ -90,13 +90,14 @@ public partial class Main : Node2D
 		_buttonBar.AddThemeConstantOverride("separation", 8);
 		root.AddChild(_buttonBar);
 
-		// 4) Log: TextEdit (read-only) — always renders, built-in scrollbar
+		// 4) Log: TextEdit (read-only) — larger font, fills available space
 		_logLabel = new TextEdit();
 		_logLabel.Editable = false;
 		_logLabel.WrapMode = TextEdit.LineWrappingMode.Boundary;
 		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
 		_logLabel.AddThemeColorOverride("background_color", new Color(0.05f, 0.05f, 0.08f));
+		_logLabel.AddThemeFontSizeOverride("font_size", 16);
 		root.AddChild(_logLabel);
 	}
 
@@ -419,10 +420,10 @@ public partial class Main : Node2D
 		ClearLog();
 		Log("=== 队伍信息 ===\n[己方]");
 		foreach (var u in _playerUnits.Where(u => u != null))
-			Log($"  [{u.Position}] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
+			Log($"  [{u.Position}] {u.Data.Name} HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}");
 		Log("[敌方]");
 		foreach (var u in _enemyUnits.Where(u => u != null))
-			Log($"  [{u.Position}] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
+			Log($"  [{u.Position}] {u.Data.Name} HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}");
 		Log("");
 
 		var engine = new BattleEngine(_ctx);

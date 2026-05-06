@@ -212,9 +212,13 @@ namespace BattleKing.Core
                 else
                 {
                     string flags = "";
-                    if (result.IsCritical) flags += "CRIT! ";
+                    if (result.IsCritical) flags += $"CRIT(×{calc.CritMultiplier:F1}) ";
                     if (result.IsBlocked) flags += $"BLOCK(-{calc.BlockReduction*100:F0}%) ";
-                    hitDetail = $"{flags}{result.TotalDamage}伤害 [{calc.FinalAttackPower}ATK vs {calc.FinalDefense}DEF]";
+                    string formula = $"({calc.FinalAttackPower}ATK - {calc.FinalDefense}DEF)={calc.BaseDifference}";
+                    if (calc.ClassTraitMultiplier != 1f) formula += $" ×兵种{calc.ClassTraitMultiplier:F1}";
+                    if (calc.SkillPowerMultiplier != 1f) formula += $" ×技能{calc.SkillPowerMultiplier:F1}";
+                    if (calc.CounterPowerBonus > 0) formula += $" +计数器{calc.CounterPowerBonus}";
+                    hitDetail = $"{flags}{result.TotalDamage}伤害 {formula}";
                 }
 
                 bool killed = false;
@@ -430,14 +434,13 @@ namespace BattleKing.Core
         private static string DumpUnitBrief(BattleUnit u)
         {
             if (u == null || !u.IsAlive) return "[阵亡]";
-            string s = $"HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp}";
+            string s = $"HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}";
             var buffs = u.Buffs.Where(b => b.Ratio != 0).Select(b => {
                 string sign = b.Ratio > 0 ? "+" : "";
                 return $"{b.TargetStat}{sign}{(int)(b.Ratio*100)}%";
             }).ToList();
-            if (buffs.Count > 0) s += " Buffs:[" + string.Join(", ", buffs) + "]";
+            if (buffs.Count > 0) s += " [" + string.Join(",", buffs) + "]";
             if (u.State != UnitState.Normal) s += $" [{u.State}]";
-            if (u.CustomCounters.Count > 0) s += " Counters:" + string.Join(",", u.CustomCounters.Select(kv => $"{kv.Key}={kv.Value}"));
             return s;
         }
     }

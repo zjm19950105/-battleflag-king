@@ -58,14 +58,16 @@ namespace BattleKing.Ai
 
 			var aliveUnits = pool.Where(u => u != null && u.IsAlive).ToList();
 
-			// Ranged, Magic, and Piercing attacks hit any row
+			// Ranged, Magic, Piercing, and Flying-unit attacks hit any row
+			// (Original game: flying unit attacks are treated as ranged)
 			if (skill.AttackType == AttackType.Ranged || skill.AttackType == AttackType.Magic
+				|| caster.Data?.Classes?.Contains(UnitClass.Flying) == true
 				|| skill.TargetType == TargetType.FrontAndBack || skill.TargetType == TargetType.Column)
 			{
 				return aliveUnits.OrderBy(u => u.Position).ToList();
 			}
 
-			// Melee: front row acts as wall — can only hit back row if front row is dead
+			// Ground melee: front row blocks back row
 			if (skill.AttackType == AttackType.Melee && targetIsEnemy)
 			{
 				var frontRow = aliveUnits.Where(u => u.IsFrontRow).ToList();
