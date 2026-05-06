@@ -215,8 +215,15 @@ namespace BattleKing.Pipeline
 
             int skillHitRate = skill.Data.HitRate ?? 100;
             int hitRate = skillHitRate + attacker.GetCurrentHitRate() - defender.GetCurrentEvasion();
-            hitRate = Math.Clamp(hitRate, 0, 100);
 
+            // 飞行系防御特性：地上近接攻击命中率半减
+            bool defenderIsFlying = defender.Data?.Classes?.Contains(UnitClass.Flying) == true;
+            bool attackerIsGrounded = attacker.Data?.Classes?.Contains(UnitClass.Flying) != true;
+            bool isMelee = skill.AttackType == AttackType.Melee;
+            if (defenderIsFlying && attackerIsGrounded && isMelee)
+                hitRate /= 2;
+
+            hitRate = Math.Clamp(hitRate, 0, 100);
             return RandUtil.Roll100() < hitRate;
         }
 

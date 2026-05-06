@@ -19,8 +19,8 @@ public enum GamePhase
 
 public partial class Main : Node2D
 {
-	private RichTextLabel _logLabel;
-	private ScrollContainer _logScroll;
+	private TextEdit _logLabel;
+	
 	private Control _formationArea;  // HBoxContainer: left pool + right grid
 	private VBoxContainer _leftPanel;
 	private VBoxContainer _rightPanel;
@@ -90,25 +90,20 @@ public partial class Main : Node2D
 		_buttonBar.AddThemeConstantOverride("separation", 8);
 		root.AddChild(_buttonBar);
 
-		// 4) Scrollable log — dark background for visibility
-		_logScroll = new ScrollContainer();
-		_logScroll.CustomMinimumSize = new Vector2(0, 200);
-		var logBg = new Panel();
-		logBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.05f, 0.05f, 0.08f) });
-		logBg.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		logBg.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_logScroll.AddChild(logBg);
-		_logLabel = new RichTextLabel { BbcodeEnabled = true, ScrollFollowing = true };
+		// 4) Log: TextEdit (read-only) — always renders, built-in scrollbar
+		_logLabel = new TextEdit();
+		_logLabel.Editable = false;
+		_logLabel.WrapMode = TextEdit.LineWrappingMode.Boundary;
 		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		logBg.AddChild(_logLabel);
-		root.AddChild(_logScroll);
+		_logLabel.AddThemeColorOverride("background_color", new Color(0.05f, 0.05f, 0.08f));
+		root.AddChild(_logLabel);
 	}
 
 	// ── HELPERS ──────────────────────────────────────────────
 
-	private void Log(string msg) => _logLabel.AppendText(msg + "\n");
-	private void ClearLog() => _logLabel.Clear();
+	private void Log(string msg) => _logLabel.InsertTextAtCaret(msg + "\n");
+	private void ClearLog() => _logLabel.Text = "";
 	private void ClearPanel(Control p) { foreach (var c in p.GetChildren()) c.QueueFree(); }
 	private void ClearAll() { ClearPanel(_leftPanel); ClearPanel(_rightPanel); ClearButtons(); }
 
@@ -417,12 +412,9 @@ public partial class Main : Node2D
 
 	private void Phase_Battle()
 	{
-		// Hide formation area during battle — log takes full screen
+		// Hide formation area, log fills screen
 		_formationArea.Visible = false;
-
-		// Expand log to fill available space
-		_logScroll.CustomMinimumSize = new Vector2(0, 0);
-		_logScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_logLabel.SizeFlagsStretchRatio = 5;
 
 		ClearLog();
 		Log("=== 队伍信息 ===\n[己方]");
@@ -434,35 +426,23 @@ public partial class Main : Node2D
 		Log("");
 
 		var engine = new BattleEngine(_ctx);
-		engine.OnLog = msg => { _logLabel.AppendText(msg + "\n"); ScrollToBottom(); };
+		engine.OnLog = msg => { _logLabel.InsertTextAtCaret(msg + "\n"); ScrollToBottom(); };
 		var proc = new BattleKing.Skills.PassiveSkillProcessor(engine.EventBus, _gameData,
-			msg => { _logLabel.AppendText(msg + "\n"); ScrollToBottom(); },
+			msg => { _logLabel.InsertTextAtCaret(msg + "\n"); ScrollToBottom(); },
 			engine.EnqueueAction);
 		proc.SubscribeAll();
 		_battleResult = engine.StartBattle();
 
-		// Restore layout for result phase
 		_formationArea.Visible = true;
-		_logScroll.CustomMinimumSize = new Vector2(0, 200);
-		_logScroll.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+		_logLabel.SizeFlagsStretchRatio = 1;
 
 		Go(GamePhase.Result);
 	}
 
-	/// <summary>Force scroll log to the latest line</summary>
+	/// <summary>Scroll log to bottom</summary>
 	private void ScrollToBottom()
 	{
-		var vbar = _logScroll.GetVScrollBar();
-		if (vbar != null)
-		{
-			// Defer by one frame so RichTextLabel has updated its content height
-			CallDeferred(nameof(ScrollToBottomDeferred));
-		}
-	}
-	private void ScrollToBottomDeferred()
-	{
-		var vbar = _logScroll.GetVScrollBar();
-		if (vbar != null) vbar.Value = vbar.MaxValue;
+		_logLabel.SetCaretLine(_logLabel.GetLineCount() - 1);
 	}
 
 	// ── PHASE 6: RESULT ──────────────────────────────────────
