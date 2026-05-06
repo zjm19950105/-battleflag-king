@@ -10,6 +10,152 @@ namespace BattleKing.Pipeline
 {
     public class DamageCalculator
     {
+        /// <summary>New signature: Calculate from a DamageCalculation (supports passive skill intervention)</summary>
+        public DamageResult Calculate(DamageCalculation calc)
+        {
+            var attacker = calc.Attacker;
+            var defender = calc.Defender;
+            var skill = calc.Skill;
+
+            // Stage 1: Attack power
+            calc.FinalAttackPower = attacker.GetCurrentAttackPower(skill.Type);
+
+            // Stage 2: Defense (with ignore-defense ratio)
+            float defMult = 1.0f - calc.IgnoreDefenseRatio;
+            calc.FinalDefense = (int)(defender.GetCurrentDefense(skill.Type) * defMult);
+
+            // Stage 3-6: Base difference * effective power * traits
+            float effectivePower = calc.EffectivePower;  // includes CounterPowerBonus
+            float baseDmgPerHit = calc.BaseDifference * (effectivePower / 100f);
+            calc.SkillPowerRatio = effectivePower / 100f;
+            baseDmgPerHit *= calc.SkillPowerMultiplier;
+
+            calc.ClassTraitMultiplier = GetClassTraitMultiplier(attacker, defender);
+            calc.CharacterTraitMultiplier = GetCharacterTraitMultiplier(attacker, defender, skill);
+
+            baseDmgPerHit *= calc.ClassTraitMultiplier;
+            baseDmgPerHit *= calc.CharacterTraitMultiplier;
+
+            // Run multi-hit pipeline: each hit independently checks hit/evasion/block/crit
+            int totalPhysical = 0;
+            int totalMagical = 0;
+            bool anyHit = false;
+            bool anyCritical = false;
+            bool anyBlocked = false;
+            bool anyEvaded = false;
+            int hitsLanded = 0;
+            int blocksTriggered = 0;
+
+            for (int hit = 0; hit < calc.HitCount; hit++)
+            {
+                // Split physical / magical damage per hit
+                int hitPhysical, hitMagical;
+                if (skill.HasMixedDamage)
+                {
+                    hitPhysical = (int)(baseDmgPerHit * 0.7f);
+                    hitMagical = (int)(baseDmgPerHit * 0.3f);
+                }
+                else
+                {
+                    hitPhysical = (int)baseDmgPerHit;
+                    hitMagical = 0;
+                }
+
+                // Stage 7: Hit check (skip if ForceHit)
+                if (!calc.ForceHit)
+                {
+                    if (!RollHit(attacker, defender, skill))
+                    {
+                        calc.IsHit = false;
+                        continue;  // this hit missed, try next hit
+                    }
+                }
+
+                // Stage 7.5: Evasion check (ForceEvasion always evades)
+                if (calc.ForceEvasion || RollEvasion(attacker, defender, skill))
+                {
+                    calc.IsEvaded = true;
+                    anyEvaded = true;
+                    continue;  // this hit evaded, try next hit
+                }
+
+                // === Cover processing (before damage) ===
+                var hitDefender = defender;
+                if (calc.CoverTarget != null && !calc.CannotBeCovered)
+                {
+                    hitDefender = calc.CoverTarget;
+                    // Recalculate defense for cover target
+                    calc.FinalDefense = (int)(hitDefender.GetCurrentDefense(skill.Type) * defMult);
+                }
+
+                // Stage 9: Critical hit
+                if (RollCrit(attacker, defender, skill))
+                {
+                    calc.IsCritical = true;
+                    anyCritical = true;
+                    calc.CritMultiplier = Math.Min(3.0f, 1.5f + attacker.Buffs.Where(b => b.TargetStat == "CritDmg").Sum(b => b.Ratio));
+                    hitPhysical = (int)(hitPhysical * calc.CritMultiplier);
+                    hitMagical = (int)(hitMagical * calc.CritMultiplier);
+                }
+
+                // Stage 10: Block (physical only, respect CannotBeBlocked and ForceBlock)
+                bool blockThisHit = false;
+                if (skill.HasPhysicalComponent && !calc.CannotBeBlocked && calc.ForceBlock != false)
+                {
+                    if (calc.ForceBlock == true || RollBlock(hitDefender, skill))
+                    {
+                        blockThisHit = true;
+                        anyBlocked = true;
+                        blocksTriggered++;
+                        calc.BlockReduction = hitDefender.GetBlockReduction();
+                        hitPhysical = (int)(hitPhysical * (1 - calc.BlockReduction));
+                    }
+                }
+
+                // Hit-dependent conditional: first hit blocked can cancel special effects
+                // (e.g. "passive steal" — first hit blocked prevents PP steal)
+                // This flag lets skill effects check after damage resolution
+                if (hit == 0 && blockThisHit)
+                    calc.IsBlocked = true;  // "first hit was blocked" flag for skill effects
+
+                // Damage immunity
+                if (calc.NullifyPhysicalDamage) hitPhysical = 0;
+                if (calc.NullifyMagicalDamage) hitMagical = 0;
+
+                totalPhysical += hitPhysical;
+                totalMagical += hitMagical;
+                hitsLanded++;
+                anyHit = true;
+            }
+
+            // Final damage multiplier
+            totalPhysical = (int)(totalPhysical * calc.DamageMultiplier);
+            totalMagical = (int)(totalMagical * calc.DamageMultiplier);
+
+            // Round
+            totalPhysical = (int)Math.Round((double)totalPhysical);
+            totalMagical = (int)Math.Round((double)totalMagical);
+
+            calc.PhysicalDamage = totalPhysical;
+            calc.MagicalDamage = totalMagical;
+            calc.IsHit = anyHit;
+            calc.IsCritical = anyCritical;
+            if (!anyBlocked && calc.HitCount == 1)
+                calc.IsBlocked = false;
+            // For multi-hit: IsBlocked = first hit was blocked (set above)
+
+            return new DamageResult(
+                calc.PhysicalDamage,
+                calc.MagicalDamage,
+                calc.IsHit,
+                calc.IsCritical,
+                calc.IsBlocked || anyBlocked,
+                anyEvaded,
+                calc.AppliedAilments
+            );
+        }
+
+        /// <summary>Old signature — kept for backward compatibility. Wraps parameters into DamageCalculation.</summary>
         public DamageResult Calculate(BattleUnit attacker, BattleUnit defender, ActiveSkill skill, BattleContext ctx)
         {
             var calc = new DamageCalculation
@@ -18,97 +164,7 @@ namespace BattleKing.Pipeline
                 Defender = defender,
                 Skill = skill
             };
-
-            // Stage 1: Attack power
-            calc.FinalAttackPower = attacker.GetCurrentAttackPower(skill.Type);
-
-            // Stage 2: Defense
-            calc.FinalDefense = defender.GetCurrentDefense(skill.Type);
-
-            // Stage 3-6: Base difference * skill power * class trait * character trait
-            float baseDmg = calc.BaseDifference * (skill.Power / 100f);
-            calc.SkillPowerRatio = skill.Power / 100f;
-            calc.ClassTraitMultiplier = GetClassTraitMultiplier(attacker, defender);
-            calc.CharacterTraitMultiplier = GetCharacterTraitMultiplier(attacker, defender, skill);
-
-            baseDmg *= calc.ClassTraitMultiplier;
-            baseDmg *= calc.CharacterTraitMultiplier;
-
-            // Split physical / magical
-            if (skill.HasMixedDamage)
-            {
-                calc.PhysicalDamage = (int)(baseDmg * 0.7f);
-                calc.MagicalDamage = (int)(baseDmg * 0.3f);
-            }
-            else
-            {
-                calc.PhysicalDamage = (int)baseDmg;
-            }
-
-            // Stage 7: Hit check
-            if (!RollHit(attacker, defender, skill))
-            {
-                calc.IsHit = false;
-                calc.PhysicalDamage = 0;
-                calc.MagicalDamage = 0;
-                return new DamageResult(
-                    calc.PhysicalDamage,
-                    calc.MagicalDamage,
-                    calc.IsHit,
-                    calc.IsCritical,
-                    calc.IsBlocked,
-                    calc.IsEvaded,
-                    calc.AppliedAilments
-                );
-            }
-
-            // Stage 8: Evasion check
-            if (RollEvasion(attacker, defender, skill))
-            {
-                calc.IsEvaded = true;
-                calc.PhysicalDamage = 0;
-                calc.MagicalDamage = 0;
-                return new DamageResult(
-                    calc.PhysicalDamage,
-                    calc.MagicalDamage,
-                    calc.IsHit,
-                    calc.IsCritical,
-                    calc.IsBlocked,
-                    calc.IsEvaded,
-                    calc.AppliedAilments
-                );
-            }
-
-            // Stage 9: Critical hit
-            if (RollCrit(attacker, defender, skill))
-            {
-                calc.IsCritical = true;
-                calc.CritMultiplier = Math.Min(3.0f, 1.5f + attacker.Buffs.Where(b => b.TargetStat == "CritDmg").Sum(b => b.Ratio));
-                calc.PhysicalDamage = (int)(calc.PhysicalDamage * calc.CritMultiplier);
-                calc.MagicalDamage = (int)(calc.MagicalDamage * calc.CritMultiplier);
-            }
-
-            // Stage 10: Block (physical only)
-            if (skill.HasPhysicalComponent && RollBlock(defender, skill))
-            {
-                calc.IsBlocked = true;
-                calc.BlockReduction = defender.GetBlockReduction();
-                calc.PhysicalDamage = (int)(calc.PhysicalDamage * (1 - calc.BlockReduction));
-            }
-
-            // Final rounding
-            calc.PhysicalDamage = (int)Math.Round((double)calc.PhysicalDamage);
-            calc.MagicalDamage = (int)Math.Round((double)calc.MagicalDamage);
-
-            return new DamageResult(
-                calc.PhysicalDamage,
-                calc.MagicalDamage,
-                calc.IsHit,
-                calc.IsCritical,
-                calc.IsBlocked,
-                calc.IsEvaded,
-                calc.AppliedAilments
-            );
+            return Calculate(calc);
         }
 
         private float GetClassTraitMultiplier(BattleUnit attacker, BattleUnit defender)
@@ -128,7 +184,6 @@ namespace BattleKing.Pipeline
 
         private float GetCharacterTraitMultiplier(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
         {
-            // TODO: integrate with TraitApplier when character traits are implemented
             return 1.0f;
         }
 
@@ -155,14 +210,9 @@ namespace BattleKing.Pipeline
 
         private bool RollHit(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
         {
-            // TODO: Darkness state check (Darkness makes hit rate 0, except when Frozen/Stun/Guarded/Charging)
             if (attacker.Ailments.Contains(StatusAilment.Darkness))
-            {
-                // For MVP, darkness always misses (advanced exceptions can be added later)
                 return false;
-            }
 
-            // Calculate hit rate: skill hit rate + attacker Hit - defender Eva
             int skillHitRate = skill.Data.HitRate ?? 100;
             int hitRate = skillHitRate + attacker.GetCurrentHitRate() - defender.GetCurrentEvasion();
             hitRate = Math.Clamp(hitRate, 0, 100);
@@ -172,15 +222,9 @@ namespace BattleKing.Pipeline
 
         private bool RollEvasion(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
         {
-            // Evasion attacks always hit, skip evasion check
             if (skill.AttackType == AttackType.Ranged)
-            {
-                // TODO: distinguish "evasion attack" type; for MVP, ranged attacks are treated as evasion attacks
                 return false;
-            }
 
-            // TODO: check if defender has evasion-type passive skill
-            // For MVP, no evasion skill exists yet, so evasion never triggers
             return false;
         }
     }

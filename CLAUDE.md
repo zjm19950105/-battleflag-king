@@ -11,6 +11,8 @@
 > **文档体系**：
 > - `CLAUDE.md`（本文档）：概念框架、机制规则、开发状态
 > - `docs/csharp-architecture.md`：**C# 技术架构** — 类设计、接口定义、方法签名、数据流、枚举
+> - `docs/dev-mistakes.md`：开发错误记录 — Subagent 规范、机制规则、常犯错误
+> - `docs/被动技能实现融入现有框架.md`：被动技能完整架构改造方案 — 5 大模块、文件修改清单、实施路线图
 
 ## 核心设计原则
 1. **数据驱动**：角色、技能、装备、条件全部走 JSON，运行时为只读
@@ -254,6 +256,7 @@ src/
 | `CLAUDE.md` | 项目根目录 | 概念框架、机制规则、开发状态（本文档） |
 | `docs/csharp-architecture.md` | `docs/` | C#技术架构：类设计、接口、枚举、数据流 |
 | `docs/dev-mistakes.md` | `docs/` | 开发错误记录：Subagent规范、机制规则、常犯错误 |
+| `docs/被动技能实现融入现有框架.md` | `docs/` | 被动技能架构改造方案：5大模块、文件清单、路线图 |
 | `progress.md` | 项目根目录 | 开发进度日志：已完成/进行中/待办 |
 | `roadmap.md` | 项目根目录 | 开发路线图：阶段划分、完结标准、想法池 |
 
@@ -273,30 +276,68 @@ BattleUnit (运行时实例)
 
 ### 已完成
 - [x] 项目目录结构初始化
-- [x] Git 仓库初始化
-- [x] 开发规范文档（CLAUDE.md + progress.md + roadmap.md）
+- [x] Git 仓库初始化并记录地址（`git@github.com:zjm19950105/-battleflag-king.git`）
+- [x] 开发规范文档（CLAUDE.md + progress.md + roadmap.md + docs/csharp-architecture.md + docs/dev-mistakes.md）
 - [x] 技术选型确定（Godot 4 + C#）
 - [x] 核心设计方向确定（大巴扎节点 + 圣兽之王自动战斗）
-- [x] 完整框架设计（基于圣兽之王资料分析）
+- [x] 完整框架设计（基于圣兽之王资料分析）：14项核心机制框架
+- [x] Memory系统记录项目上下文
 - [x] Godot 4 C# 项目创建并配置完毕
+- [x] 全部 .cs 文件生成 .uid，Godot 编辑器识别正常
+- [x] 能 F5 跑起场景
+- [x] 能正常 commit 到 git
 - [x] Data层：角色/主动技能/被动技能/装备 JSON + GameDataRepository
 - [x] Pipeline层：DamageCalculator（命中/回避/暴击/格挡/兵种克制）
 - [x] AI层：StrategyEvaluator + ConditionEvaluator + TargetSelector
 - [x] Core层：BattleUnit + BattleContext + BattleEngine
 - [x] Main.cs 入口脚本（加载数据 → 创建单位 → 启动战斗）
 - [x] 1v1 普攻代码闭环完成（逻辑层）
+- [x] CC框架接入：CharacterData/BattleUnit/Main.cs 支持CC状态切换，默认未CC
+- [x] 12/12角色数据已填充（Subagent批量填充+修正），JSON格式验证通过
+- [x] `CcInitialEquipmentIds` 配置：CC后新增装备槽强制带装备
+- [x] `EquipmentSlot` 武器槽校验：MainHand永不为空
+- [x] 装备槽统一规则（3基础 → 4 CC）：所有12角色基础3槽、CC后4槽已配置
+- [x] 格挡规则修正：`GetBlockReduction()` 无盾格挡减25%，大盾减50%
+- [x] Godot 运行验证通过（未CC状态）：1v1 战斗循环正常，AP消耗、HP变化、胜负判定正确
+- [x] **Phase 1.2 — 战前配置与 3v3 自动战斗**：
+  - [x] 控制台输入改为 Godot LineEdit UI（async/await，解决 Windows GUI stdin 问题）
+  - [x] 队伍组建：12角色选3人
+  - [x] 阵型布置：6位置网格（前排1-3，后排4-6）
+  - [x] 敌人配置框架：enemy_formations.json + strategy_presets.json
+  - [x] 被动技能选择系统（PP上限控制）
+  - [x] 策略编程控制台（8条策略栏位，支持编辑/确认/默认）
+  - [x] 条件系统MVP（SelfHp、SelfApPp、lowest/highest排序）
+  - [x] EventBus接入BattleEngine（6个战斗事件）
+  - [x] PassiveSkillProcessor：12个触发时机 + 同時発動制限
+  - [x] 3v3完整对战验证通过（Godot中可正常运行）
+  - [x] 攻击日志改进（显示剩余HP和debuff）
+  - [x] 被动技能效果打印（ExecuteSimpleEffect）
+  - [x] 多轮对战支持（"是否再来一局"）
+  - [x] 被动技能架构文档：`docs/被动技能实现融入现有框架.md`
 
 ### 当前聚焦
-**Phase 1.1 — 1v1 普攻对战（验证运行）**
+**Phase 1.3 — 被动技能完整实现与架构改造**
 
-目标：在 Godot 中实际跑通 1v1 战斗，观察控制台输出，修复 AP=0 等问题。
+目标：实现被动技能对伤害计算的干预（格挡/回避/必中/免疫/掩护）、反击/追击/先制攻击、一次性标记系统。
+
+核心任务：
+1. DamageCalculation 可变上下文（BeforeHitEvent 暴露 Calc 引用）
+2. PendingActionQueue 行动队列（反击/追击/先制）
+3. TemporalState 临时标记系统（1次免疫）
+4. 友方目标选择 + 效果结构化
+5. 逐个职业实现完整被动技能效果
 
 ### 待办（按优先级）
-1. 给 swordsman 补充 AP 值，让普攻能真正打出伤害
-2. F5 运行场景，验证 1v1 普攻闭环输出
-3. 接入 EventBus 到 BattleEngine（战斗开始/行动前/行动后事件）
-4. 引入第二个角色/技能，扩展数据层
-5. 2D 视觉表现（占位 Sprite、血条、战斗动画）
+1. **DamageCalculation 可变上下文改造**（模块1，最高优先级）
+2. **TemporalState 系统**（模块3）
+3. **PendingActionQueue 行动队列**（模块2）
+4. 条件系统完整实现（Position/UnitClass/Status/EnemyClassExists）
+5. 策略默认配置（用户提供文档后实施）
+6. 玩家策略持久化（JSON save/load）
+7. 6v6 完整竞技场扩展
+8. 2D 视觉表现（占位 Sprite、血条、战斗日志 UI）
+9. 大巴扎循环（Phase 2）
+10. 本地化与合规（Phase 3）
 
 ## 协作规则
 - **每次只修改一个模块**，修改前 Read 相关文件确认上下文

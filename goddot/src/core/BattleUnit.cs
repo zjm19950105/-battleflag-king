@@ -28,7 +28,8 @@ namespace BattleKing.Core
         public int ConsecutiveWaitCount { get; set; } = 0;
         public bool IsPlayer { get; set; }
         public bool IsCc { get; private set; }
-        public int CurrentLevel { get; set; } = 1;  // 天数系统映射的等效等级
+        public int CurrentLevel { get; set; } = 1;
+        public string ChargedSkillId { get; set; } = null;  // Module 6: Charge skill tracking  // 天数系统映射的等效等级
 
         public void SetCcState(bool isCc)
         {
@@ -41,6 +42,12 @@ namespace BattleKing.Core
         public List<StatusAilment> Ailments { get; private set; } = new List<StatusAilment>();
         public List<Strategy> Strategies { get; set; } = new List<Strategy>();
         public List<string> EquippedPassiveSkillIds { get; set; } = new List<string>();
+
+        // Module 3: Temporal states (1-time immunities, limited-duration effects)
+        public List<TemporalState> TemporalStates { get; private set; } = new List<TemporalState>();
+
+        // Module 4: Custom counters (generic key-value for sprite/rage/combo etc.)
+        public Dictionary<string, int> CustomCounters { get; private set; } = new Dictionary<string, int>();
 
         public BattleUnit(CharacterData data, GameDataRepository gameData, bool isPlayer, bool isCc = false)
         {
@@ -171,7 +178,46 @@ namespace BattleKing.Core
         public void TakeDamage(int damage)
         {
             CurrentHp = Math.Max(0, CurrentHp - damage);
-            if (CurrentHp == 0) { /* trigger knockdown event */ }
+            if (CurrentHp == 0) { /* OnKnockdownEvent published by BattleEngine */ }
+        }
+
+        // === Module 3: Temporal states ===
+
+        public bool TryConsumeTemporal(string key)
+        {
+            var state = TemporalStates.Find(s => s.Key == key);
+            if (state == null) return false;
+            if (state.RemainingCount > 0) state.RemainingCount--;
+            if (state.RemainingCount == 0) TemporalStates.Remove(state);
+            return true;
+        }
+
+        public void AddTemporal(string key, int count = 1, int turns = -1, string source = null)
+        {
+            TemporalStates.Add(new TemporalState
+            {
+                Key = key,
+                RemainingCount = count,
+                RemainingTurns = turns,
+                SourceSkillId = source
+            });
+        }
+
+        // === Module 4: Custom counters ===
+
+        public int GetCounter(string key) => CustomCounters.GetValueOrDefault(key, 0);
+
+        public void ModifyCounter(string key, int delta)
+        {
+            if (!CustomCounters.ContainsKey(key)) CustomCounters[key] = 0;
+            CustomCounters[key] = Math.Max(0, CustomCounters[key] + delta);
+        }
+
+        public int ConsumeCounter(string key)
+        {
+            if (!CustomCounters.TryGetValue(key, out int val)) return 0;
+            CustomCounters.Remove(key);
+            return val;
         }
     }
 }

@@ -4,6 +4,8 @@ using System.Linq;
 using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Events;
+using BattleKing.Equipment;
+using BattleKing.Pipeline;
 
 namespace BattleKing.Skills
 {
@@ -12,18 +14,19 @@ namespace BattleKing.Skills
         private EventBus _eventBus;
         private GameDataRepository _gameData;
         private Action<string> _log;
+        private Action<PendingAction> _enqueueAction;
 
-        // Track simultaneous-limited skills that have fired this battle
         private HashSet<string> _battleStartFired = new();
         private HashSet<string> _allyBuffFired = new();
         private HashSet<string> _defenseFired = new();
         private HashSet<string> _afterActionFired = new();
 
-        public PassiveSkillProcessor(EventBus eventBus, GameDataRepository gameData, Action<string> log)
+        public PassiveSkillProcessor(EventBus eventBus, GameDataRepository gameData, Action<string> log, Action<PendingAction> enqueueAction = null)
         {
             _eventBus = eventBus;
             _gameData = gameData;
             _log = log;
+            _enqueueAction = enqueueAction;
         }
 
         public void SubscribeAll()
@@ -33,6 +36,7 @@ namespace BattleKing.Skills
             _eventBus.Subscribe<BeforeHitEvent>(OnBeforeHit);
             _eventBus.Subscribe<AfterHitEvent>(OnAfterHit);
             _eventBus.Subscribe<AfterActiveUseEvent>(OnAfterActiveUse);
+            _eventBus.Subscribe<OnKnockdownEvent>(OnKnockdown);
             _eventBus.Subscribe<BattleEndEvent>(OnBattleEnd);
         }
 
@@ -49,59 +53,67 @@ namespace BattleKing.Skills
 
         private void OnBeforeActiveUse(BeforeActiveUseEvent evt)
         {
-            // Attacker's self-buffs (SelfOnActiveUse, SelfBeforeAttack)
             ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfOnActiveUse, "主动使用前", limitSimultaneous: false);
             ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfBeforeAttack, "攻击前", limitSimultaneous: false);
 
-            // Ally buffs (AllyBeforeAttack, AllyOnActiveUse)
             var allies = GetAllies(evt.Caster, evt.Context);
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeAttack, "友方攻击前",
                 limitSimultaneous: true, _allyBuffFired);
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnActiveUse, "友方主动时",
-                limitSimultaneous: false, _allyBuffFired);
+                limitSimultaneous: false);
         }
 
         private void OnBeforeHit(BeforeHitEvent evt)
         {
-            // Defender's self-defense (SelfBeforeHit, SelfBeforePhysicalHit, SelfBeforeMeleeHit)
-            ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeHit, "被攻击前", limitSimultaneous: false);
+            // Defender self-defense
+            ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeHit, "被攻击前", limitSimultaneous: false,
+                calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender);
             if (evt.Skill.Data.Type == SkillType.Physical)
-                ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforePhysicalHit, "被物理攻击前", limitSimultaneous: false);
+                ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforePhysicalHit, "被物理攻击前", limitSimultaneous: false,
+                    calc: evt.Calc);
             if (evt.Skill.Data.AttackType == AttackType.Melee)
-                ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeMeleeHit, "被近接攻击前", limitSimultaneous: false);
+                ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeMeleeHit, "被近接攻击前", limitSimultaneous: false,
+                    calc: evt.Calc);
 
-            // Ally defense/cover (AllyBeforeHit)
+            // Ally defense/cover
             var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeHit, "友方被攻击前",
-                limitSimultaneous: true, _defenseFired);
+                limitSimultaneous: true, _defenseFired, calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender);
         }
 
         private void OnAfterHit(AfterHitEvent evt)
         {
-            // Defender on being hit (OnBeingHit)
-            ProcessForUnit(evt.Defender, PassiveTriggerTiming.OnBeingHit, "被攻击后", limitSimultaneous: false);
+            ProcessForUnit(evt.Defender, PassiveTriggerTiming.OnBeingHit, "被攻击后", limitSimultaneous: false,
+                attacker: evt.Attacker);
 
-            // Ally on attacked (AllyOnAttacked)
             var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnAttacked, "友方被攻击后",
-                limitSimultaneous: false, null);
+                limitSimultaneous: false, attacker: evt.Attacker, defender: evt.Defender);
         }
 
         private void OnAfterActiveUse(AfterActiveUseEvent evt)
         {
-            // Post-action passives for all alive units (both sides)
             _afterActionFired.Clear();
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.AfterAction, "行动后",
                 limitSimultaneous: true, _afterActionFired);
         }
 
+        private void OnKnockdown(OnKnockdownEvent evt)
+        {
+            // Process OnKnockdown timing passives for all units
+            ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.OnKnockdown, "击倒时",
+                limitSimultaneous: false, knockoutVictim: evt.Victim, knockoutKiller: evt.Killer);
+        }
+
         private void OnBattleEnd(BattleEndEvent evt)
         {
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.BattleEnd, "战斗结束时",
-                limitSimultaneous: false, null);
+                limitSimultaneous: false);
         }
 
-        private void ProcessForUnit(BattleUnit unit, PassiveTriggerTiming timing, string timingLabel, bool limitSimultaneous)
+        private void ProcessForUnit(BattleUnit unit, PassiveTriggerTiming timing, string timingLabel,
+            bool limitSimultaneous, DamageCalculation calc = null, BattleUnit attacker = null,
+            BattleUnit defender = null, BattleUnit knockoutVictim = null, BattleUnit knockoutKiller = null)
         {
             if (unit == null || !unit.IsAlive) return;
 
@@ -114,13 +126,17 @@ namespace BattleKing.Skills
                 if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                     continue;
 
+                unit.ConsumePp(skillData.PpCost);
+
                 _log?.Invoke($"  [被动] {unit.Data.Name} 触发 {skillData.Name} ({timingLabel})");
-                ExecuteSimpleEffect(unit, skillData);
+                ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
             }
         }
 
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
-            bool limitSimultaneous, HashSet<string> firedSet)
+            bool limitSimultaneous, HashSet<string> firedSet = null, DamageCalculation calc = null,
+            BattleUnit attacker = null, BattleUnit defender = null, BattleUnit knockoutVictim = null,
+            BattleUnit knockoutKiller = null)
         {
             if (candidates == null || candidates.Count == 0) return;
 
@@ -146,17 +162,224 @@ namespace BattleKing.Skills
                         firedSet.Add(timingLabel);
                     }
 
+                    unit.ConsumePp(skillData.PpCost);
+
                     _log?.Invoke($"  [被动] {unit.Data.Name} 触发 {skillData.Name} ({timingLabel})");
-                    ExecuteSimpleEffect(unit, skillData);
+                    ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
                     break;
                 }
             }
         }
 
-        private void ExecuteSimpleEffect(BattleUnit unit, PassiveSkillData skillData)
+        private void ExecuteEffect(BattleUnit unit, PassiveSkillData skillData,
+            DamageCalculation calc, BattleUnit attacker, BattleUnit defender,
+            BattleUnit knockoutVictim, BattleUnit knockoutKiller)
+        {
+            var effects = new List<string>();
+
+            // === Module 4: Structured Effects (preferred) ===
+            if (skillData.Effects != null && skillData.Effects.Count > 0)
+            {
+                foreach (var effect in skillData.Effects)
+                {
+                    ExecuteStructuredEffect(unit, skillData, effect, calc, attacker, defender, effects);
+                }
+            }
+            else
+            {
+                // Fallback to legacy tag-based execution
+                ExecuteLegacyTags(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller, effects);
+            }
+
+            if (effects.Count > 0)
+                _log?.Invoke($"    → 效果: {string.Join(", ", effects)}");
+        }
+
+        private void ExecuteStructuredEffect(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
+            DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects)
+        {
+            var p = effect.Parameters ?? new Dictionary<string, object>();
+
+            switch (effect.EffectType)
+            {
+                case "RecoverAp":
+                    int apAmt = GetIntParam(p, "amount", 1);
+                    // Check target: Self or Ally
+                    var apTarget = GetTargetType(p, "target", "Self");
+                    var apUnits = SelectPassiveTargets(unit, apTarget, attacker, defender);
+                    foreach (var t in apUnits)
+                    {
+                        t.RecoverAp(apAmt);
+                        effects.Add($"{t.Data.Name} AP+{apAmt}");
+                    }
+                    break;
+
+                case "RecoverPp":
+                    int ppAmt = GetIntParam(p, "amount", 1);
+                    var ppTarget = GetTargetType(p, "target", "Self");
+                    var ppUnits = SelectPassiveTargets(unit, ppTarget, attacker, defender);
+                    foreach (var t in ppUnits)
+                    {
+                        t.RecoverPp(ppAmt);
+                        effects.Add($"{t.Data.Name} PP+{ppAmt}");
+                    }
+                    break;
+
+                case "RecoverHp":
+                    int healPct = GetIntParam(p, "amount", 25);
+                    var healTarget = GetTargetType(p, "target", "Self");
+                    var healUnits = SelectPassiveTargets(unit, healTarget, attacker, defender);
+                    foreach (var t in healUnits)
+                    {
+                        int heal = (int)(t.Data.BaseStats.GetValueOrDefault("HP", 0) * healPct / 100f);
+                        t.CurrentHp = Math.Min(t.Data.BaseStats.GetValueOrDefault("HP", 0), t.CurrentHp + Math.Max(1, heal));
+                        effects.Add($"{t.Data.Name} HP回复{healPct}%");
+                    }
+                    break;
+
+                case "AddBuff":
+                    var buffStat = GetStringParam(p, "stat", "Str");
+                    float buffRatio = GetFloatParam(p, "ratio", 0.2f);
+                    int buffTurns = GetIntParam(p, "turns", -1);
+                    var buffTarget = GetTargetType(p, "target", "Self");
+                    var buffUnits = SelectPassiveTargets(unit, buffTarget, attacker, defender);
+                    foreach (var t in buffUnits)
+                    {
+                        t.Buffs.Add(new Buff { TargetStat = buffStat, Ratio = buffRatio, RemainingTurns = buffTurns });
+                        effects.Add($"{t.Data.Name} {buffStat}+{(int)(buffRatio * 100)}%");
+                    }
+                    break;
+
+                case "ModifyCounter":
+                    string counterKey = GetStringParam(p, "counter", "sprite");
+                    int counterDelta = GetIntParam(p, "amount", 1);
+                    unit.ModifyCounter(counterKey, counterDelta);
+                    effects.Add($"{counterKey}+{counterDelta} (当前: {unit.GetCounter(counterKey)})");
+                    break;
+
+                case "ConsumeCounter":
+                    string consumeKey = GetStringParam(p, "counter", "sprite");
+                    int powerPer = GetIntParam(p, "powerPerCounter", 30);
+                    int consumed = unit.ConsumeCounter(consumeKey);
+                    if (calc != null)
+                    {
+                        calc.CounterPowerBonus += consumed * powerPer;
+                    }
+                    effects.Add($"消耗全部{consumeKey}({consumed}个), 威力+{consumed * powerPer}");
+                    break;
+
+                case "ModifyDamageCalc":
+                    if (calc != null)
+                    {
+                        if (p.ContainsKey("ForceHit") && (bool)p["ForceHit"])
+                        { calc.ForceHit = true; effects.Add("必中"); }
+                        if (p.ContainsKey("ForceEvasion") && (bool)p["ForceEvasion"])
+                        { calc.ForceEvasion = true; effects.Add("强制回避"); }
+                        if (p.ContainsKey("CannotBeBlocked") && (bool)p["CannotBeBlocked"])
+                        { calc.CannotBeBlocked = true; effects.Add("格挡不可"); }
+                        if (p.ContainsKey("IgnoreDefenseRatio"))
+                        { calc.IgnoreDefenseRatio = (float)(double)p["IgnoreDefenseRatio"]; effects.Add($"无视{(int)(calc.IgnoreDefenseRatio * 100)}%防御"); }
+                        if (p.ContainsKey("SkillPowerMultiplier"))
+                        { calc.SkillPowerMultiplier *= (float)(double)p["SkillPowerMultiplier"]; effects.Add($"威力×{calc.SkillPowerMultiplier}"); }
+                    }
+                    break;
+
+                case "CoverAlly":
+                    if (calc != null && !calc.CannotBeCovered)
+                    {
+                        calc.CoverTarget = unit;
+                        effects.Add($"{unit.Data.Name} 掩护目标");
+                    }
+                    break;
+
+                case "TemporalMark":
+                    string markKey = GetStringParam(p, "key", "OneTimeImmunity");
+                    int markCount = GetIntParam(p, "count", 1);
+                    var markTarget = GetTargetType(p, "target", "Self");
+                    var markUnits = SelectPassiveTargets(unit, markTarget, attacker, defender);
+                    foreach (var t in markUnits)
+                    {
+                        t.AddTemporal(markKey, markCount, -1, skillData.Id);
+                        effects.Add($"{t.Data.Name} 获得{markKey}({markCount}次)");
+                    }
+                    break;
+
+                case "CounterAttack":
+                    if (attacker != null && _enqueueAction != null)
+                    {
+                        int cntPower = GetIntParam(p, "power", 75);
+                        int? cntHit = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null;
+                        _enqueueAction(new PendingAction
+                        {
+                            Type = PendingActionType.Counter,
+                            Actor = unit,
+                            Targets = new List<BattleUnit> { attacker },
+                            Power = cntPower,
+                            HitRate = cntHit,
+                            DamageType = SkillType.Physical,
+                            AttackType = AttackType.Melee,
+                            SourcePassiveId = skillData.Id,
+                            Tags = GetStringListParam(p, "tags")
+                        });
+                        effects.Add($"反击(威力{cntPower})");
+                    }
+                    break;
+
+                case "PursuitAttack":
+                    if (attacker != null && _enqueueAction != null)
+                    {
+                        int purPower = GetIntParam(p, "power", 75);
+                        int? purHit = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null;
+                        _enqueueAction(new PendingAction
+                        {
+                            Type = PendingActionType.Pursuit,
+                            Actor = unit,
+                            Targets = new List<BattleUnit> { attacker },
+                            Power = purPower,
+                            HitRate = purHit,
+                            DamageType = SkillType.Physical,
+                            AttackType = AttackType.Melee,
+                            SourcePassiveId = skillData.Id,
+                            Tags = GetStringListParam(p, "tags")
+                        });
+                        effects.Add($"追击(威力{purPower})");
+                    }
+                    break;
+
+                case "PreemptiveAttack":
+                    if (_enqueueAction != null)
+                    {
+                        int prePower = GetIntParam(p, "power", 100);
+                        int? preHit = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null;
+                        var preTarget = GetTargetType(p, "target", "Attacker");
+                        var preUnits = SelectPassiveTargets(unit, preTarget, attacker, defender);
+                        _enqueueAction(new PendingAction
+                        {
+                            Type = PendingActionType.Preemptive,
+                            Actor = unit,
+                            Targets = preUnits,
+                            Power = prePower,
+                            HitRate = preHit,
+                            DamageType = SkillType.Physical,
+                            AttackType = AttackType.Melee,
+                            SourcePassiveId = skillData.Id,
+                            Tags = GetStringListParam(p, "tags")
+                        });
+                        effects.Add($"先制攻击(威力{prePower})");
+                    }
+                    break;
+
+                default:
+                    effects.Add($"{effect.EffectType}(待实现)");
+                    break;
+            }
+        }
+
+        private void ExecuteLegacyTags(BattleUnit unit, PassiveSkillData skillData,
+            DamageCalculation calc, BattleUnit attacker, BattleUnit defender,
+            BattleUnit knockoutVictim, BattleUnit knockoutKiller, List<string> effects)
         {
             var tags = skillData.Tags ?? new List<string>();
-            var effects = new List<string>();
 
             if (tags.Contains("ApPlus1"))
             {
@@ -165,13 +388,11 @@ namespace BattleKing.Skills
             }
             if (tags.Contains("ApPlus1Ally"))
             {
-                // Ally-targeted AP buff requires context; log for now
-                effects.Add("友方AP+1(待实现)");
+                effects.Add("友方AP+1(待结构化)");
             }
             if (tags.Contains("HitPpPlus1"))
             {
-                // PP+1 on hit requires AfterHit context; handled separately
-                effects.Add("命中时PP+1(待实现)");
+                effects.Add("命中时PP+1(待结构化)");
             }
             if (tags.Contains("DefUp20"))
             {
@@ -208,37 +429,54 @@ namespace BattleKing.Skills
                 unit.Buffs.Add(new Buff { TargetStat = "CritDmg", Ratio = 0.50f, RemainingTurns = -1 });
                 effects.Add("暴击伤害+50%");
             }
-            if (tags.Contains("MediumGuard"))
+            if (tags.Contains("MediumGuard") && calc != null)
             {
-                effects.Add("中格挡防御(格挡率提升，伤害减免)");
+                calc.ForceBlock = true;
+                effects.Add("中格挡防御");
             }
-            if (tags.Contains("LargeGuardAlly"))
+            if (tags.Contains("LargeGuardAlly") && calc != null)
             {
+                calc.ForceBlock = true;
                 effects.Add("大格挡防御(友方)");
             }
-            if (tags.Contains("CoverAlly"))
+            if (tags.Contains("CoverAlly") && calc != null && !calc.CannotBeCovered)
             {
+                calc.CoverTarget = unit;
                 effects.Add("掩护友方");
             }
-            if (tags.Contains("Counter"))
+            if (tags.Contains("Counter") && _enqueueAction != null && attacker != null)
             {
-                effects.Add("反击(待实现额外攻击)");
+                _enqueueAction(new PendingAction
+                {
+                    Type = PendingActionType.Counter,
+                    Actor = unit,
+                    Targets = new List<BattleUnit> { attacker },
+                    Power = 75,
+                    HitRate = 90,
+                    DamageType = SkillType.Physical,
+                    AttackType = AttackType.Melee,
+                    SourcePassiveId = skillData.Id
+                });
+                effects.Add("反击(威力75)");
             }
             if (tags.Contains("NullifyFirstMeleeHit"))
             {
-                effects.Add("免疫下一次近战伤害(待实现)");
+                unit.AddTemporal("MeleeHitNullify", 1);
+                effects.Add("免疫下一次近战伤害");
             }
             if (tags.Contains("BlockSealEnemy"))
             {
-                effects.Add("攻击附带格挡封印(待实现)");
+                effects.Add("攻击附带格挡封印(待结构化)");
             }
-            if (tags.Contains("SureHit"))
+            if (tags.Contains("SureHit") && calc != null)
             {
-                effects.Add("必中(待实现)");
+                calc.ForceHit = true;
+                effects.Add("必中");
             }
-            if (tags.Contains("EvasionSkill"))
+            if (tags.Contains("EvasionSkill") && calc != null)
             {
-                effects.Add("回避攻击(待实现)");
+                calc.ForceEvasion = true;
+                effects.Add("回避攻击");
             }
             if (tags.Contains("Heal25"))
             {
@@ -248,18 +486,102 @@ namespace BattleKing.Skills
             }
             if (tags.Contains("HealAlly"))
             {
-                effects.Add("回复友方HP(待实现)");
+                effects.Add("回复友方HP(待结构化)");
             }
+        }
 
-            if (effects.Count > 0)
-                _log?.Invoke($"    → 效果: {string.Join(", ", effects)}");
+        // === Module 4: Target selection helpers ===
+
+        private List<BattleUnit> SelectPassiveTargets(BattleUnit owner, PassiveTargetType targetType,
+            BattleUnit attacker, BattleUnit defender)
+        {
+            switch (targetType)
+            {
+                case PassiveTargetType.Self:
+                    return new List<BattleUnit> { owner };
+                case PassiveTargetType.Attacker:
+                    return attacker != null ? new List<BattleUnit> { attacker } : new List<BattleUnit>();
+                case PassiveTargetType.Defender:
+                    return defender != null ? new List<BattleUnit> { defender } : new List<BattleUnit>();
+                case PassiveTargetType.LowestHpAlly:
+                    var allies = GetAllies(owner, null);
+                    return allies.Any() ? new List<BattleUnit> { allies.OrderBy(u => u.CurrentHp).First() } : new List<BattleUnit>();
+                case PassiveTargetType.HighestHpAlly:
+                    var alliesH = GetAllies(owner, null);
+                    return alliesH.Any() ? new List<BattleUnit> { alliesH.OrderByDescending(u => u.CurrentHp).First() } : new List<BattleUnit>();
+                case PassiveTargetType.AllAllies:
+                    return GetAllies(owner, null);
+                case PassiveTargetType.RandomAlly:
+                    var alliesR = GetAllies(owner, null);
+                    return alliesR.Any() ? new List<BattleUnit> { alliesR[new Random().Next(alliesR.Count)] } : new List<BattleUnit>();
+                default:
+                    return new List<BattleUnit> { owner };
+            }
         }
 
         private List<BattleUnit> GetAllies(BattleUnit unit, BattleContext ctx)
         {
-            return unit.IsPlayer
-                ? ctx.PlayerUnits.Where(u => u != null && u.IsAlive).ToList()
-                : ctx.EnemyUnits.Where(u => u != null && u.IsAlive).ToList();
+            if (ctx != null)
+            {
+                return unit.IsPlayer
+                    ? ctx.PlayerUnits.Where(u => u != null && u.IsAlive).ToList()
+                    : ctx.EnemyUnits.Where(u => u != null && u.IsAlive).ToList();
+            }
+            return new List<BattleUnit> { unit };
+        }
+
+        // === Parameter helpers ===
+
+        private int GetIntParam(Dictionary<string, object> p, string key, int defaultVal)
+        {
+            if (p.TryGetValue(key, out var val))
+            {
+                if (val is int i) return i;
+                if (val is long l) return (int)l;
+                if (val is double d) return (int)d;
+            }
+            return defaultVal;
+        }
+
+        private float GetFloatParam(Dictionary<string, object> p, string key, float defaultVal)
+        {
+            if (p.TryGetValue(key, out var val))
+            {
+                if (val is float f) return f;
+                if (val is double d) return (float)d;
+            }
+            return defaultVal;
+        }
+
+        private string GetStringParam(Dictionary<string, object> p, string key, string defaultVal)
+        {
+            if (p.TryGetValue(key, out var val) && val is string s)
+                return s;
+            return defaultVal;
+        }
+
+        private List<string> GetStringListParam(Dictionary<string, object> p, string key)
+        {
+            if (p.TryGetValue(key, out var val) && val is List<string> list)
+                return list;
+            return new List<string>();
+        }
+
+        private PassiveTargetType GetTargetType(Dictionary<string, object> p, string key, string defaultVal)
+        {
+            string val = GetStringParam(p, key, defaultVal);
+            return val switch
+            {
+                "Self" => PassiveTargetType.Self,
+                "Attacker" => PassiveTargetType.Attacker,
+                "Defender" => PassiveTargetType.Defender,
+                "RandomAlly" => PassiveTargetType.RandomAlly,
+                "LowestHpAlly" => PassiveTargetType.LowestHpAlly,
+                "HighestHpAlly" => PassiveTargetType.HighestHpAlly,
+                "AllAllies" => PassiveTargetType.AllAllies,
+                "ColumnAllies" => PassiveTargetType.ColumnAllies,
+                _ => PassiveTargetType.Self
+            };
         }
     }
 }

@@ -136,7 +136,7 @@ public partial class Main : Node2D
 		var engine = new BattleEngine(ctx);
 		engine.OnLog = msg => GD.Print(msg);
 
-		var passiveProcessor = new BattleKing.Skills.PassiveSkillProcessor(engine.EventBus, gameData, msg => GD.Print(msg));
+		var passiveProcessor = new BattleKing.Skills.PassiveSkillProcessor(engine.EventBus, gameData, msg => GD.Print(msg), engine.EnqueueAction);
 		passiveProcessor.SubscribeAll();
 
 		var result = engine.StartBattle();

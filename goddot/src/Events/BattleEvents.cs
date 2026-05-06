@@ -1,4 +1,5 @@
 using BattleKing.Core;
+using BattleKing.Pipeline;
 using BattleKing.Skills;
 
 namespace BattleKing.Events
@@ -21,6 +22,9 @@ namespace BattleKing.Events
         public BattleUnit Defender { get; set; }
         public ActiveSkill Skill { get; set; }
         public BattleContext Context { get; set; }
+
+        /// <summary>Mutable calculation context — passive skills can modify this before damage is resolved</summary>
+        public DamageCalculation Calc { get; set; }
     }
 
     public class AfterHitEvent : IBattleEvent
@@ -37,6 +41,13 @@ namespace BattleKing.Events
     {
         public BattleUnit Caster { get; set; }
         public ActiveSkill Skill { get; set; }
+        public BattleContext Context { get; set; }
+    }
+
+    public class OnKnockdownEvent : IBattleEvent
+    {
+        public BattleUnit Victim { get; set; }
+        public BattleUnit Killer { get; set; }
         public BattleContext Context { get; set; }
     }
 

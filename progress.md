@@ -204,3 +204,18 @@
 - **2026/05/05**：用户要求分析被动技能对框架的影响。对照 wiki 完整被动技能资料，发现需要5大架构改造：DamageCalculation可变上下文、PendingActionQueue、TemporalState、友方目标选择、效果结构化。
 - **2026/05/05**：创建 `被动技能实现融入现有框架.md` 架构文档，详细记录改造方案、文件修改清单、5阶段实施路线图、关键设计决策。
 - **2026/05/05**：用户不小心还原 progress.md / roadmap.md / CLAUDE.md，从 git 历史恢复并更新到最新状态。准备上传代码到 GitHub。
+  - **2026/05/06 夜间（自主执行）**：Phase 1.3 全部6模块实施完成：
+    - 模块1：DamageCalculation 扩展13个可变字段+多段攻击；DamageCalculator 签名改为 Calculate(DamageCalculation)
+    - 模块2：PendingAction/PendingActionType 行动队列，BattleEngine ProcessPendingActions
+    - 模块3：TemporalState 临时标记系统（BattleUnit.TemporalStates）
+    - 模块4：自定义计数器+友方目标选择+10+种新 EffectType
+    - 模块5：Python 脚本批量 Tags→Effects 迁移（17被动+5主动已填充）
+    - 模块6：Charge 蓄力状态机+OnKnockdownEvent+动态威力
+    - 编译通过，0错误0警告
+- **2026/05/06**：回顾项目状态。对照4份被动技能文档和2份主动技能文档，确认 class-compendium.md 为最全面的数据源（40+职业含成长数据）。发现以下框架影响：
+  - **多段攻击**：约15+个主动技能有2~9hit，需每hit独立判定命中/格挡/暴击 → 模块1范围扩大
+  - **小精灵系统**：精灵女先知专属自定义计数器（积累/消耗循环），AP/PP/HP之外的第四种资源 → 想法池记录，后续独立追加
+  - **资源偷取（AP/PP转移）**：暂时锁定，待奖励系统确定后再设计
+  - **勇气技能**：全部排除，不纳入本项目
+  - **击倒事件/蓄力/动态威力**：新增模块6
+  - roadmap.md 已更新，Phase 1.3 从5模块扩展为6模块

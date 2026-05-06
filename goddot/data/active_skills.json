@@ -13,7 +13,23 @@
       "SureHit",
       "CritUp50"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceHit": true
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Crit",
+          "ratio": 0.5,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "learnCondition": "剑士/剑圣 Lv1",
     "unlockLevel": 1
   },
@@ -48,7 +64,23 @@
       "MultiHit9",
       "CritUp30"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 9
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Crit",
+          "ratio": 0.3,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "learnCondition": "剑圣 Lv20",
     "unlockLevel": 20
   },
@@ -98,7 +130,14 @@
       "MultiHit2",
       "HpMorePowerUp"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 2
+        }
+      }
+    ],
     "learnCondition": "兰茨克内希特 Lv20",
     "unlockLevel": 20
   },
@@ -118,7 +157,14 @@
       "KillHeal25",
       "HpBelow50Priority"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceHit": true
+        }
+      }
+    ],
     "learnCondition": "领主/君主 Lv1",
     "unlockLevel": 1
   },
@@ -156,7 +202,14 @@
       "IgnoreDef50",
       "KillPpPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 2
+        }
+      }
+    ],
     "learnCondition": "君主 Lv20",
     "unlockLevel": 20
   },

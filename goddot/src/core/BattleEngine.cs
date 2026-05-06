@@ -19,6 +19,11 @@ namespace BattleKing.Core
         public Action<string> OnLog { get; set; }
         public EventBus EventBus => _eventBus;
 
+        // Module 2: Pending action queue (counter-attacks, pursuit, preemptive)
+        private Queue<PendingAction> _pendingActions = new Queue<PendingAction>();
+
+        public void EnqueueAction(PendingAction action) => _pendingActions.Enqueue(action);
+
         public BattleEngine(BattleContext ctx)
         {
             _ctx = ctx;
@@ -41,6 +46,9 @@ namespace BattleKing.Core
 
             _eventBus.Publish(new BattleStartEvent { Context = _ctx });
 
+            // Process preemptive actions queued during BattleStart (e.g. Quick Strike)
+            ProcessPendingActions();
+
             while (true)
             {
                 _ctx.TurnCount++;
@@ -53,7 +61,6 @@ namespace BattleKing.Core
                     return EndBattle(BattleResult.Draw);
                 }
 
-                // Sort by speed descending
                 var turnOrder = aliveUnits.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
 
                 foreach (var unit in turnOrder)
@@ -61,20 +68,20 @@ namespace BattleKing.Core
                     if (!unit.IsAlive)
                         continue;
 
-                    // Check win condition before each action
                     var preCheck = CheckBattleEnd();
                     if (preCheck.HasValue)
                         return EndBattle(preCheck.Value);
 
                     ExecuteUnitTurn(unit);
+
+                    // Process any pending counter/pursuit actions from this turn
+                    ProcessPendingActions();
                 }
 
-                // Check win condition after the round
                 var postCheck = CheckBattleEnd();
                 if (postCheck.HasValue)
                     return EndBattle(postCheck.Value);
 
-                // Check AP exhaustion
                 var apCheck = CheckApExhaustion();
                 if (apCheck.HasValue)
                     return EndBattle(apCheck.Value);
@@ -83,17 +90,57 @@ namespace BattleKing.Core
 
         private BattleResult EndBattle(BattleResult result)
         {
+            // Process BattleEnd pending actions (e.g. Finishing Strike) BEFORE judging winner
+            ProcessPendingActions();
+
             _eventBus.Publish(new BattleEndEvent { Context = _ctx, Result = result });
             return result;
         }
 
         private void ExecuteUnitTurn(BattleUnit unit)
         {
+            // Module 6: Charge state machine
+            // If charging, execute the charged skill this turn
+            if (unit.State == UnitState.Charging)
+            {
+                if (unit.ConsecutiveWaitCount >= 3)
+                {
+                    Log($"{unit.Data.Name} 蓄力超时（连续3回待机），蓄力解除");
+                    unit.State = UnitState.Normal;
+                    unit.ChargedSkillId = null;
+                    unit.ConsecutiveWaitCount = 0;
+                    return;
+                }
+
+                // Execute the charged skill
+                var chargeSkill = unit.GameData.GetActiveSkill(unit.ChargedSkillId);
+                if (chargeSkill == null)
+                {
+                    unit.State = UnitState.Normal;
+                    unit.ChargedSkillId = null;
+                    return;
+                }
+
+                Log($"{unit.Data.Name} 蓄力发动！→ {chargeSkill.Name}");
+                unit.State = UnitState.Normal;
+                unit.ChargedSkillId = null;
+
+                var chargeTargets = _strategyEvaluator.SelectTargetsForSkill(unit, chargeSkill);
+                ExecuteSkillAgainstTargets(unit, new BattleKing.Skills.ActiveSkill(chargeSkill, unit.GameData), chargeTargets);
+                return;
+            }
+
+            // Normal flow: evaluate strategy
             var (skill, targets) = _strategyEvaluator.Evaluate(unit);
 
             if (skill == null || targets == null || targets.Count == 0)
             {
-                Log($"{unit.Data.Name} 无法行动，跳过");
+                unit.ConsecutiveWaitCount++;
+                // If charging state somehow without skill, count as wait
+                if (unit.State == UnitState.Charging)
+                    Log($"{unit.Data.Name} 蓄力中，无法行动（第{unit.ConsecutiveWaitCount}次待机）");
+                else
+                    Log($"{unit.Data.Name} 无法行动，跳过");
                 return;
             }
 
@@ -103,18 +150,52 @@ namespace BattleKing.Core
                 return;
             }
 
+            // Check if skill has Charge tag → enter charging state, skip this turn
+            if (skill.Data.Tags != null && skill.Data.Tags.Contains("Charge"))
+            {
+                Log($"{unit.Data.Name} 开始蓄力：{skill.Data.Name}（下次行动时发动）");
+                unit.State = UnitState.Charging;
+                unit.ChargedSkillId = skill.Data.Id;
+                unit.ConsecutiveWaitCount = 0;
+                unit.ConsumeAp(skill.ApCost);  // AP consumed on charge start
+                return;
+            }
+
+            unit.ConsecutiveWaitCount = 0;
+            ExecuteSkillAgainstTargets(unit, skill, targets);
+        }
+
+        private void ExecuteSkillAgainstTargets(BattleUnit unit, BattleKing.Skills.ActiveSkill skill, List<BattleUnit> targets)
+        {
             _eventBus.Publish(new BeforeActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
 
-            unit.ConsumeAp(skill.ApCost);
+            if (unit.State != UnitState.Charging)  // AP already consumed for Charge skills
+                unit.ConsumeAp(skill.ApCost);
 
             foreach (var target in targets)
             {
                 if (!target.IsAlive)
                     continue;
 
-                _eventBus.Publish(new BeforeHitEvent { Attacker = unit, Defender = target, Skill = skill, Context = _ctx });
+                // Create DamageCalculation BEFORE publishing BeforeHitEvent — passive skills can modify it
+                var calc = new DamageCalculation
+                {
+                    Attacker = unit,
+                    Defender = target,
+                    Skill = skill,
+                    HitCount = 1  // Default; multi-hit skills override this via effects
+                };
 
-                var result = _damageCalculator.Calculate(unit, target, skill, _ctx);
+                _eventBus.Publish(new BeforeHitEvent
+                {
+                    Attacker = unit,
+                    Defender = target,
+                    Skill = skill,
+                    Context = _ctx,
+                    Calc = calc
+                });
+
+                var result = _damageCalculator.Calculate(calc);
 
                 string statusText = "";
                 if (!result.IsHit)
@@ -133,9 +214,28 @@ namespace BattleKing.Core
                 if (result.IsHit && !result.IsEvaded)
                 {
                     target.TakeDamage(damage);
+
+                    // Publish OnKnockdown if target died
+                    if (!target.IsAlive)
+                    {
+                        _eventBus.Publish(new OnKnockdownEvent
+                        {
+                            Victim = target,
+                            Killer = unit,
+                            Context = _ctx
+                        });
+                    }
                 }
 
-                _eventBus.Publish(new AfterHitEvent { Attacker = unit, Defender = target, Skill = skill, DamageDealt = damage, IsHit = result.IsHit, Context = _ctx });
+                _eventBus.Publish(new AfterHitEvent
+                {
+                    Attacker = unit,
+                    Defender = target,
+                    Skill = skill,
+                    DamageDealt = damage,
+                    IsHit = result.IsHit,
+                    Context = _ctx
+                });
 
                 string aftermath = $"{target.Data.Name} 剩余 HP:{target.CurrentHp}";
                 if (result.AppliedAilments.Count > 0)
@@ -145,6 +245,93 @@ namespace BattleKing.Core
             }
 
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
+        }
+
+        private void ProcessPendingActions()
+        {
+            while (_pendingActions.Count > 0)
+            {
+                var action = _pendingActions.Dequeue();
+                if (!action.Actor.IsAlive)
+                    continue;
+
+                foreach (var target in action.Targets)
+                {
+                    if (!target.IsAlive)
+                        continue;
+
+                    // Build a temporary ActiveSkill for the pending attack
+                    var tempSkill = BuildTempSkill(action);
+
+                    var calc = new DamageCalculation
+                    {
+                        Attacker = action.Actor,
+                        Defender = target,
+                        Skill = tempSkill,
+                        HitCount = 1
+                    };
+
+                    // Apply tags from the pending action
+                    if (action.Tags.Contains("SureHit"))
+                        calc.ForceHit = true;
+                    if (action.Tags.Contains("CannotBeBlocked"))
+                        calc.CannotBeBlocked = true;
+
+                    _eventBus.Publish(new BeforeHitEvent
+                    {
+                        Attacker = action.Actor,
+                        Defender = target,
+                        Skill = tempSkill,
+                        Context = _ctx,
+                        Calc = calc
+                    });
+
+                    var result = _damageCalculator.Calculate(calc);
+
+                    if (result.IsHit && !result.IsEvaded)
+                    {
+                        target.TakeDamage(result.TotalDamage);
+
+                        if (!target.IsAlive)
+                        {
+                            _eventBus.Publish(new OnKnockdownEvent
+                            {
+                                Victim = target,
+                                Killer = action.Actor,
+                                Context = _ctx
+                            });
+                        }
+                    }
+
+                    _eventBus.Publish(new AfterHitEvent
+                    {
+                        Attacker = action.Actor,
+                        Defender = target,
+                        Skill = tempSkill,
+                        DamageDealt = result.TotalDamage,
+                        IsHit = result.IsHit,
+                        Context = _ctx
+                    });
+
+                    Log($"[{action.Type}] {action.Actor.Data.Name} → {target.Data.Name} {result.TotalDamage}伤害 [{action.SourcePassiveId}]");
+                }
+            }
+        }
+
+        private ActiveSkill BuildTempSkill(PendingAction action)
+        {
+            var data = new ActiveSkillData
+            {
+                Id = $"temp_{action.SourcePassiveId}",
+                Name = action.SourcePassiveId,
+                ApCost = 0,
+                Type = action.DamageType,
+                AttackType = action.AttackType,
+                Power = action.Power,
+                HitRate = action.HitRate,
+                TargetType = action.TargetType
+            };
+            return new ActiveSkill(data, _ctx.PlayerUnits.FirstOrDefault()?.GameData);
         }
 
         private BattleResult? CheckBattleEnd()

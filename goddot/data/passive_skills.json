@@ -12,7 +12,14 @@
       "SureHit",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceHit": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "剑士/剑圣 Lv1",
     "unlockLevel": 1
@@ -30,7 +37,23 @@
       "NullifyFirstMeleeHit",
       "ApPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "key": "MeleeHitNullify",
+          "count": 1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "amount": 1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "剑士/剑圣 Lv10，招架盾",
     "unlockLevel": 10
@@ -48,7 +71,24 @@
       "ApPlus1",
       "CritDamageUp50"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "amount": 1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "CritDmg",
+          "ratio": 0.5,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "剑圣 Lv25",
     "unlockLevel": 25
@@ -66,7 +106,15 @@
       "Counter",
       "HitPpPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CounterAttack",
+        "parameters": {
+          "power": 75,
+          "hitRate": 90
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "佣兵/兰茨克内希特 Lv1",
     "unlockLevel": 1
@@ -84,7 +132,23 @@
       "MediumGuard",
       "AtkUp20Stackable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Str",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "兰茨克内希特 Lv25，佣兵木盾",
     "unlockLevel": 25
@@ -103,7 +167,33 @@
       "AtkUp20",
       "SpdUp20"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "amount": 1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Str",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Spd",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "兰茨克内希特 Lv30",
     "unlockLevel": 30
@@ -122,7 +212,23 @@
       "DefUp20",
       "FreeBelow50Hp"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Def",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "领主/君主 Lv1",
     "unlockLevel": 1
@@ -139,7 +245,12 @@
     "tags": [
       "CoverAlly"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CoverAlly",
+        "parameters": {}
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "领主/君主 Lv10",
     "unlockLevel": 10
@@ -193,7 +304,15 @@
       "Heal25",
       "SingleTarget"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "RecoverHp",
+        "parameters": {
+          "amount": 25,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "战士/先锋 Lv10",
     "unlockLevel": 10
@@ -299,7 +418,17 @@
       "DefUp20",
       "BlockEnhance"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Def",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "家臣/维京 Lv15",
     "unlockLevel": 15
@@ -316,7 +445,14 @@
     "tags": [
       "LargeGuardAlly"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "维京 Lv25",
     "unlockLevel": 25
@@ -368,7 +504,15 @@
       "Counter",
       "Pursuit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CounterAttack",
+        "parameters": {
+          "power": 75,
+          "hitRate": 90
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "甲胄骑兵 Lv20",
     "unlockLevel": 20
@@ -403,7 +547,14 @@
     "tags": [
       "EvasionSkill"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceEvasion": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "角斗士/狂战士 Lv15",
     "unlockLevel": 15
@@ -475,7 +626,14 @@
     "tags": [
       "BlockSealEnemy"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "CannotBeBlocked": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "破坏者 Lv25",
     "unlockLevel": 25
@@ -493,7 +651,17 @@
       "AtkUp20Stackable",
       "HitUp20Stackable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Str",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "猎人/狙击手 Lv1",
     "unlockLevel": 1
@@ -600,7 +768,21 @@
       "EvasionSkill",
       "ApPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceEvasion": true
+        }
+      },
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "amount": 1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "盗贼/流氓 Lv1",
     "unlockLevel": 1
@@ -635,7 +817,26 @@
       "SpdUp30",
       "EvaUp30"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Spd",
+          "ratio": 0.3,
+          "turns": -1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Eva",
+          "ratio": 0.3,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "流氓 Lv25",
     "unlockLevel": 25

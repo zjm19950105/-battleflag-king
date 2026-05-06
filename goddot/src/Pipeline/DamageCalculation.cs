@@ -32,5 +32,51 @@ namespace BattleKing.Pipeline
         public int TotalDamage => PhysicalDamage + MagicalDamage;
 
         public List<StatusAilment> AppliedAilments { get; set; } = new List<StatusAilment>();
+
+        // === Module 1: Mutable params for passive skill intervention ===
+
+        /// <summary>Force hit (skip hit check, but evasion skills still work)</summary>
+        public bool ForceHit { get; set; } = false;
+
+        /// <summary>Force evasion (skip hit, always evade)</summary>
+        public bool ForceEvasion { get; set; } = false;
+
+        /// <summary>Force block (true) or force no block (false); null = normal roll</summary>
+        public bool? ForceBlock { get; set; } = null;
+
+        /// <summary>Additional multiplier on skill power (e.g. Death Blade: HP<50% → +0.5)</summary>
+        public float SkillPowerMultiplier { get; set; } = 1.0f;
+
+        /// <summary>Final damage multiplier after all other calculations</summary>
+        public float DamageMultiplier { get; set; } = 1.0f;
+
+        /// <summary>Ignore defense ratio (0~1, e.g. Heavy Breaker ignores 100%)</summary>
+        public float IgnoreDefenseRatio { get; set; } = 0f;
+
+        /// <summary>Nullify physical damage (1-hit immunity, etc.)</summary>
+        public bool NullifyPhysicalDamage { get; set; } = false;
+
+        /// <summary>Nullify magical damage (magic barrier, etc.)</summary>
+        public bool NullifyMagicalDamage { get; set; } = false;
+
+        /// <summary>If set, attack redirects to this unit (cover)</summary>
+        public BattleUnit CoverTarget { get; set; } = null;
+
+        /// <summary>This attack cannot be covered</summary>
+        public bool CannotBeCovered { get; set; } = false;
+
+        /// <summary>This attack cannot be blocked (guard-seal)</summary>
+        public bool CannotBeBlocked { get; set; } = false;
+
+        // === Module 1: Multi-hit support ===
+
+        /// <summary>Number of hits for this attack (1 for normal, N for multi-hit)</summary>
+        public int HitCount { get; set; } = 1;
+
+        /// <summary>Bonus power from custom counters (e.g. sprite counter × 30)</summary>
+        public float CounterPowerBonus { get; set; } = 0f;
+
+        /// <summary>Effective skill power = base power + counter bonus</summary>
+        public float EffectivePower => Skill.Power + CounterPowerBonus;
     }
 }
