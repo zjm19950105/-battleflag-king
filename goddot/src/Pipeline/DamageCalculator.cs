@@ -222,8 +222,13 @@ namespace BattleKing.Pipeline
 
         private bool RollEvasion(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
         {
-            if (skill.AttackType == AttackType.Ranged)
-                return false;
+            // Evasion skill (e.g. 回避步伐) — always evades, bypasses everything
+            // This is set by passive effects via DamageCalculation.ForceEvasion
+            // Handled in Calculate() before calling this method
+
+            // Normal evasion is already factored into hit rate formula:
+            //   hitRate = skillHit + attacker.Hit - defender.Eva
+            // So no separate evasion roll needed here.
 
             return false;
         }
