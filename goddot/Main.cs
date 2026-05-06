@@ -8,6 +8,7 @@ using BattleKing.Ai;
 
 public enum GamePhase
 {
+	ModeSelect,
 	PlayerFormation,
 	EnemyChoice,
 	EnemyDragFormation,
@@ -35,6 +36,7 @@ public partial class Main : Node2D
 	private string[] _playerSlots = new string[6];
 	private string[] _enemySlots = new string[6];
 	private bool _enemyUseDrag;
+	private int _minSlots = 3;
 
 	private BattleContext _ctx;
 	private BattleEngine _engine;
@@ -45,6 +47,7 @@ public partial class Main : Node2D
 	private int _passiveSetupIdx;
 	private int _strategySetupIdx;
 	private BattleResult _battleResult;
+	private Node _logOriginalParent;
 
 	// ── GODOT ────────────────────────────────────────────────
 
@@ -56,7 +59,7 @@ public partial class Main : Node2D
 		_allChars = _gameData.Characters.Values.ToList();
 		SetupUi();
 		Log("数据加载完成 — 战旗之王 Phase 1.3");
-		Go(GamePhase.PlayerFormation);
+		Go(GamePhase.ModeSelect);
 	}
 
 	// ── LAYOUT: status → formation-area → button-bar → log ──
@@ -127,6 +130,7 @@ public partial class Main : Node2D
 		ClearAll();
 		switch (p)
 		{
+			case GamePhase.ModeSelect:        Phase_ModeSelect(); break;
 			case GamePhase.PlayerFormation:   Phase_PlayerFormation(); break;
 			case GamePhase.EnemyChoice:       Phase_EnemyChoice(); break;
 			case GamePhase.EnemyDragFormation: Phase_EnemyDragFormation(); break;
@@ -137,15 +141,32 @@ public partial class Main : Node2D
 		}
 	}
 
+	// ── PHASE 0: MODE SELECT ──────────────────────────────
+
+	private void Phase_ModeSelect()
+	{
+		_statusLabel.Text = "▶  选择对战模式";
+		ClearLog();
+		_leftPanel.AddChild(new Label { Text = "选择对战模式:\n" });
+		_leftPanel.AddChild(Btn("[1v1 对战] — 双方各上场1人", () => {
+			_minSlots = 1;
+			Go(GamePhase.PlayerFormation);
+		}));
+		_leftPanel.AddChild(Btn("[3v3 对战] — 双方各上场3人", () => {
+			_minSlots = 3;
+			Go(GamePhase.PlayerFormation);
+		}));
+	}
+
 	// ── PHASE 1: PLAYER FORMATION ────────────────────────────
 
 	private void Phase_PlayerFormation()
 	{
-		_statusLabel.Text = "▶  我方阵型 — 拖拽角色到格子 (至少3人，最多6人)";
+		_statusLabel.Text = $"▶  我方阵型 — 拖拽角色到格子 (至少{_minSlots}人，最多6人)";
 		ClearLog();
 		BuildDragUI("我方", _playerSlots, () => {
 			int n = _playerSlots.Count(s => s != null);
-			if (n < 3) { Log($"至少需要3人 (当前{n})"); return; }
+			if (n < _minSlots) { Log($"至少需要{_minSlots}人 (当前{n})"); return; }
 			Log($"我方阵型确认 ({n}人): {string.Join(",", _playerSlots.Where(s => s != null))}");
 			Go(GamePhase.EnemyChoice);
 		});
@@ -182,10 +203,10 @@ public partial class Main : Node2D
 
 	private void Phase_EnemyDragFormation()
 	{
-		_statusLabel.Text = "▶  敌方阵型 — 拖拽角色到格子 (至少3人)";
+		_statusLabel.Text = $"▶  敌方阵型 — 拖拽角色到格子 (至少{_minSlots}人)";
 		BuildDragUI("敌方", _enemySlots, () => {
 			int n = _enemySlots.Count(s => s != null);
-			if (n < 3) { Log($"至少需要3人 (当前{n})"); return; }
+			if (n < _minSlots) { Log($"至少需要{_minSlots}人 (当前{n})"); return; }
 			Log($"敌方阵型确认 ({n}人)");
 			CreateAllUnits(preset: false);
 			Go(GamePhase.PassiveSetup);
@@ -201,8 +222,8 @@ public partial class Main : Node2D
 		if (selected.Id == "fmt_random" || selected.Units.Count == 0)
 		{
 			var available = _gameData.Characters.Keys.ToList();
-			var picked = available.OrderBy(_ => _rnd.Next()).Take(3).ToList();
-			_enemyConfig = new() { (picked[0], 1, "preset_aggressive"), (picked[1], 2, "preset_aggressive"), (picked[2], 3, "preset_aggressive") };
+			var picked = available.OrderBy(_ => _rnd.Next()).Take(_minSlots).ToList();
+			_enemyConfig = picked.Select((p, i) => (p, i + 1, "preset_aggressive")).ToList();
 		}
 		else
 		{
@@ -235,7 +256,7 @@ public partial class Main : Node2D
 		// Bottom: confirm
 		int filled = slots.Count(s => s != null);
 		var confirmBtn = Btn($"✓ 确认{teamLabel}阵型 ({filled}人)", onConfirm);
-		if (filled < 3) confirmBtn.Disabled = true;
+		if (filled < _minSlots) confirmBtn.Disabled = true;
 		_buttonBar.AddChild(confirmBtn);
 	}
 
@@ -317,6 +338,19 @@ public partial class Main : Node2D
 		if (eq != null) foreach (var eid in eq) { var ed = _gameData.GetEquipment(eid); if (ed != null) u.Equipment.Equip(ed); }
 		var firstId = u.GetAvailableActiveSkillIds().FirstOrDefault();
 		if (firstId != null) u.Strategies = Enumerable.Range(0, 8).Select(_ => new Strategy { SkillId = firstId }).ToList();
+
+		// Auto-equip default passives (UnlockLevel <= 1) up to PP cap
+		var autoPassives = u.GetAvailablePassiveSkillIds()
+			.Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null)
+			.Where(s => s.UnlockLevel == null || s.UnlockLevel <= 1)
+			.OrderBy(s => s.PpCost).ToList();
+		int ppUsed = 0;
+		foreach (var s in autoPassives)
+		{
+			if (ppUsed + s.PpCost > u.MaxPp) continue;
+			u.EquippedPassiveSkillIds.Add(s.Id);
+			ppUsed += s.PpCost;
+		}
 		return u;
 	}
 
@@ -425,7 +459,12 @@ public partial class Main : Node2D
 		unitLabel.AddThemeFontSizeOverride("normal_font_size", 18);
 		_leftPanel.AddChild(unitLabel);
 
-		// Right: battle log uses _logLabel (TextEdit) below
+		// Right: reparent log TextEdit from bottom to right panel
+		_logOriginalParent = _logLabel.GetParent();
+		if (_logOriginalParent != null) _logOriginalParent.RemoveChild(_logLabel);
+		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_rightPanel.AddChild(_logLabel);
 
 		// Init engine
 		_engine = new BattleEngine(_ctx);
@@ -490,7 +529,7 @@ public partial class Main : Node2D
 	{
 		_statusLabel.Text = $"战斗结果: {_battleResult}";
 		Log($"\n=== {_battleResult} ===");
-		AddBtn("再来一局", () => { Array.Clear(_playerSlots); Array.Clear(_enemySlots); Go(GamePhase.PlayerFormation); });
+		AddBtn("再来一局", () => { Array.Clear(_playerSlots); Array.Clear(_enemySlots); Go(GamePhase.ModeSelect); });
 		AddBtn("结束", () => { _statusLabel.Text = "游戏结束"; });
 	}
 }
