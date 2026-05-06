@@ -99,7 +99,7 @@ public partial class Main : Node2D
 		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
 		_logLabel.AddThemeColorOverride("background_color", new Color(0.05f, 0.05f, 0.08f));
-		_logLabel.AddThemeFontSizeOverride("font_size", 16);
+		_logLabel.AddThemeFontSizeOverride("font_size", 20);
 		root.AddChild(_logLabel);
 	}
 
@@ -413,27 +413,21 @@ public partial class Main : Node2D
 
 	// ── PHASE 5: BATTLE ──────────────────────────────────────
 
+	// ── PHASE 5: BATTLE (step-by-step) ─────────────────────
+
 	private void Phase_Battle()
 	{
-		// Two-panel: left unit status, right battle log
-		_formationArea.Visible = false;
-		ClearLog();
+		ClearAll();
+		_statusLabel.Text = "▶  战斗 — 点击「下一回合」逐步推进";
 
-		// Add unit panel to left
-		var unitBg = new Panel();
-		unitBg.CustomMinimumSize = new Vector2(300, 0);
-		unitBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.06f, 0.06f, 0.16f) });
-		_formationArea.AddChild(unitBg);
-		var _unitLabel = new RichTextLabel { BbcodeEnabled = true };
-		_unitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		_unitLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_unitLabel.AddThemeFontSizeOverride("normal_font_size", 16);
-		unitBg.AddChild(_unitLabel);
+		// Left: unit status
+		var unitLabel = new RichTextLabel { BbcodeEnabled = true };
+		unitLabel.AddThemeFontSizeOverride("normal_font_size", 18);
+		_leftPanel.AddChild(unitLabel);
 
-		// Log fills remaining space
-		_logLabel.SizeFlagsStretchRatio = 3;
+		// Right: battle log uses _logLabel (TextEdit) below
 
-		// Init battle
+		// Init engine
 		_engine = new BattleEngine(_ctx);
 		_engine.OnLog = msg => { _logLabel.InsertTextAtCaret(msg + "\n"); };
 		_passiveProc = new BattleKing.Skills.PassiveSkillProcessor(_engine.EventBus, _gameData,
@@ -441,44 +435,44 @@ public partial class Main : Node2D
 			_engine.EnqueueAction);
 		_passiveProc.SubscribeAll();
 		_engine.InitBattle();
-		RefreshUnitPanel(_unitLabel);
 
-		AddBtn("▶ 下一回合", () => StepOneTurn(_unitLabel));
+		ClearLog();
+		RefreshBattleStatus(unitLabel);
+
+		AddBtn("▶ 下一回合", () => StepOneTurn(unitLabel));
 	}
 
-	private void RefreshUnitPanel(RichTextLabel label)
+	private void RefreshBattleStatus(RichTextLabel label)
 	{
 		label.Clear();
-		label.AppendText("[color=yellow]══ 战场 ══[/color]\n");
+		label.AppendText("[color=yellow]══ 战场 ══[/color]\n\n");
 		label.AppendText("[color=cyan]▸ 己方[/color]\n");
 		foreach (var u in _playerUnits)
 		{
 			if (u == null) continue;
 			if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); continue; }
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
-			string hpBar = new string('|', hpPct / 5) + new string('.', (100 - hpPct) / 5);
-			label.AppendText($"  [color=white][{u.Position}][/color] {u.Data.Name} {hpBar} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
+			string hpBar = new string('█', hpPct / 10) + new string('░', (100 - hpPct) / 10);
+			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
 		}
-		label.AppendText("[color=orange]▸ 敌方[/color]\n");
+		label.AppendText("\n[color=orange]▸ 敌方[/color]\n");
 		foreach (var u in _enemyUnits)
 		{
 			if (u == null) continue;
 			if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); continue; }
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
-			string hpBar = new string('|', hpPct / 5) + new string('.', (100 - hpPct) / 5);
-			label.AppendText($"  [color=white][{u.Position}][/color] {u.Data.Name} {hpBar} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
+			string hpBar = new string('█', hpPct / 10) + new string('░', (100 - hpPct) / 10);
+			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
 		}
 	}
 
-	private void StepOneTurn(RichTextLabel unitLabel)
+	private void StepOneTurn(RichTextLabel label)
 	{
 		var result = _engine.StepBattle();
-		RefreshUnitPanel(unitLabel);
+		RefreshBattleStatus(label);
 		if (result != BattleStepResult.Continue)
 		{
 			ClearButtons();
-			_formationArea.Visible = true;
-			_logLabel.SizeFlagsStretchRatio = 1;
 			_battleResult = result switch
 			{
 				BattleStepResult.PlayerWin => BattleResult.PlayerWin,
@@ -486,7 +480,7 @@ public partial class Main : Node2D
 				_ => BattleResult.Draw
 			};
 			Log("\n=== " + _battleResult + " ===");
-			AddBtn("查看结果", () => Go(GamePhase.Result));
+			AddBtn("结果", () => Go(GamePhase.Result));
 		}
 	}
 
