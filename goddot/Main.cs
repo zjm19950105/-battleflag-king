@@ -127,6 +127,14 @@ public partial class Main : Node2D
 	private void Go(GamePhase p)
 	{
 		_phase = p;
+		// Before clearing: reparent log if it was moved to right panel
+		if (_logOriginalParent != null)
+		{
+			if (_rightPanel != null && _logLabel.GetParent() == _rightPanel)
+				_rightPanel.RemoveChild(_logLabel);
+			_logOriginalParent.AddChild(_logLabel);
+			_logOriginalParent = null;
+		}
 		ClearAll();
 		switch (p)
 		{
@@ -457,6 +465,7 @@ public partial class Main : Node2D
 		// Left: unit status
 		var unitLabel = new RichTextLabel { BbcodeEnabled = true };
 		unitLabel.AddThemeFontSizeOverride("normal_font_size", 18);
+		unitLabel.AddThemeColorOverride("default_color", new Color(0.9f, 0.9f, 0.9f));
 		_leftPanel.AddChild(unitLabel);
 
 		// Right: reparent log TextEdit from bottom to right panel
@@ -491,8 +500,10 @@ public partial class Main : Node2D
 			if (u == null) continue;
 			if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); continue; }
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
-			string hpBar = new string('█', hpPct / 10) + new string('░', (100 - hpPct) / 10);
-			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
+			string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
+			var pv = u.GetEquippedPassiveSkills();
+			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
+			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
 		}
 		label.AppendText("\n[color=orange]▸ 敌方[/color]\n");
 		foreach (var u in _enemyUnits)
@@ -500,8 +511,10 @@ public partial class Main : Node2D
 			if (u == null) continue;
 			if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); continue; }
 			int hpPct = u.CurrentHp * 100 / Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
-			string hpBar = new string('█', hpPct / 10) + new string('░', (100 - hpPct) / 10);
-			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}\n");
+			string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
+			var pv = u.GetEquippedPassiveSkills();
+			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
+			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
 		}
 	}
 
