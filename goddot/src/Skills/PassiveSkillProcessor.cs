@@ -207,13 +207,12 @@ namespace BattleKing.Skills
             {
                 case "RecoverAp":
                     int apAmt = GetIntParam(p, "amount", 1);
-                    // Check target: Self or Ally
                     var apTarget = GetTargetType(p, "target", "Self");
                     var apUnits = SelectPassiveTargets(unit, apTarget, attacker, defender);
                     foreach (var t in apUnits)
                     {
                         t.RecoverAp(apAmt);
-                        effects.Add($"{t.Data.Name} AP+{apAmt}");
+                        effects.Add($"[AP] {t.Data.Name} AP+{apAmt} ({t.CurrentAp - apAmt}→{t.CurrentAp})");
                     }
                     break;
 
@@ -224,7 +223,7 @@ namespace BattleKing.Skills
                     foreach (var t in ppUnits)
                     {
                         t.RecoverPp(ppAmt);
-                        effects.Add($"{t.Data.Name} PP+{ppAmt}");
+                        effects.Add($"[PP] {t.Data.Name} PP+{ppAmt} ({t.CurrentPp - ppAmt}→{t.CurrentPp})");
                     }
                     break;
 
@@ -234,22 +233,26 @@ namespace BattleKing.Skills
                     var healUnits = SelectPassiveTargets(unit, healTarget, attacker, defender);
                     foreach (var t in healUnits)
                     {
+                        int hpBefore = t.CurrentHp;
                         int heal = (int)(t.Data.BaseStats.GetValueOrDefault("HP", 0) * healPct / 100f);
                         t.CurrentHp = Math.Min(t.Data.BaseStats.GetValueOrDefault("HP", 0), t.CurrentHp + Math.Max(1, heal));
-                        effects.Add($"{t.Data.Name} HP回复{healPct}%");
+                        effects.Add($"[HP] {t.Data.Name} +{Math.Min(heal, t.CurrentHp - hpBefore)} ({hpBefore}→{t.CurrentHp})");
                     }
                     break;
 
                 case "AddBuff":
                     var buffStat = GetStringParam(p, "stat", "Str");
                     float buffRatio = GetFloatParam(p, "ratio", 0.2f);
-                    int buffTurns = GetIntParam(p, "turns", 1);  // default 1 turn; use -1 for battle-long
+                    int buffTurns = GetIntParam(p, "turns", 1);
                     var buffTarget = GetTargetType(p, "target", "Self");
                     var buffUnits = SelectPassiveTargets(unit, buffTarget, attacker, defender);
                     foreach (var t in buffUnits)
                     {
+                        int before = t.GetCurrentStat(buffStat);
                         t.Buffs.Add(new Buff { TargetStat = buffStat, Ratio = buffRatio, RemainingTurns = buffTurns });
-                        effects.Add($"{t.Data.Name} {buffStat}+{(int)(buffRatio * 100)}%");
+                        int after = t.GetCurrentStat(buffStat);
+                        string dur = buffTurns == -1 ? "[战斗]" : $"[{buffTurns}回合]";
+                        effects.Add($"[+] {buffStat}+{(int)(buffRatio * 100)}% ({before}→{after}) {dur}");
                     }
                     break;
 
@@ -275,15 +278,15 @@ namespace BattleKing.Skills
                     if (calc != null)
                     {
                         if (p.ContainsKey("ForceHit") && (bool)p["ForceHit"])
-                        { calc.ForceHit = true; effects.Add("必中"); }
+                        { calc.ForceHit = true; effects.Add("[!] 必中"); }
                         if (p.ContainsKey("ForceEvasion") && (bool)p["ForceEvasion"])
-                        { calc.ForceEvasion = true; effects.Add("强制回避"); }
+                        { calc.ForceEvasion = true; effects.Add("[!] 强制回避"); }
                         if (p.ContainsKey("CannotBeBlocked") && (bool)p["CannotBeBlocked"])
-                        { calc.CannotBeBlocked = true; effects.Add("格挡不可"); }
+                        { calc.CannotBeBlocked = true; effects.Add("[!] 格挡不可"); }
                         if (p.ContainsKey("IgnoreDefenseRatio"))
-                        { calc.IgnoreDefenseRatio = (float)(double)p["IgnoreDefenseRatio"]; effects.Add($"无视{(int)(calc.IgnoreDefenseRatio * 100)}%防御"); }
+                        { calc.IgnoreDefenseRatio = (float)(double)p["IgnoreDefenseRatio"]; effects.Add($"[!] 无视{(int)(calc.IgnoreDefenseRatio * 100)}%防御"); }
                         if (p.ContainsKey("SkillPowerMultiplier"))
-                        { calc.SkillPowerMultiplier *= (float)(double)p["SkillPowerMultiplier"]; effects.Add($"威力×{calc.SkillPowerMultiplier}"); }
+                        { calc.SkillPowerMultiplier *= (float)(double)p["SkillPowerMultiplier"]; effects.Add($"[!] 威力×{calc.SkillPowerMultiplier}"); }
                     }
                     break;
 
@@ -291,7 +294,7 @@ namespace BattleKing.Skills
                     if (calc != null && !calc.CannotBeCovered)
                     {
                         calc.CoverTarget = unit;
-                        effects.Add($"{unit.Data.Name} 掩护目标");
+                        effects.Add($"[#] {unit.Data.Name} 掩护目标");
                     }
                     break;
 
@@ -303,7 +306,7 @@ namespace BattleKing.Skills
                     foreach (var t in markUnits)
                     {
                         t.AddTemporal(markKey, markCount, -1, skillData.Id);
-                        effects.Add($"{t.Data.Name} 获得{markKey}({markCount}次)");
+                        effects.Add($"[*] {t.Data.Name} {markKey}({markCount}次)");
                     }
                     break;
 
@@ -311,20 +314,17 @@ namespace BattleKing.Skills
                     if (attacker != null && _enqueueAction != null)
                     {
                         int cntPower = GetIntParam(p, "power", 75);
-                        int? cntHit = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null;
                         _enqueueAction(new PendingAction
                         {
                             Type = PendingActionType.Counter,
                             Actor = unit,
                             Targets = new List<BattleUnit> { attacker },
                             Power = cntPower,
-                            HitRate = cntHit,
-                            DamageType = SkillType.Physical,
-                            AttackType = AttackType.Melee,
-                            SourcePassiveId = skillData.Id,
-                            Tags = GetStringListParam(p, "tags")
+                            HitRate = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null,
+                            DamageType = SkillType.Physical, AttackType = AttackType.Melee,
+                            SourcePassiveId = skillData.Id, Tags = GetStringListParam(p, "tags")
                         });
-                        effects.Add($"反击(威力{cntPower})");
+                        effects.Add($"[>>] 反击(威力{cntPower})");
                     }
                     break;
 
@@ -332,20 +332,17 @@ namespace BattleKing.Skills
                     if (attacker != null && _enqueueAction != null)
                     {
                         int purPower = GetIntParam(p, "power", 75);
-                        int? purHit = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null;
                         _enqueueAction(new PendingAction
                         {
                             Type = PendingActionType.Pursuit,
                             Actor = unit,
                             Targets = new List<BattleUnit> { attacker },
                             Power = purPower,
-                            HitRate = purHit,
-                            DamageType = SkillType.Physical,
-                            AttackType = AttackType.Melee,
-                            SourcePassiveId = skillData.Id,
-                            Tags = GetStringListParam(p, "tags")
+                            HitRate = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null,
+                            DamageType = SkillType.Physical, AttackType = AttackType.Melee,
+                            SourcePassiveId = skillData.Id, Tags = GetStringListParam(p, "tags")
                         });
-                        effects.Add($"追击(威力{purPower})");
+                        effects.Add($"[>>] 追击(威力{purPower})");
                     }
                     break;
 
@@ -353,22 +350,17 @@ namespace BattleKing.Skills
                     if (_enqueueAction != null)
                     {
                         int prePower = GetIntParam(p, "power", 100);
-                        int? preHit = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null;
                         var preTarget = GetTargetType(p, "target", "Attacker");
                         var preUnits = SelectPassiveTargets(unit, preTarget, attacker, defender);
                         _enqueueAction(new PendingAction
                         {
-                            Type = PendingActionType.Preemptive,
-                            Actor = unit,
-                            Targets = preUnits,
+                            Type = PendingActionType.Preemptive, Actor = unit, Targets = preUnits,
                             Power = prePower,
-                            HitRate = preHit,
-                            DamageType = SkillType.Physical,
-                            AttackType = AttackType.Melee,
-                            SourcePassiveId = skillData.Id,
-                            Tags = GetStringListParam(p, "tags")
+                            HitRate = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null,
+                            DamageType = SkillType.Physical, AttackType = AttackType.Melee,
+                            SourcePassiveId = skillData.Id, Tags = GetStringListParam(p, "tags")
                         });
-                        effects.Add($"先制攻击(威力{prePower})");
+                        effects.Add($"[>>] 先制攻击(威力{prePower})");
                     }
                     break;
 
@@ -386,51 +378,58 @@ namespace BattleKing.Skills
 
             if (tags.Contains("ApPlus1"))
             {
+                int apBefore = unit.CurrentAp;
                 unit.RecoverAp(1);
-                effects.Add("AP+1");
+                effects.Add($"[AP] AP+1 ({apBefore}→{unit.CurrentAp})");
             }
             if (tags.Contains("ApPlus1Ally"))
             {
-                effects.Add("友方AP+1(待结构化)");
+                effects.Add("[AP] 友方AP+1(待结构化)");
             }
             if (tags.Contains("HitPpPlus1"))
             {
-                effects.Add("命中时PP+1(待结构化)");
+                effects.Add("[PP] 命中时PP+1(待结构化)");
             }
             if (tags.Contains("DefUp20"))
             {
+                int before = unit.GetCurrentStat("Def");
                 unit.Buffs.Add(new Buff { TargetStat = "Def", Ratio = 0.20f, RemainingTurns = 1 });
-                effects.Add("防御+20%");
+                effects.Add($"[+] Def+20% ({before}→{unit.GetCurrentStat("Def")})");
             }
             if (tags.Contains("AtkUp20"))
             {
+                int before = unit.GetCurrentStat("Str");
                 unit.Buffs.Add(new Buff { TargetStat = "Str", Ratio = 0.20f, RemainingTurns = 1 });
-                effects.Add("物攻+20%");
+                effects.Add($"[+] Str+20% ({before}→{unit.GetCurrentStat("Str")})");
             }
             if (tags.Contains("AtkUp20Stackable"))
             {
+                int before = unit.GetCurrentStat("Str");
                 unit.Buffs.Add(new Buff { TargetStat = "Str", Ratio = 0.20f, RemainingTurns = 1 });
-                effects.Add("物攻+20%(可叠加)");
+                effects.Add($"[+] Str+20%可叠加 ({before}→{unit.GetCurrentStat("Str")})");
             }
             if (tags.Contains("SpdUp20"))
             {
+                int before = unit.GetCurrentStat("Spd");
                 unit.Buffs.Add(new Buff { TargetStat = "Spd", Ratio = 0.20f, RemainingTurns = 1 });
-                effects.Add("速度+20");
+                effects.Add($"[+] Spd+20% ({before}→{unit.GetCurrentStat("Spd")})");
             }
             if (tags.Contains("SpdUp30"))
             {
+                int before = unit.GetCurrentStat("Spd");
                 unit.Buffs.Add(new Buff { TargetStat = "Spd", Ratio = 0.30f, RemainingTurns = 1 });
-                effects.Add("速度+30");
+                effects.Add($"[+] Spd+30% ({before}→{unit.GetCurrentStat("Spd")})");
             }
             if (tags.Contains("EvaUp30"))
             {
+                int before = unit.GetCurrentStat("Eva");
                 unit.Buffs.Add(new Buff { TargetStat = "Eva", Ratio = 0.30f, RemainingTurns = 1 });
-                effects.Add("回避+30");
+                effects.Add($"[+] Eva+30% ({before}→{unit.GetCurrentStat("Eva")})");
             }
             if (tags.Contains("CritDamageUp50"))
             {
                 unit.Buffs.Add(new Buff { TargetStat = "CritDmg", Ratio = 0.50f, RemainingTurns = 1 });
-                effects.Add("暴击伤害+50%");
+                effects.Add("[+] 暴击伤害+50%");
             }
             if (tags.Contains("MediumGuard") && calc != null)
             {
