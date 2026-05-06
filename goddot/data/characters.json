@@ -20,16 +20,16 @@
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 60,
-      "Str": 45,
-      "Def": 15,
-      "Mag": 31,
-      "MDef": 40,
-      "Hit": 166,
-      "Eva": 97,
-      "Crit": 40,
-      "Block": 10,
-      "Spd": 54,
+      "HP": 21,
+      "Str": 12,
+      "Def": 4,
+      "Mag": 8,
+      "MDef": 11,
+      "Hit": 66,
+      "Eva": 29,
+      "Crit": 14,
+      "Block": 3,
+      "Spd": 16,
       "AP": 2,
       "PP": 1
     },
@@ -77,16 +77,16 @@
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 104,
-      "Str": 79,
-      "Def": 36,
-      "Mag": 17,
-      "MDef": 25,
-      "Hit": 128,
-      "Eva": 30,
-      "Crit": 20,
-      "Block": 24,
-      "Spd": 16,
+      "HP": 36,
+      "Str": 22,
+      "Def": 10,
+      "Mag": 4,
+      "MDef": 7,
+      "Hit": 51,
+      "Eva": 9,
+      "Crit": 7,
+      "Block": 8,
+      "Spd": 4,
       "AP": 2,
       "PP": 1
     },
@@ -111,7 +111,8 @@
       "act_bastard_cross"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_brute_force"
+      "pas_brute_force",
+      "pas_vengeance_guard"
     ]
   },
   {
@@ -135,16 +136,16 @@
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 120,
-      "Str": 100,
-      "Def": 120,
-      "Mag": 100,
-      "MDef": 110,
-      "Hit": 115,
-      "Eva": 120,
-      "Crit": 100,
-      "Block": 140,
-      "Spd": 120,
+      "HP": 40,
+      "Str": 16,
+      "Def": 16,
+      "Mag": 15,
+      "MDef": 15,
+      "Hit": 60,
+      "Eva": 25,
+      "Crit": 10,
+      "Block": 14,
+      "Spd": 16,
       "AP": 2,
       "PP": 1
     },
@@ -156,7 +157,7 @@
     ],
     "note": "领主数据在参考文档中未找到独立章节，当前为占位数据，需补充来源",
     "ccClassId": "high_lord",
-    "ccName": "君主",
+    "ccName": "高阶领主",
     "ccEquippableCategories": [
       "Sword",
       "Shield",
@@ -176,13 +177,13 @@
   },
   {
     "id": "fighter",
-    "name": "斗士",
+    "name": "战士",
     "classes": [
       "Infantry",
       "Heavy"
     ],
     "equippableCategories": [
-      "Axe",
+      "Sword",
       "Shield",
       "Accessory"
     ],
@@ -192,21 +193,20 @@
     ],
     "innatePassiveSkillIds": [
       "pas_cheer_shout",
-      "pas_end_heal25",
-      "pas_hundred_crit"
+      "pas_end_heal25"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 88,
-      "Str": 43,
-      "Def": 42,
-      "Mag": 31,
-      "MDef": 18,
-      "Hit": 140,
-      "Eva": 32,
-      "Crit": 16,
-      "Block": 34,
-      "Spd": 28,
+      "HP": 30,
+      "Str": 12,
+      "Def": 11,
+      "Mag": 8,
+      "MDef": 5,
+      "Hit": 56,
+      "Eva": 9,
+      "Crit": 5,
+      "Block": 11,
+      "Spd": 8,
       "AP": 2,
       "PP": 1
     },
@@ -219,7 +219,7 @@
     "ccClassId": "vanguard",
     "ccName": "先锋",
     "ccEquippableCategories": [
-      "Axe",
+      "Sword",
       "Shield",
       "Accessory",
       "Accessory"
@@ -237,7 +237,7 @@
   },
   {
     "id": "soldier",
-    "name": "兵士",
+    "name": "士兵",
     "classes": [
       "Infantry"
     ],
@@ -252,21 +252,20 @@
     ],
     "innatePassiveSkillIds": [
       "pas_give_ap",
-      "pas_muscle_swelling",
-      "pas_formation_counter"
+      "pas_muscle_swelling"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 84,
-      "Str": 47,
-      "Def": 33,
-      "Mag": 37,
-      "MDef": 35,
-      "Hit": 138,
-      "Eva": 55,
-      "Crit": 16,
-      "Block": 12,
-      "Spd": 33,
+      "HP": 29,
+      "Str": 13,
+      "Def": 9,
+      "Mag": 10,
+      "MDef": 9,
+      "Hit": 55,
+      "Eva": 16,
+      "Crit": 5,
+      "Block": 4,
+      "Spd": 9,
       "AP": 2,
       "PP": 1
     },
@@ -276,7 +275,7 @@
       "equ_soldier_spear"
     ],
     "ccClassId": "sergeant",
-    "ccName": "士官",
+    "ccName": "军士",
     "ccEquippableCategories": [
       "Spear",
       "Accessory",
@@ -295,13 +294,13 @@
   },
   {
     "id": "huskarl",
-    "name": "近卫",
+    "name": "家臣",
     "classes": [
       "Infantry"
     ],
     "equippableCategories": [
       "Axe",
-      "Shield",
+      "Accessory",
       "Accessory"
     ],
     "innateActiveSkillIds": [
@@ -310,21 +309,20 @@
     ],
     "innatePassiveSkillIds": [
       "pas_rampage",
-      "pas_iron_guard",
-      "pas_calm_cover"
+      "pas_iron_guard"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 76,
-      "Str": 59,
-      "Def": 30,
-      "Mag": 21,
-      "MDef": 23,
-      "Hit": 138,
-      "Eva": 40,
-      "Crit": 14,
-      "Block": 20,
-      "Spd": 34,
+      "HP": 26,
+      "Str": 16,
+      "Def": 8,
+      "Mag": 5,
+      "MDef": 6,
+      "Hit": 55,
+      "Eva": 12,
+      "Crit": 4,
+      "Block": 7,
+      "Spd": 10,
       "AP": 2,
       "PP": 1
     },
@@ -369,21 +367,20 @@
     ],
     "innatePassiveSkillIds": [
       "pas_line_cover",
-      "pas_hawk_eye",
-      "pas_pursuit"
+      "pas_hawk_eye"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 100,
-      "Str": 39,
-      "Def": 57,
-      "Mag": 27,
-      "MDef": 41,
-      "Hit": 132,
-      "Eva": 7,
-      "Crit": 9,
-      "Block": 40,
-      "Spd": 10,
+      "HP": 35,
+      "Str": 10,
+      "Def": 15,
+      "Mag": 7,
+      "MDef": 11,
+      "Hit": 52,
+      "Eva": 2,
+      "Crit": 3,
+      "Block": 14,
+      "Spd": 3,
       "AP": 2,
       "PP": 1
     },
@@ -394,7 +391,7 @@
       "equ_hoplite_greatshield"
     ],
     "ccClassId": "cataphract",
-    "ccName": "铁甲卫士",
+    "ccName": "甲胄骑兵",
     "ccEquippableCategories": [
       "Spear",
       "GreatShield",
@@ -428,22 +425,20 @@
       "act_full_assault"
     ],
     "innatePassiveSkillIds": [
-      "pas_sky_sniper",
-      "pas_dodge",
-      "pas_surprise_blade"
+      "pas_dodge"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 148,
-      "Str": 55,
-      "Def": 12,
-      "Mag": 7,
-      "MDef": 18,
-      "Hit": 122,
-      "Eva": 17,
-      "Crit": 10,
-      "Block": 14,
-      "Spd": 13,
+      "HP": 51,
+      "Str": 15,
+      "Def": 3,
+      "Mag": 1,
+      "MDef": 5,
+      "Hit": 48,
+      "Eva": 5,
+      "Crit": 3,
+      "Block": 4,
+      "Spd": 3,
       "AP": 2,
       "PP": 1
     },
@@ -474,7 +469,7 @@
   },
   {
     "id": "warrior",
-    "name": "战士",
+    "name": "勇士",
     "classes": [
       "Infantry"
     ],
@@ -488,22 +483,20 @@
       "act_charge_strike"
     ],
     "innatePassiveSkillIds": [
-      "pas_rapid_reload",
-      "pas_emergency_cover",
-      "pas_block_seal"
+      "pas_rapid_reload"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 96,
-      "Str": 71,
-      "Def": 39,
-      "Mag": 13,
-      "MDef": 44,
-      "Hit": 140,
-      "Eva": 4,
-      "Crit": 22,
-      "Block": 31,
-      "Spd": 22,
+      "HP": 33,
+      "Str": 19,
+      "Def": 10,
+      "Mag": 3,
+      "MDef": 12,
+      "Hit": 56,
+      "Eva": 1,
+      "Crit": 7,
+      "Block": 10,
+      "Spd": 6,
       "AP": 2,
       "PP": 1
     },
@@ -513,7 +506,7 @@
       "equ_warrior_axe"
     ],
     "ccClassId": "breaker",
-    "ccName": "扫荡者",
+    "ccName": "破坏者",
     "ccEquippableCategories": [
       "Axe",
       "Accessory",
@@ -524,7 +517,8 @@
       "act_line_destruction"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_block_seal"
+      "pas_block_seal",
+      "pas_emergency_cover"
     ],
     "ccInitialEquipmentIds": [
       "equ_warrior_axe"
@@ -548,31 +542,34 @@
     ],
     "innatePassiveSkillIds": [
       "pas_unstoppable_rage",
-      "pas_cut_grass",
-      "pas_fervor"
+      "pas_cut_grass"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 72,
-      "Str": 47,
-      "Def": 15,
-      "Mag": 33,
-      "MDef": 46,
-      "Hit": 182,
-      "Eva": 60,
-      "Crit": 26,
-      "Block": 10,
-      "Spd": 30,
+      "HP": 25,
+      "Str": 13,
+      "Def": 4,
+      "Mag": 9,
+      "MDef": 12,
+      "Hit": 72,
+      "Eva": 18,
+      "Crit": 9,
+      "Block": 3,
+      "Spd": 9,
       "AP": 2,
       "PP": 1
     },
     "growthType": "命中型",
-    "traits": [],
+    "traits": [
+      {
+        "traitType": "BowVsFlying"
+      }
+    ],
     "initialEquipmentIds": [
       "equ_hunter_bow"
     ],
     "ccClassId": "sniper",
-    "ccName": "神射手",
+    "ccName": "狙击手",
     "ccEquippableCategories": [
       "Bow",
       "Accessory",
@@ -606,26 +603,29 @@
     ],
     "innatePassiveSkillIds": [
       "pas_battle_horn",
-      "pas_quick_reload",
-      "pas_aid_cover"
+      "pas_quick_reload"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 80,
-      "Str": 59,
-      "Def": 27,
-      "Mag": 23,
-      "MDef": 39,
-      "Hit": 162,
-      "Eva": 27,
-      "Crit": 10,
-      "Block": 30,
-      "Spd": 21,
+      "HP": 28,
+      "Str": 16,
+      "Def": 7,
+      "Mag": 6,
+      "MDef": 10,
+      "Hit": 64,
+      "Eva": 8,
+      "Crit": 3,
+      "Block": 10,
+      "Spd": 6,
       "AP": 2,
       "PP": 1
     },
     "growthType": "攻击型",
-    "traits": [],
+    "traits": [
+      {
+        "traitType": "BowVsFlying"
+      }
+    ],
     "initialEquipmentIds": [
       "equ_shooter_bow"
     ],
@@ -670,16 +670,16 @@
     ],
     "innateValorSkillIds": [],
     "baseStats": {
-      "HP": 52,
-      "Str": 31,
-      "Def": 12,
-      "Mag": 35,
-      "MDef": 35,
-      "Hit": 158,
-      "Eva": 102,
-      "Crit": 30,
-      "Block": 4,
-      "Spd": 51,
+      "HP": 18,
+      "Str": 8,
+      "Def": 3,
+      "Mag": 9,
+      "MDef": 9,
+      "Hit": 63,
+      "Eva": 30,
+      "Crit": 10,
+      "Block": 1,
+      "Spd": 15,
       "AP": 2,
       "PP": 1
     },
@@ -690,7 +690,7 @@
       "equ_thief_dagger"
     ],
     "ccClassId": "rogue",
-    "ccName": "流氓",
+    "ccName": "潜行者",
     "ccEquippableCategories": [
       "Sword",
       "Accessory",

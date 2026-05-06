@@ -306,10 +306,9 @@
     ],
     "effects": [
       {
-        "effectType": "RecoverHp",
+        "effectType": "ModifyDamageCalc",
         "parameters": {
-          "amount": 25,
-          "target": "Self"
+          "ForceBlock": true
         }
       }
     ],
@@ -469,7 +468,18 @@
     "tags": [
       "MediumGuardRow"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CoverAlly",
+        "parameters": {}
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "重装步兵/甲胄骑兵 Lv1",
     "unlockLevel": 1
@@ -648,17 +658,13 @@
     "hitRate": null,
     "effectDescription": "自身主动攻击前，攻击必中",
     "tags": [
-      "AtkUp20Stackable",
-      "HitUp20Stackable"
+      "SureHit"
     ],
     "effects": [
       {
-        "effectType": "AddBuff",
+        "effectType": "ModifyDamageCalc",
         "parameters": {
-          "stat": "Str",
-          "ratio": 0.2,
-          "turns": -1,
-          "target": "Self"
+          "ForceHit": true
         }
       }
     ],
