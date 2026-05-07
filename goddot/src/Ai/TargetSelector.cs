@@ -123,7 +123,28 @@ namespace BattleKing.Ai
 			if (condition == null || list.Count == 0) return list;
 
 			if (mode == ConditionMode.Only)
+			{
+				// "仅+最低" = keep only units with minimum value
+				if (condition.Operator == "lowest")
+				{
+					return condition.Category switch
+					{
+						ConditionCategory.Hp => list.Where(u => u.CurrentHp == list.Min(x => x.CurrentHp)).ToList(),
+						ConditionCategory.ApPp => list.Where(u => u.CurrentAp == list.Min(x => x.CurrentAp)).ToList(),
+						_ => list.Where(u => _conditionEvaluator.Evaluate(condition, caster, u)).ToList()
+					};
+				}
+				if (condition.Operator == "highest")
+				{
+					return condition.Category switch
+					{
+						ConditionCategory.Hp => list.Where(u => u.CurrentHp == list.Max(x => x.CurrentHp)).ToList(),
+						ConditionCategory.ApPp => list.Where(u => u.CurrentAp == list.Max(x => x.CurrentAp)).ToList(),
+						_ => list.Where(u => _conditionEvaluator.Evaluate(condition, caster, u)).ToList()
+					};
+				}
 				return list.Where(u => _conditionEvaluator.Evaluate(condition, caster, u)).ToList();
+			}
 			else
 			{
 				if (condition.Operator == "lowest")

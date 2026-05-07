@@ -784,15 +784,16 @@ public partial class Main : Node2D
 
 	private void BuildConditionRow(VBoxContainer parent, BattleUnit unit, int slot, bool isCond1)
 	{
-		var row = new HBoxContainer();
-		string label = isCond1 ? "  条件1:" : "  条件2:";
-		row.AddChild(new Label { Text = label });
-
 		var strategy = unit.Strategies.Count > slot ? unit.Strategies[slot] : null;
 		var cond = isCond1 ? strategy?.Condition1 : strategy?.Condition2;
 		var mode = isCond1 ? strategy?.Mode1 : strategy?.Mode2;
+		bool isOnly = mode == ConditionMode.Only;
 
-		// Category dropdown
+		// Row 1: category + operator + value + mode buttons
+		var row1 = new HBoxContainer();
+		string label = isCond1 ? "  条件1:" : "  条件2:";
+		row1.AddChild(new Label { Text = label });
+
 		var catOpt = new OptionButton();
 		catOpt.AddItem("(无)");
 		int catSel = 0;
@@ -803,46 +804,89 @@ public partial class Main : Node2D
 		}
 		catOpt.Selected = catSel;
 
-		// Operator dropdown
 		var opOpt = new OptionButton();
-		// Value dropdown
 		var valOpt = new OptionButton();
 
-		// "仅" checkbox
-		var onlyCb = new CheckBox { Text = "仅" };
-		if (mode == ConditionMode.Only) onlyCb.ButtonPressed = true;
+		// Mode toggle buttons: [优先] [仅]
+		var priBtn = new Button { Text = "优先", Flat = false };
+		var onlyBtn = new Button { Text = "仅", Flat = false };
+		priBtn.AddThemeColorOverride("font_color", isOnly ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.3f, 1.0f, 0.3f));
+		onlyBtn.AddThemeColorOverride("font_color", isOnly ? new Color(1.0f, 0.3f, 0.3f) : new Color(0.6f, 0.6f, 0.6f));
+		Label previewLabel = new Label();
 
-		// Populate operator & value based on initial selection
+		// Populate operator & value
 		var selCat = catSel > 0 ? ConditionMeta.AllCategories[catSel - 1] : (ConditionCategory?)null;
 		RebuildCondDropdowns(opOpt, valOpt, selCat, cond?.Operator, cond?.Value);
 
-		Action saveCond = () => SaveCondition(unit, slot, isCond1, catOpt, opOpt, valOpt, onlyCb);
+		Action refreshUi = () => {
+			bool curOnly = onlyBtn.Modulate != null; // use button color state
+			// Update button colors
+			bool nowOnly = onlyBtn.GetMeta("active", false).AsBool();
+			priBtn.AddThemeColorOverride("font_color", nowOnly ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.3f, 1.0f, 0.3f));
+			onlyBtn.AddThemeColorOverride("font_color", nowOnly ? new Color(1.0f, 0.3f, 0.3f) : new Color(0.6f, 0.6f, 0.6f));
+			SaveCondition(unit, slot, isCond1, catOpt, opOpt, valOpt, nowOnly);
+			// Update preview
+			previewLabel.Text = BuildCondPreview(catOpt, opOpt, valOpt, nowOnly);
+		};
 
-		// Cascade: category change → rebuild operator + value, then save
+		// Use SetMeta to track only/priority state
+		onlyBtn.SetMeta("active", Variant.From(isOnly));
+		priBtn.SetMeta("active", Variant.From(!isOnly));
+
+		priBtn.Pressed += () => {
+			onlyBtn.SetMeta("active", Variant.From(false));
+			priBtn.SetMeta("active", Variant.From(true));
+			refreshUi();
+		};
+		onlyBtn.Pressed += () => {
+			onlyBtn.SetMeta("active", Variant.From(true));
+			priBtn.SetMeta("active", Variant.From(false));
+			refreshUi();
+		};
+
+		// Cascade handlers
 		catOpt.ItemSelected += (long idx) => {
 			int ci = (int)idx;
 			var newCat = ci > 0 ? ConditionMeta.AllCategories[ci - 1] : (ConditionCategory?)null;
 			RebuildCondDropdowns(opOpt, valOpt, newCat, null, null);
-			saveCond();
+			refreshUi();
 		};
-
-		// Operator change → rebuild value, then save
 		opOpt.ItemSelected += (long _) => {
 			int ci = catOpt.Selected;
 			var curCat = ci > 0 ? ConditionMeta.AllCategories[ci - 1] : (ConditionCategory?)null;
 			string curOp = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : null;
 			RebuildValueDropdown(valOpt, curCat, curOp);
-			saveCond();
+			refreshUi();
 		};
+		valOpt.ItemSelected += (_) => refreshUi();
 
-		valOpt.ItemSelected += (_) => saveCond();
-		onlyCb.Toggled += (_) => saveCond();
+		row1.AddChild(catOpt);
+		row1.AddChild(opOpt);
+		row1.AddChild(valOpt);
+		row1.AddChild(priBtn);
+		row1.AddChild(onlyBtn);
+		parent.AddChild(row1);
 
-		row.AddChild(catOpt);
-		row.AddChild(opOpt);
-		row.AddChild(valOpt);
-		row.AddChild(onlyCb);
-		parent.AddChild(row);
+		// Row 2: preview text
+		var row2 = new HBoxContainer();
+		row2.AddChild(new Label { Text = "       → " });
+		previewLabel.Text = BuildCondPreview(catOpt, opOpt, valOpt, isOnly);
+		previewLabel.AddThemeColorOverride("font_color", new Color(0.7f, 0.7f, 1.0f));
+		row2.AddChild(previewLabel);
+		parent.AddChild(row2);
+	}
+
+	private static string BuildCondPreview(OptionButton catOpt, OptionButton opOpt, OptionButton valOpt, bool isOnly)
+	{
+		int ci = catOpt.Selected;
+		if (ci <= 0) return "(无条件)";
+		string cat = catOpt.GetItemText(ci);
+		string op = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : "";
+		string val = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? valOpt.GetItemText(valOpt.Selected) : "";
+		string modeStr = isOnly ? "仅" : "优先";
+		if (string.IsNullOrEmpty(op) || op == "-") return $"[{modeStr}] {cat}";
+		if (string.IsNullOrEmpty(val) || val == "-") return $"[{modeStr}] {cat} {op}";
+		return $"[{modeStr}] {cat} {op}{val}";
 	}
 
 	private static void RebuildCondDropdowns(OptionButton opOpt, OptionButton valOpt, ConditionCategory? cat, string currentOp, object currentVal)
@@ -871,7 +915,7 @@ public partial class Main : Node2D
 		foreach (var v in vals) valOpt.AddItem(v);
 	}
 
-	private void SaveCondition(BattleUnit unit, int slot, bool isCond1, OptionButton catOpt, OptionButton opOpt, OptionButton valOpt, CheckBox onlyCb)
+	private void SaveCondition(BattleUnit unit, int slot, bool isCond1, OptionButton catOpt, OptionButton opOpt, OptionButton valOpt, bool isOnly)
 	{
 		while (unit.Strategies.Count <= slot)
 			unit.Strategies.Add(new Strategy { SkillId = unit.GetAvailableActiveSkillIds().FirstOrDefault() ?? "" });
@@ -879,7 +923,6 @@ public partial class Main : Node2D
 		int ci = catOpt.Selected;
 		if (ci <= 0)
 		{
-			// No condition
 			if (isCond1) { unit.Strategies[slot].Condition1 = null; unit.Strategies[slot].Mode1 = ConditionMode.Priority; }
 			else { unit.Strategies[slot].Condition2 = null; unit.Strategies[slot].Mode2 = ConditionMode.Priority; }
 			return;
@@ -888,7 +931,6 @@ public partial class Main : Node2D
 		var cat = ConditionMeta.AllCategories[ci - 1];
 		string op = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : "";
 		string val = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? valOpt.GetItemText(valOpt.Selected) : "";
-		bool isOnly = onlyCb.ButtonPressed;
 
 		var cond = ConditionMeta.BuildCondition(cat, op, val, isOnly);
 		if (isCond1) { unit.Strategies[slot].Condition1 = cond; unit.Strategies[slot].Mode1 = isOnly ? ConditionMode.Only : ConditionMode.Priority; }

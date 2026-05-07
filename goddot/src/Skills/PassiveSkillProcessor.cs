@@ -18,10 +18,11 @@ namespace BattleKing.Skills
         private Action<PendingAction> _enqueueAction;
 
         private BattleContext _ctx;
-        private HashSet<string> _battleStartFired = new();
-        private HashSet<string> _allyBuffFired = new();
-        private HashSet<string> _defenseFired = new();
-        private HashSet<string> _afterActionFired = new();
+        // Per-side simultaneous limit: key=true=player, false=enemy
+        private Dictionary<bool, HashSet<string>> _battleStartFired = new() { [true] = new(), [false] = new() };
+        private Dictionary<bool, HashSet<string>> _allyBuffFired = new() { [true] = new(), [false] = new() };
+        private Dictionary<bool, HashSet<string>> _defenseFired = new() { [true] = new(), [false] = new() };
+        private Dictionary<bool, HashSet<string>> _afterActionFired = new() { [true] = new(), [false] = new() };
 
         public PassiveSkillProcessor(EventBus eventBus, GameDataRepository gameData, Action<string> log, Action<PendingAction> enqueueAction = null)
         {
@@ -45,10 +46,10 @@ namespace BattleKing.Skills
         private void OnBattleStart(BattleStartEvent evt)
         {
             _ctx = evt.Context;
-            _battleStartFired.Clear();
-            _allyBuffFired.Clear();
-            _defenseFired.Clear();
-            _afterActionFired.Clear();
+            foreach (var set in _battleStartFired.Values) set.Clear();
+            foreach (var set in _allyBuffFired.Values) set.Clear();
+            foreach (var set in _defenseFired.Values) set.Clear();
+            foreach (var set in _afterActionFired.Values) set.Clear();
 
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.BattleStart, "战斗开始时",
                 limitSimultaneous: true, _battleStartFired);
@@ -154,7 +155,7 @@ namespace BattleKing.Skills
         }
 
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
-            bool limitSimultaneous, HashSet<string> firedSet = null, DamageCalculation calc = null,
+            bool limitSimultaneous, Dictionary<bool, HashSet<string>> firedSet = null, DamageCalculation calc = null,
             BattleUnit attacker = null, BattleUnit defender = null, BattleUnit knockoutVictim = null,
             BattleUnit knockoutKiller = null)
         {
@@ -177,9 +178,10 @@ namespace BattleKing.Skills
 
                     if (limitSimultaneous && skillData.HasSimultaneousLimit && firedSet != null)
                     {
-                        if (firedSet.Contains(timingLabel))
+                        var sideSet = firedSet[unit.IsPlayer];
+                        if (sideSet.Contains(timingLabel))
                             continue;
-                        firedSet.Add(timingLabel);
+                        sideSet.Add(timingLabel);
                     }
 
                     // Check player-set passive condition
