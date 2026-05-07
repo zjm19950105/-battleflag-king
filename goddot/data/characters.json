@@ -475,7 +475,7 @@
       "pas_berserk"
     ],
     "ccInitialEquipmentIds": [
-      "eq_berserker_axe"
+      "equ_gladiator_axe"
     ]
   },
   {
@@ -753,9 +753,7 @@
     },
     "growthType": "AllRounder",
     "traits": [],
-    "initialEquipmentIds": [
-      "eq_staff_of_wisdom"
-    ],
+    "initialEquipmentIds": [],
     "ccClassId": "warlock",
     "ccName": "术士",
     "ccClasses": [],
@@ -773,10 +771,7 @@
       "pas_pursuit_magic",
       "pas_concentration"
     ],
-    "ccInitialEquipmentIds": [
-      "eq_staff_of_wisdom",
-      "eq_blue_glasses"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "witch",
@@ -814,9 +809,7 @@
     },
     "growthType": "AllRounder",
     "traits": [],
-    "initialEquipmentIds": [
-      "eq_ice_storm_staff"
-    ],
+    "initialEquipmentIds": [],
     "ccClassId": "sorceress",
     "ccName": "魔女",
     "ccClasses": [],
@@ -834,10 +827,7 @@
       "pas_focus",
       "pas_quick_cast"
     ],
-    "ccInitialEquipmentIds": [
-      "eq_ice_storm_staff",
-      "eq_cat_ear"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "white_knight",
@@ -877,7 +867,8 @@
     "growthType": "AllRounder",
     "traits": [],
     "initialEquipmentIds": [
-      "eq_holy_sword"
+      "equ_lord_sword",
+      "equ_bronze_shield"
     ],
     "ccClassId": "saint_knight",
     "ccName": "圣骑士",
@@ -896,9 +887,7 @@
       "pas_holy_guard",
       "pas_row_barrier"
     ],
-    "ccInitialEquipmentIds": [
-      "eq_holy_sword"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "griffin_knight",
@@ -943,7 +932,7 @@
       }
     ],
     "initialEquipmentIds": [
-      "equ_griffin_sword"
+      "equ_bronze_sword"
     ],
     "ccClassId": null,
     "ccName": null,
@@ -990,9 +979,7 @@
     },
     "growthType": "AllRounder",
     "traits": [],
-    "initialEquipmentIds": [
-      "eq_cursed_staff"
-    ],
+    "initialEquipmentIds": [],
     "ccClassId": "druid",
     "ccName": "德鲁伊",
     "ccClasses": [],
@@ -1010,9 +997,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_curse_swamp"
     ],
-    "ccInitialEquipmentIds": [
-      "eq_cursed_staff"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "elf_sibyl",
@@ -1055,7 +1040,7 @@
     "growthType": "AllRounder",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_elf_spear"
+      "equ_soldier_spear"
     ],
     "ccClassId": null,
     "ccName": null,

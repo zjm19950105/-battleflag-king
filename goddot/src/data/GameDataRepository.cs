@@ -45,11 +45,11 @@ namespace BattleKing.Data
             });
         }
 
-        public CharacterData GetCharacter(string id) => Characters[id];
-        public ActiveSkillData GetActiveSkill(string id) => ActiveSkills[id];
-        public PassiveSkillData GetPassiveSkill(string id) => PassiveSkills[id];
-        public EquipmentData GetEquipment(string id) => Equipments[id];
-        public EnemyFormationData GetEnemyFormation(string id) => EnemyFormations[id];
-        public StrategyPresetData GetStrategyPreset(string id) => StrategyPresets[id];
+        public CharacterData GetCharacter(string id) => Characters.TryGetValue(id, out var v) ? v : null;
+        public ActiveSkillData GetActiveSkill(string id) => ActiveSkills.TryGetValue(id, out var v) ? v : null;
+        public PassiveSkillData GetPassiveSkill(string id) => PassiveSkills.TryGetValue(id, out var v) ? v : null;
+        public EquipmentData GetEquipment(string id) => Equipments.TryGetValue(id, out var v) ? v : null;
+        public EnemyFormationData GetEnemyFormation(string id) => EnemyFormations.TryGetValue(id, out var v) ? v : null;
+        public StrategyPresetData GetStrategyPreset(string id) => StrategyPresets.TryGetValue(id, out var v) ? v : null;
     }
 }
