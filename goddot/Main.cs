@@ -634,36 +634,200 @@ public partial class Main : Node2D
 
 		var unit = units[_strategySetupIdx];
 		var avail = unit.GetAvailableActiveSkillIds().Select(id => _gameData.GetActiveSkill(id)).Where(s => s != null).ToList();
-		_statusLabel.Text = "▶  策略配置 [" + unit.Data.Name + "] — 下拉选择技能";
-		_leftPanel.AddChild(new Label { Text = unit.Data.Name + " 8条策略栏位:" });
+		_statusLabel.Text = $"▶  策略编程 [{unit.Data.Name}] — 技能条件组合";
+
+		// Left: scrollable strategy editor
+		var stratScroll = new ScrollContainer();
+		stratScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		var stratList = new VBoxContainer();
+		stratScroll.AddChild(stratList);
+
+		stratList.AddChild(new Label { Text = $"{unit.Data.Name} — 8条策略栏位 (AP:{unit.CurrentAp}/{unit.MaxAp})\n" });
 
 		for (int i = 0; i < 8; i++)
 		{
 			int slot = i;
 			var s = unit.Strategies.Count > i ? unit.Strategies[i] : null;
 
-			var row = new HBoxContainer();
-			row.AddChild(new Label { Text = "[" + (slot + 1) + "]" });
-			var opt = new OptionButton();
-			opt.AddItem("(空)");
-			int selected = 0;
+			// Separator
+			if (i > 0) stratList.AddChild(new HSeparator());
+
+			// Row header: slot number + skill dropdown
+			var headerRow = new HBoxContainer();
+			headerRow.AddChild(new Label { Text = $"[{slot + 1}]" });
+			var skillOpt = new OptionButton();
+			skillOpt.AddItem("(空)");
+			int skillSel = 0;
 			for (int j = 0; j < avail.Count; j++)
 			{
-				opt.AddItem(avail[j].Name + " (AP" + avail[j].ApCost + ")");
-				if (s != null && avail[j].Id == s.SkillId) selected = j + 1;
+				skillOpt.AddItem($"{avail[j].Name} AP{avail[j].ApCost}");
+				if (s != null && avail[j].Id == s.SkillId) skillSel = j + 1;
 			}
-			opt.Selected = selected;
+			skillOpt.Selected = skillSel;
 			int cap = slot;
-			opt.ItemSelected += (long idx) => {
+			skillOpt.ItemSelected += (long idx) => {
+				int si = (int)idx;
 				while (unit.Strategies.Count <= cap) unit.Strategies.Add(new Strategy { SkillId = avail[0].Id });
-				unit.Strategies[cap].SkillId = (int)idx == 0 ? avail[0].Id : avail[(int)idx - 1].Id;
+				unit.Strategies[cap].SkillId = si == 0 ? avail[0].Id : avail[si - 1].Id;
 			};
-			row.AddChild(opt);
-			_leftPanel.AddChild(row);
+			headerRow.AddChild(skillOpt);
+			stratList.AddChild(headerRow);
+
+			// Condition 1 row
+			BuildConditionRow(stratList, unit, slot, isCond1: true);
+
+			// Condition 2 row
+			BuildConditionRow(stratList, unit, slot, isCond1: false);
 		}
 
-		AddBtn("→ 确认/下一个", () => { _strategySetupIdx++; ShowStrategy(); });
+		_leftPanel.AddChild(stratScroll);
+
+		// Right: skill detail
+		UpdateSkillDetail(unit);
+
+		// Bottom
+		AddBtn("→ 下一个角色", () => { _strategySetupIdx++; ShowStrategy(); });
 		AddBtn("→ 全部默认跳过", () => { _strategySetupIdx = units.Count; ShowStrategy(); });
+	}
+
+	private void BuildConditionRow(VBoxContainer parent, BattleUnit unit, int slot, bool isCond1)
+	{
+		var row = new HBoxContainer();
+		string label = isCond1 ? "  条件1:" : "  条件2:";
+		row.AddChild(new Label { Text = label });
+
+		var strategy = unit.Strategies.Count > slot ? unit.Strategies[slot] : null;
+		var cond = isCond1 ? strategy?.Condition1 : strategy?.Condition2;
+		var mode = isCond1 ? strategy?.Mode1 : strategy?.Mode2;
+
+		// Category dropdown
+		var catOpt = new OptionButton();
+		catOpt.AddItem("(无)");
+		int catSel = 0;
+		for (int c = 0; c < ConditionMeta.AllCategories.Count; c++)
+		{
+			catOpt.AddItem(ConditionMeta.CategoryLabel(ConditionMeta.AllCategories[c]));
+			if (cond != null && ConditionMeta.AllCategories[c] == cond.Category) catSel = c + 1;
+		}
+		catOpt.Selected = catSel;
+
+		// Operator dropdown
+		var opOpt = new OptionButton();
+		// Value dropdown
+		var valOpt = new OptionButton();
+
+		// "仅" checkbox
+		var onlyCb = new CheckBox { Text = "仅" };
+		if (mode == ConditionMode.Only) onlyCb.ButtonPressed = true;
+
+		// Populate operator & value based on initial selection
+		var selCat = catSel > 0 ? ConditionMeta.AllCategories[catSel - 1] : (ConditionCategory?)null;
+		RebuildCondDropdowns(opOpt, valOpt, selCat, cond?.Operator, cond?.Value);
+
+		Action saveCond = () => SaveCondition(unit, slot, isCond1, catOpt, opOpt, valOpt, onlyCb);
+
+		// Cascade: category change → rebuild operator + value, then save
+		catOpt.ItemSelected += (long idx) => {
+			int ci = (int)idx;
+			var newCat = ci > 0 ? ConditionMeta.AllCategories[ci - 1] : (ConditionCategory?)null;
+			RebuildCondDropdowns(opOpt, valOpt, newCat, null, null);
+			saveCond();
+		};
+
+		// Operator change → rebuild value, then save
+		opOpt.ItemSelected += (long _) => {
+			int ci = catOpt.Selected;
+			var curCat = ci > 0 ? ConditionMeta.AllCategories[ci - 1] : (ConditionCategory?)null;
+			string curOp = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : null;
+			RebuildValueDropdown(valOpt, curCat, curOp);
+			saveCond();
+		};
+
+		valOpt.ItemSelected += (_) => saveCond();
+		onlyCb.Toggled += (_) => saveCond();
+
+		row.AddChild(catOpt);
+		row.AddChild(opOpt);
+		row.AddChild(valOpt);
+		row.AddChild(onlyCb);
+		parent.AddChild(row);
+	}
+
+	private static void RebuildCondDropdowns(OptionButton opOpt, OptionButton valOpt, ConditionCategory? cat, string currentOp, object currentVal)
+	{
+		opOpt.Clear();
+		if (cat == null) { opOpt.AddItem("-"); valOpt.Clear(); valOpt.AddItem("-"); return; }
+
+		var ops = ConditionMeta.GetOperators(cat.Value);
+		int opSel = 0;
+		for (int o = 0; o < ops.Count; o++)
+		{
+			opOpt.AddItem(ops[o]);
+			if (ops[o] == currentOp) opSel = o;
+		}
+		opOpt.Selected = opSel;
+		string selOp = ops[opSel];
+		RebuildValueDropdown(valOpt, cat, selOp);
+	}
+
+	private static void RebuildValueDropdown(OptionButton valOpt, ConditionCategory? cat, string op)
+	{
+		valOpt.Clear();
+		if (cat == null || string.IsNullOrEmpty(op)) { valOpt.AddItem("-"); return; }
+
+		var vals = ConditionMeta.GetValues(cat.Value, op);
+		foreach (var v in vals) valOpt.AddItem(v);
+	}
+
+	private void SaveCondition(BattleUnit unit, int slot, bool isCond1, OptionButton catOpt, OptionButton opOpt, OptionButton valOpt, CheckBox onlyCb)
+	{
+		while (unit.Strategies.Count <= slot)
+			unit.Strategies.Add(new Strategy { SkillId = unit.GetAvailableActiveSkillIds().FirstOrDefault() ?? "" });
+
+		int ci = catOpt.Selected;
+		if (ci <= 0)
+		{
+			// No condition
+			if (isCond1) { unit.Strategies[slot].Condition1 = null; unit.Strategies[slot].Mode1 = ConditionMode.Priority; }
+			else { unit.Strategies[slot].Condition2 = null; unit.Strategies[slot].Mode2 = ConditionMode.Priority; }
+			return;
+		}
+
+		var cat = ConditionMeta.AllCategories[ci - 1];
+		string op = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : "";
+		string val = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? valOpt.GetItemText(valOpt.Selected) : "";
+		bool isOnly = onlyCb.ButtonPressed;
+
+		var cond = ConditionMeta.BuildCondition(cat, op, val, isOnly);
+		if (isCond1) { unit.Strategies[slot].Condition1 = cond; unit.Strategies[slot].Mode1 = isOnly ? ConditionMode.Only : ConditionMode.Priority; }
+		else { unit.Strategies[slot].Condition2 = cond; unit.Strategies[slot].Mode2 = isOnly ? ConditionMode.Only : ConditionMode.Priority; }
+	}
+
+	private void UpdateSkillDetail(BattleUnit unit)
+	{
+		ClearPanel(_rightPanel);
+		var detailLabel = new RichTextLabel { BbcodeEnabled = true };
+		detailLabel.AddThemeFontSizeOverride("normal_font_size", 15);
+		detailLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_rightPanel.AddChild(detailLabel);
+
+		detailLabel.AppendText($"[color=yellow]══ 策略编程说明 ══[/color]\n\n");
+		detailLabel.AppendText("每条策略 = 技能 + 条件1 + 条件2\n\n");
+		detailLabel.AppendText("[color=cyan]条件组合逻辑:[/color]\n");
+		detailLabel.AppendText("• 仅+仅 = AND (两个条件都满足才发动)\n");
+		detailLabel.AppendText("• 仅+优先 = 先过滤, 再排序\n");
+		detailLabel.AppendText("• 优先+优先 = 条件2优先于条件1!\n");
+		detailLabel.AppendText("  顺序: 1+2 > 2 > 1\n\n");
+		detailLabel.AppendText("[color=cyan]模式:[/color]\n");
+		detailLabel.AppendText("• 仅 = 条件不满足则[color=red]跳过技能[/color]\n");
+		detailLabel.AppendText("• 优先(不勾选仅) = 条件不满足[color=green]仍会发动[/color]\n\n");
+		detailLabel.AppendText($"[color=orange]{unit.Data.Name} 可用技能:[/color]\n");
+		foreach (var sid in unit.GetAvailableActiveSkillIds())
+		{
+			var sk = _gameData.GetActiveSkill(sid);
+			if (sk == null) continue;
+			detailLabel.AppendText($"  AP{sk.ApCost} {sk.Name} — {sk.EffectDescription}\n");
+		}
 	}
 
 // ── PHASE 5: BATTLE ──────────────────────────────────────
