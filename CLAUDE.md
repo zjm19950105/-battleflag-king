@@ -246,7 +246,7 @@ src/
 | `characters.json` | 职业模板：基础属性（含AP/PP初始值）、成长类型、兵种标签、可装备类型、自带技能ID列表 |
 | `active_skills.json` | 主动技能：AP消耗、类型、威力、命中、范围、效果、特性标签 |
 | `passive_skills.json` | 被动技能：PP消耗、触发时机、效果、特性标签、同时发动限制标记 |
-| `equipments.json` | 装备：类型、属性字典、赋予技能ID、可装备职业、特殊效果 |
+| `equipments.json` | 装备：80件（8大类型全覆盖）、属性字典、赋予技能ID、可装备职业、特殊效果 |
 | `conditions.json` | 条件定义：12大类条件的枚举和参数结构 |
 
 ### 文档体系索引
@@ -333,28 +333,20 @@ BattleUnit (运行时实例)
   - [x] 编译通过，0错误0警告
 
 ### 当前聚焦
-**Phase 1.3 — 被动技能完整实现与架构改造**
+**Phase 1.4 — 6v6 完整竞技场**
 
-目标：实现被动技能对伤害计算的干预（格挡/回避/必中/免疫/掩护）、反击/追击/先制攻击、一次性标记系统。
-
-核心任务：
-1. DamageCalculation 可变上下文（BeforeHitEvent 暴露 Calc 引用）
-2. PendingActionQueue 行动队列（反击/追击/先制）
-3. TemporalState 临时标记系统（1次免疫）
-4. 友方目标选择 + 效果结构化
-5. 逐个职业实现完整被动技能效果
+Phase 1.3 已完成。下一步：
+1. 从3v3扩展到6v6（填满6个位置）
+2. 完整的 if/条件/执行/优先级 编程系统验证
+3. 更丰富的条件和执行指令
+4. 战斗日志/回放，方便调试编程逻辑
 
 ### 待办（按优先级）
-1. **DamageCalculation 可变上下文改造**（模块1，最高优先级）
-2. **TemporalState 系统**（模块3）
-3. **PendingActionQueue 行动队列**（模块2）
-4. 条件系统完整实现（Position/UnitClass/Status/EnemyClassExists）
-5. 策略默认配置（用户提供文档后实施）
-6. 玩家策略持久化（JSON save/load）
-7. 6v6 完整竞技场扩展
-8. 2D 视觉表现（占位 Sprite、血条、战斗日志 UI）
-9. 大巴扎循环（Phase 2）
-10. 本地化与合规（Phase 3）
+1. **6v6 完整竞技场**（Phase 1.4）
+2. 玩家策略持久化（JSON save/load）
+3. 2D 视觉表现（占位 Sprite、血条、战斗日志 UI）
+4. 大巴扎循环（Phase 2）
+5. 本地化与合规（Phase 3）
 
 ## 协作规则
 - **每次只修改一个模块**，修改前 Read 相关文件确认上下文

@@ -2,66 +2,79 @@
 
 > 本文档记录 C# 侧的类设计、接口定义、枚举、方法签名和数据流。
 > 与 `CLAUDE.md`（概念框架）互补：CLAUDE 讲"是什么"，本文档讲"怎么写"。
+> **最后更新**: 2026-05-07 — Phase 1.3 完成 + 装备系统 + 策略条件编辑器
 
 ---
 
-## 目录结构
+## 目录结构（实际）
 
 ```
 src/
-  Data/              # JSON 反序列化类（纯数据，无行为）
+  Data/
     Models/
       CharacterData.cs
       ActiveSkillData.cs
       PassiveSkillData.cs
       EquipmentData.cs
+      EquipmentCategory.cs
+      ConditionCategory.cs
       ConditionData.cs
+      ConditionMode.cs
+      TraitData.cs
+      SkillEffectData.cs
     GameDataRepository.cs
-  Core/              # 战斗运行时核心
+    DayProgression.cs
+  Core/
     BattleUnit.cs
     BattleContext.cs
     BattleEngine.cs
-    TurnManager.cs
-    SimultaneousActivationLimiter.cs
-  Skills/            # 技能定义与执行
+    BattleResult.cs
+    TemporalState.cs
+  Skills/
     ActiveSkill.cs
     PassiveSkill.cs
     ISkillEffect.cs
     SkillEffectFactory.cs
-    Effects/           # 具体效果实现
-      DamageEffect.cs
-      BuffEffect.cs
-      HealEffect.cs
-      StatusAilmentEffect.cs
-  Ai/                # 策略编程
+    PassiveSkillProcessor.cs
+    PendingAction.cs
+    PendingActionType.cs
+    PassiveTargetType.cs
+  Ai/
     Strategy.cs
+    Condition.cs
     StrategyEvaluator.cs
     ConditionEvaluator.cs
+    ConditionMeta.cs
     TargetSelector.cs
-  Equipment/         # 装备与 Buff
+  Equipment/
+    Equipment.cs
     EquipmentSlot.cs
-    EquipmentData.cs
+    Buff.cs
     BuffManager.cs
     TraitApplier.cs
     ITrait.cs
-  Pipeline/          # 伤害计算流水线
+  Pipeline/
     DamageCalculator.cs
     DamageCalculation.cs
     DamageResult.cs
-  Events/            # 事件总线
+  Events/
     EventBus.cs
     IBattleEvent.cs
-    BattleEvents/      # 具体事件定义
-      BeforeAttackEvent.cs
-      AfterAttackEvent.cs
-      OnBattleStartEvent.cs
-      OnBattleEndEvent.cs
-      OnActionStartEvent.cs
-      OnActionEndEvent.cs
-  Utils/             # 工具
-    JsonLoader.cs
-    RandUtil.cs
+    BattleEvents.cs
 ```
+
+---
+
+## 数据文件
+
+| 文件 | 条目数 | 说明 |
+|------|--------|------|
+| `characters.json` | 18 | 所有角色（含CC数据） |
+| `active_skills.json` | 55 | 主动技能 |
+| `passive_skills.json` | 50 | 被动技能 |
+| `equipments.json` | 80 | 装备（8大类型全覆盖） |
+| `enemy_formations.json` | 5 | 敌方阵型模板 |
+| `strategy_presets.json` | 3 | 策略预设 |
 
 ---
 
@@ -72,138 +85,54 @@ namespace BattleKing.Data
 {
     public enum UnitClass
     {
-        Infantry,    // 步兵
-        Cavalry,     // 骑兵/骑马
-        Flying,      // 飞行
-        Heavy,       // 重装
-        Scout,       // 斥候
-        Archer,      // 弓兵
-        Mage,        // 术士
-        Elf,         // 精灵
-        Beastman,    // 兽人
-        Winged       // 有翼人
+        Infantry, Cavalry, Flying, Heavy, Scout, Archer, Mage, Elf, Beastman, Winged
     }
 
     public enum EquipmentCategory
     {
-        Sword,        // 剑（可双持）
-        Axe,          // 斧
-        Spear,        // 枪（前后列贯通）
-        Bow,          // 弓（遠隔）
-        Staff,        // 杖（魔法攻击）
-        Shield,       // 盾（格挡+25%减轻）
-        GreatShield,  // 大盾（格挡+50%减轻）
-        Accessory     // 饰品（全职业）
+        Sword, Axe, Spear, Bow, Staff, Shield, GreatShield, Accessory
     }
 
-    public enum SkillType
-    {
-        Physical,   // 物理
-        Magical,    // 魔法
-        Assist,     // 辅助
-        Heal,       // 回复
-        Debuff      // 妨害
-    }
-
-    public enum AttackType
-    {
-        Melee,      // 近接物理（只能打前排）
-        Ranged,     // 遠隔物理（可打后排）
-        Magic       // 魔法攻击（可打后排）
-    }
+    public enum SkillType { Physical, Magical, Assist, Heal, Debuff }
+    public enum AttackType { Melee, Ranged, Magic }
 
     public enum TargetType
     {
-        Self,
-        SingleEnemy,
-        SingleAlly,
-        TwoEnemies,
-        ThreeEnemies,
-        FrontAndBack,   // 前后列贯通
-        Column,         // 一列
-        Row,            // 一排
-        AllEnemies,
-        AllAllies
+        Self, SingleEnemy, SingleAlly, TwoEnemies, ThreeEnemies,
+        FrontAndBack, Column, Row, AllEnemies, AllAllies
     }
 
     public enum ConditionCategory
     {
-        Position,          // 队列·状况（前排/后排/前后列/人数）
-        UnitClass,         // 兵种
-        Hp,                // HP
-        ApPp,              // AP·PP
-        Status,            // 状态（buff/debuff/异常）
-        AttackAttribute,   // 攻击属性
-        TeamSize,          // 编成人数
-        SelfState,         // 自身状态（第N次行动等）
-        SelfHp,            // 自身HP
-        SelfApPp,          // 自身AP·PP
-        EnemyClassExists,  // 敌兵种存在
-        AttributeRank      // 最高/最低属性
+        Position, UnitClass, Hp, ApPp, Status, AttackAttribute,
+        TeamSize, SelfState, SelfHp, SelfApPp, EnemyClassExists, AttributeRank
     }
 
-    public enum ConditionMode
-    {
-        Only,       // 仅：条件不满足则跳过
-        Priority    // 优先：条件不满足仍发动，按默认目标
-    }
+    public enum ConditionMode { Only, Priority }
+    // Only = 仅（条件不满足则跳过技能）
+    // Priority = 优先（条件不满足仍按默认目标发动）
 
     public enum PassiveTriggerTiming
     {
-        BattleStart,           // 战斗开始时
-        SelfBeforeAttack,      // 自身攻击前（主动）
-        AllyBeforeAttack,      // 友方攻击前（主动）
-        AllyBeforeHit,         // 友方被攻击前
-        SelfBeforeHit,         // 自身被攻击直前
-        SelfBeforeMeleeHit,    // 自身被近接攻击直前（招架等）
-        SelfBeforePhysicalHit, // 自身被物理攻击直前（格挡/复仇守护等）
-        AllyOnAttacked,        // 友方被攻击时（追击斩等）
-        SelfOnActiveUse,       // 自身使用主动技能时（蓄力行动/蛮力等）
-        AllyOnActiveUse,       // 友方使用主动技能时（主动礼物等）
-        AfterAction,           // 行动后（敌我双方）
-        BattleEnd,             // 战斗结束时
-        OnHit,                 // 命中时
-        OnBeingHit,            // 被命中时
-        OnKnockdown            // 击倒时
-    }
-
-    public enum SimultaneousLimitType
-    {
-        BattleStart,           // 战斗开始时（敌我各1人）
-        AllyBuffBeforeAction,  // 友方强化（同部队1人）
-        EnemyDefendBeforeAction,// 防守方防御（对方部队1人）
-        AfterActionCorrespond, // 行动后对应（敌我各1人）
-        None                   // 无限制
+        BattleStart, SelfBeforeAttack, AllyBeforeAttack, AllyBeforeHit,
+        SelfBeforeHit, SelfBeforeMeleeHit, SelfBeforePhysicalHit,
+        AllyOnAttacked, SelfOnActiveUse, AllyOnActiveUse,
+        AfterAction, BattleEnd, OnHit, OnBeingHit, OnKnockdown
     }
 
     public enum UnitState
     {
-        Normal,     // 正常
-        Charging,   // 蓄力中（回避和被动不可用）
-        Stunned,    // 气绝（跳过一次行动）
-        Frozen,     // 冻结（无法行动，受击解除，回避率=0）
-        Darkness,   // 黑暗（下次攻击命中率0）
-        BlockSeal,  // 格挡封印
-        CritSeal    // 无法暴击
+        Normal, Charging, Stunned, Frozen, Darkness, BlockSeal, CritSeal
     }
 
     public enum StatusAilment
     {
-        Poison,     // 毒：下次行动损失最大HP30%
-        Burn,       // 炎上：固定20HP，每层多结算一次
-        Freeze,     // 冻结：无法行动，受击解除，回避率=0
-        Darkness,   // 黑暗：下次攻击命中率0
-        Stun,       // 气绝：跳过一次行动
-        BlockSeal,  // 格挡封印
-        CritSeal    // 无法暴击
+        Poison, Burn, Freeze, Darkness, Stun, BlockSeal, CritSeal
     }
 
-    public enum BlockType
+    public enum PendingActionType
     {
-        None,       // 无格挡
-        Small,      // 格挡(小) -25%（无盾或装备Shield时）
-        Medium,     // 格挡(中) -50%（装备GreatShield时）
-        Large       // 格挡(大) -75%（预留：特定技能/被动可提升至此）
+        Counter, Pursuit, Preemptive, BattleEndAttack
     }
 }
 ```
@@ -215,49 +144,47 @@ namespace BattleKing.Data
 ```csharp
 namespace BattleKing.Data
 {
-    // ==================== CharacterData ====================
     public class CharacterData
     {
         public string Id { get; set; }
         public string Name { get; set; }
-        public List<UnitClass> Classes { get; set; } = new();      // 多兵种标签
-        public List<EquipmentCategory> EquippableCategories { get; set; } = new();  // 未CC可装备类型
-        public List<string> InnateActiveSkillIds { get; set; } = new();   // 基础主动技能
-        public List<string> InnatePassiveSkillIds { get; set; } = new();  // 基础被动技能
-        public List<string> InnateValorSkillIds { get; set; } = new();
-        public Dictionary<string, int> BaseStats { get; set; } = new();  // HP,Str,Def,Mag,MDef,Hit,Eva,Crit,Block,Spd,AP,PP
-        public string GrowthType { get; set; }  // HP型/力量型/防御型...
+        public List<UnitClass> Classes { get; set; } = new();
+        public List<EquipmentCategory> EquippableCategories { get; set; } = new();
+        public List<string> InnateActiveSkillIds { get; set; } = new();
+        public List<string> InnatePassiveSkillIds { get; set; } = new();
+        public Dictionary<string, int> BaseStats { get; set; } = new();
+        public string GrowthType { get; set; }
         public List<TraitData> Traits { get; set; } = new();
-        public List<string> InitialEquipmentIds { get; set; } = new();    // 未CC初始装备
+        public List<string> InitialEquipmentIds { get; set; } = new();
 
-        // CC (Class Change) 数据
+        // CC 数据
         public string CcClassId { get; set; }
         public string CcName { get; set; }
-        public List<EquipmentCategory> CcEquippableCategories { get; set; } = new();  // CC后可装备类型
-        public List<string> CcInnateActiveSkillIds { get; set; } = new();   // CC新增主动技能
-        public List<string> CcInnatePassiveSkillIds { get; set; } = new();  // CC新增被动技能
-        public List<string> CcInitialEquipmentIds { get; set; } = new();    // CC后初始装备（覆盖新增/变化槽位）
+        public List<UnitClass> CcClasses { get; set; } = new();       // CC后兵种变化(领主→骑兵)
+        public List<TraitData> CcTraits { get; set; } = new();         // CC后特性(物理对步兵2倍)
+        public List<EquipmentCategory> CcEquippableCategories { get; set; } = new();
+        public List<string> CcInnateActiveSkillIds { get; set; } = new();
+        public List<string> CcInnatePassiveSkillIds { get; set; } = new();
+        public List<string> CcInitialEquipmentIds { get; set; } = new();
     }
 
-    // ==================== ActiveSkillData ====================
     public class ActiveSkillData
     {
         public string Id { get; set; }
         public string Name { get; set; }
         public int ApCost { get; set; }
-        public SkillType Type { get; set; }         // 物/魔/辅助/回复/妨害
-        public AttackType AttackType { get; set; }  // 近接/遠隔/魔法
-        public int Power { get; set; }              // 技能威力（100=×1.0）
-        public int? HitRate { get; set; }           // 100=100%，null=必中
+        public SkillType Type { get; set; }
+        public AttackType AttackType { get; set; }
+        public int Power { get; set; }
+        public int? HitRate { get; set; }
         public TargetType TargetType { get; set; }
         public string EffectDescription { get; set; }
-        public List<string> Tags { get; set; } = new();  // 遠隔/同時発動制限/ガード不可...
+        public List<string> Tags { get; set; } = new();
         public List<SkillEffectData> Effects { get; set; } = new();
-        public string LearnCondition { get; set; }   // "领主 Lv1" 或 "毒蛇剑"（显示用）
-        public int? UnlockLevel { get; set; }        // 解锁等级（null=无等级限制，如装备赋予技能）
+        public string LearnCondition { get; set; }
+        public int? UnlockLevel { get; set; }
     }
 
-    // ==================== PassiveSkillData ====================
     public class PassiveSkillData
     {
         public string Id { get; set; }
@@ -271,44 +198,33 @@ namespace BattleKing.Data
         public List<string> Tags { get; set; } = new();
         public List<SkillEffectData> Effects { get; set; } = new();
         public bool HasSimultaneousLimit { get; set; }
-        public string LearnCondition { get; set; }   // 显示用
-        public int? UnlockLevel { get; set; }        // 解锁等级（null=无等级限制）
+        public string LearnCondition { get; set; }
+        public int? UnlockLevel { get; set; }
     }
 
-    // ==================== EquipmentData ====================
     public class EquipmentData
     {
         public string Id { get; set; }
         public string Name { get; set; }
         public EquipmentCategory Category { get; set; }
-        public Dictionary<string, int> BaseStats { get; set; } = new();  // phys_atk, magic_atk, phys_def, block_rate...
+        public Dictionary<string, int> BaseStats { get; set; } = new();
         public List<string> GrantedActiveSkillIds { get; set; } = new();
         public List<string> GrantedPassiveSkillIds { get; set; } = new();
-        public List<UnitClass> UsableByClasses { get; set; } = new();    // 为空表示全职业（饰品）
-        public List<string> RestrictedClassIds { get; set; } = new();    // 额外职业限制
-        public List<string> SpecialEffects { get; set; } = new();        // 毒无效/炎上无效/黑暗无效...
+        public List<UnitClass> UsableByClasses { get; set; } = new();
+        public List<string> RestrictedClassIds { get; set; } = new();
+        public List<string> SpecialEffects { get; set; } = new();
     }
 
-    // ==================== SkillEffectData ====================
     public class SkillEffectData
     {
-        public string EffectType { get; set; }   // "Damage", "Buff", "Heal", "StatusAilment"
+        public string EffectType { get; set; }
         public Dictionary<string, object> Parameters { get; set; } = new();
     }
 
-    // ==================== ConditionData ====================
-    public class ConditionData
-    {
-        public ConditionCategory Category { get; set; }
-        public string Operator { get; set; }     // equals, less_than, greater_than, contains
-        public object Value { get; set; }
-    }
-
-    // ==================== TraitData ====================
     public class TraitData
     {
-        public string TraitType { get; set; }    // "BowVsFlying", "CavalryVsInfantry", "AddRangedToMelee"...
-        public Dictionary<string, object> Parameters { get; set; } = new();
+        public string TraitType { get; set; }
+        public string Description { get; set; }
     }
 
     // ==================== GameDataRepository ====================
@@ -318,12 +234,17 @@ namespace BattleKing.Data
         public Dictionary<string, ActiveSkillData> ActiveSkills { get; private set; }
         public Dictionary<string, PassiveSkillData> PassiveSkills { get; private set; }
         public Dictionary<string, EquipmentData> Equipments { get; private set; }
+        public Dictionary<string, EnemyFormationData> EnemyFormations { get; private set; }
+        public Dictionary<string, StrategyPresetData> StrategyPresets { get; private set; }
 
         public void LoadAll(string dataPath) { /* 一次性加载所有JSON */ }
-        public CharacterData GetCharacter(string id) => Characters[id];
-        public ActiveSkillData GetActiveSkill(string id) => ActiveSkills[id];
-        public PassiveSkillData GetPassiveSkill(string id) => PassiveSkills[id];
-        public EquipmentData GetEquipment(string id) => Equipments[id];
+
+        // 所有 Get* 方法使用 TryGetValue，缺key返回null（不抛异常）
+        public CharacterData GetCharacter(string id) => Characters.TryGetValue(id, out var v) ? v : null;
+        public ActiveSkillData GetActiveSkill(string id) => ActiveSkills.TryGetValue(id, out var v) ? v : null;
+        public PassiveSkillData GetPassiveSkill(string id) => PassiveSkills.TryGetValue(id, out var v) ? v : null;
+        public EquipmentData GetEquipment(string id) => Equipments.TryGetValue(id, out var v) ? v : null;
+        public List<EquipmentData> GetAllEquipment() => Equipments.Values.ToList();
     }
 }
 ```
@@ -335,383 +256,183 @@ namespace BattleKing.Data
 ```csharp
 namespace BattleKing.Core
 {
-    // ==================== BattleUnit ====================
     public class BattleUnit
     {
-        // 只读模板引用
         public CharacterData Data { get; private set; }
         public GameDataRepository GameData { get; private set; }
+        public bool IsPlayer { get; set; }
 
-        // 运行时可变状态
-        public bool IsCc { get; private set; }      // CC状态标志
-        public int CurrentLevel { get; set; } = 1;  // 天数系统映射的等效等级
-        public void SetCcState(bool isCc) { IsCc = isCc; }
+        // 运行时状态
+        public bool IsCc { get; private set; }
+        public int CurrentLevel { get; set; } = 1;
         public int CurrentHp { get; set; }
         public int CurrentAp { get; set; }
         public int CurrentPp { get; set; }
-        public int MaxAp { get; private set; }      // 基础+装备
-        public int MaxPp { get; private set; }      // 基础+装备
-        public int Position { get; set; }           // 1-6
+        public int MaxAp { get; private set; }
+        public int MaxPp { get; private set; }
+        public int Position { get; set; }  // 1-6
         public bool IsFrontRow => Position <= 3;
         public bool IsAlive => CurrentHp > 0;
         public UnitState State { get; set; } = UnitState.Normal;
-        public int ActionCount { get; set; } = 0;   // 第N次行动计数
-        public int ConsecutiveWaitCount { get; set; } = 0;
+        public int ActionCount { get; set; } = 0;
 
         // 运行时集合
         public EquipmentSlot Equipment { get; private set; } = new();
         public List<Buff> Buffs { get; private set; } = new();
         public List<StatusAilment> Ailments { get; private set; } = new();
-        public List<Strategy> Strategies { get; set; } = new();  // 8条策略
+        public List<Strategy> Strategies { get; set; } = new();         // 8条策略
+        public List<string> EquippedPassiveSkillIds { get; set; } = new();
 
-        public BattleUnit(CharacterData data, GameDataRepository gameData, bool isPlayer, bool isCc = false)
-        {
-            Data = data;
-            GameData = gameData;
-            IsPlayer = isPlayer;
-            IsCc = isCc;
-            CurrentHp = data.BaseStats.GetValueOrDefault("HP", 0);
-            CurrentAp = data.BaseStats.GetValueOrDefault("AP", 2);
-            CurrentPp = data.BaseStats.GetValueOrDefault("PP", 1);
-        }
+        // 被动条件: skillId → 发动条件
+        public Dictionary<string, Condition> PassiveConditions { get; set; } = new();
 
-        // 根据CC状态返回可装备类型
-        public List<EquipmentCategory> GetEquippableCategories()
-        {
-            return IsCc && Data.CcEquippableCategories != null && Data.CcEquippableCategories.Count > 0
-                ? Data.CcEquippableCategories
-                : Data.EquippableCategories;
-        }
+        // 临时标记（1次免疫、致死耐等）
+        public List<TemporalState> TemporalStates { get; private set; } = new();
 
-        // 动态属性计算（基础+装备+buff）
-        public int GetCurrentStat(string statName)
-        {
-            int baseValue = Data.BaseStats.GetValueOrDefault(statName, 0);
-            int equipValue = Equipment.GetTotalStat(statName);
-            float buffRatio = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
-            return (int)((baseValue + equipValue) * (1 + buffRatio));
-        }
+        // 自定义计数器（小精灵/怒气/连击等）
+        public Dictionary<string, int> CustomCounters { get; private set; } = new();
 
-        public int GetCurrentAttackPower(SkillType damageType)
-        {
-            string stat = damageType == SkillType.Magical ? "Mag" : "Str";
-            return GetCurrentStat(stat) + Equipment.GetTotalStat("phys_atk"); // 简化版，实际需按damageType区分
-        }
+        // CC感知的兵种标签
+        public List<UnitClass> GetEffectiveClasses() =>
+            IsCc && Data.CcClasses?.Count > 0 ? Data.CcClasses : Data.Classes;
 
-        public int GetCurrentDefense(SkillType damageType)
-        {
-            string stat = damageType == SkillType.Magical ? "MDef" : "Def";
-            return GetCurrentStat(stat) + Equipment.GetTotalStat("phys_def");
-        }
+        // CC感知的特性列表
+        public List<TraitData> GetEffectiveTraits() { /* 合并 base + CC traits */ }
 
-        public int GetCurrentSpeed() => GetCurrentStat("Spd");
-        public int GetCurrentHitRate() => GetCurrentStat("Hit");
-        public int GetCurrentEvasion() => GetCurrentStat("Eva");
-        public int GetCurrentCritRate() => GetCurrentStat("Crit");
-        public int GetCurrentBlockRate() => GetCurrentStat("Block");
+        // 动态属性计算
+        public int GetCurrentStat(string statName) { /* 基础 + 装备 + buff */ }
 
-        // 可用主动技能池 = 基础 + CC新增（按CurrentLevel过滤） + 装备赋予
-        public List<string> GetAvailableActiveSkillIds()
-        {
-            var ids = new List<string>(Data.InnateActiveSkillIds);
-            if (IsCc && Data.CcInnateActiveSkillIds != null)
-                ids.AddRange(Data.CcInnateActiveSkillIds);
+        // 可用技能池（含装备赋予 + 等级过滤）
+        public List<string> GetAvailableActiveSkillIds() { /* 基础 + CC + 装备赋予，按UnlockLevel过滤 */ }
+        public List<string> GetAvailablePassiveSkillIds() { /* 同上 */ }
+        public List<PassiveSkillData> GetEquippedPassiveSkills() { /* 从EquippedPassiveSkillIds解析 */ }
 
-            ids = ids.Where(id =>
-            {
-                var skill = GameData.GetActiveSkill(id);
-                return skill?.UnlockLevel == null || skill.UnlockLevel <= CurrentLevel;
-            }).ToList();
-
-            ids.AddRange(Equipment.GetGrantedActiveSkillIds());
-            return ids.Distinct().ToList();
-        }
-
-        // 可用被动技能池 = 基础 + CC新增（按CurrentLevel过滤） + 装备赋予
-        public List<string> GetAvailablePassiveSkillIds()
-        {
-            var ids = new List<string>(Data.InnatePassiveSkillIds);
-            if (IsCc && Data.CcInnatePassiveSkillIds != null)
-                ids.AddRange(Data.CcInnatePassiveSkillIds);
-
-            ids = ids.Where(id =>
-            {
-                var skill = GameData.GetPassiveSkill(id);
-                return skill?.UnlockLevel == null || skill.UnlockLevel <= CurrentLevel;
-            }).ToList();
-
-            ids.AddRange(Equipment.GetGrantedPassiveSkillIds());
-            return ids.Distinct().ToList();
-        }
-
-        public bool CanUseActiveSkill(ActiveSkill skill) => CurrentAp >= skill.Data.ApCost;
-        public bool CanUsePassiveSkill(PassiveSkill skill) => CurrentPp >= skill.Data.PpCost && State != UnitState.Charging;
-
+        public void TakeDamage(int damage) { CurrentHp = Math.Max(0, CurrentHp - damage); }
         public void ConsumeAp(int amount) => CurrentAp = Math.Max(0, CurrentAp - amount);
         public void ConsumePp(int amount) => CurrentPp = Math.Max(0, CurrentPp - amount);
-        public void RecoverAp(int amount) => CurrentAp = Math.Min(MaxAp, CurrentAp + amount);
-        public void RecoverPp(int amount) => CurrentPp = Math.Min(MaxPp, CurrentPp + amount);
-
-        public void TakeDamage(int damage)
-        {
-            CurrentHp = Math.Max(0, CurrentHp - damage);
-            if (CurrentHp == 0) { /* 触发击倒事件 */ }
-        }
+        public int GetUsedPp() { /* 已装备被动PP总和 */ }
+        public bool CanEquipPassive(string skillId) { /* PP上限检查 */ }
     }
 
-    // ==================== BattleContext ====================
     public class BattleContext
     {
-        public List<BattleUnit> PlayerUnits { get; set; } = new();   // 6人
-        public List<BattleUnit> EnemyUnits { get; set; } = new();    // 6人
+        public GameDataRepository GameData { get; private set; }
+        public List<BattleUnit> PlayerUnits { get; set; } = new();
+        public List<BattleUnit> EnemyUnits { get; set; } = new();
         public int TurnCount { get; set; } = 0;
-        public bool IsDaytime { get; set; } = true;  // 昼夜系统（影响部分条件）
+        public bool IsDaytime { get; set; } = true;
 
-        public List<BattleUnit> AllUnits => PlayerUnits.Concat(EnemyUnits).ToList();
-        public List<BattleUnit> GetAliveUnits(bool isPlayer) => (isPlayer ? PlayerUnits : EnemyUnits).Where(u => u.IsAlive).ToList();
-        public BattleUnit GetUnitAtPosition(bool isPlayer, int position) => (isPlayer ? PlayerUnits : EnemyUnits).FirstOrDefault(u => u.Position == position);
+        // 当前正在处理的伤害计算（供ConditionEvaluator读取攻击属性）
+        public DamageCalculation CurrentCalc { get; set; }
 
-        // 用于条件判定的全场扫描
-        public bool HasEnemyClass(UnitClass unitClass) => EnemyUnits.Any(u => u.Data.Classes.Contains(unitClass));
+        public List<BattleUnit> AllUnits => PlayerUnits.Concat(EnemyUnits).Where(u => u != null).ToList();
+        public List<BattleUnit> GetAliveUnits(bool isPlayer) => (isPlayer ? PlayerUnits : EnemyUnits).Where(u => u != null && u.IsAlive).ToList();
         public int GetAliveCount(bool isPlayer) => GetAliveUnits(isPlayer).Count;
+
+        public static int GetStatValue(BattleUnit unit, string statName) { /* 从BaseStats读取 */ }
     }
 
-    // ==================== BattleEngine ====================
+    public class TemporalState
+    {
+        public string Key { get; set; }           // "MeleeHitNullify", "DeathResist", "SureHitNext"
+        public int RemainingCount { get; set; } = 1;  // 剩余次数
+        public int RemainingTurns { get; set; } = -1; // -1=战斗结束前有效
+        public string SourceSkillId { get; set; }
+    }
+
+    // BattleEngine — 使用 StepOneAction 逐步推进战斗
     public class BattleEngine
     {
         private BattleContext _ctx;
         private EventBus _eventBus;
-        private SimultaneousActivationLimiter _limiter;
         private DamageCalculator _damageCalculator;
-        private StrategyEvaluator _strategyEvaluator;
+        private List<BattleUnit> _turnQueue;  // 本回合行动队列
 
-        public BattleEngine(BattleContext ctx, EventBus eventBus)
+        public Action<string> OnLog;
+
+        // 逐步推进：每次执行一个单位的行动
+        public SingleActionResult StepOneAction()
         {
-            _ctx = ctx;
-            _eventBus = eventBus;
-            _limiter = new SimultaneousActivationLimiter();
-            _damageCalculator = new DamageCalculator();
-            _strategyEvaluator = new StrategyEvaluator(ctx);
+            if (_turnQueue.Count == 0) { /* 新回合：填充队列，按速度排序 */ }
+            // 取出下一个存活单位
+            ExecuteUnitTurn(unit);
+            ProcessPendingActions();
+            BuffManager.CleanupAfterAction(unit);
+            if (_turnQueue.Count == 0) { /* 回合结束：清理buff，检查AP耗尽 */ }
         }
 
-        public BattleResult RunBattle()
-        {
-            // 阶段1：战斗开始被动
-            Phase_BattleStart();
-
-            // 阶段2：行动循环
-            while (!IsBattleOver())
-            {
-                Phase_ActionLoop();
-                _ctx.TurnCount++;
-            }
-
-            // 阶段3：战斗结束
-            Phase_BattleEnd();
-
-            return JudgeWinner();
-        }
-
-        private void Phase_BattleStart()
-        {
-            var allUnits = _ctx.AllUnits.Where(u => u.IsAlive).OrderByDescending(u => u.GetCurrentSpeed());
-            foreach (var unit in allUnits)
-            {
-                var passives = GetTriggerablePassives(unit, PassiveTriggerTiming.BattleStart);
-                foreach (var passive in passives)
-                {
-                    if (!_limiter.CanTrigger(unit, SimultaneousLimitType.BattleStart, unit.IsPlayer))
-                        break;
-                    ExecutePassive(unit, passive, null);
-                }
-            }
-        }
-
-        private void Phase_ActionLoop()
-        {
-            var actionOrder = _ctx.AllUnits
-                .Where(u => u.IsAlive && u.State != UnitState.Stunned && u.State != UnitState.Frozen)
-                .OrderByDescending(u => u.GetCurrentSpeed())
-                .ThenBy(u => u.Position)
-                .ToList();
-
-            foreach (var unit in actionOrder)
-            {
-                if (!unit.IsAlive) continue;
-
-                // 1. 尝试发动主动技能
-                var (skill, targets) = _strategyEvaluator.Evaluate(unit);
-                if (skill != null && targets != null && targets.Count > 0)
-                {
-                    ExecuteActiveSkill(unit, skill, targets);
-                }
-                else
-                {
-                    unit.ConsecutiveWaitCount++;
-                }
-            }
-        }
-
-        private void ExecuteActiveSkill(BattleUnit attacker, ActiveSkill skill, List<BattleUnit> targets)
-        {
-            attacker.ActionCount++;
-            attacker.ConsecutiveWaitCount = 0;
-
-            // 攻击方被动（自身强化 + 友方最快1人）
-            TriggerAttackerPassives(attacker, skill);
-
-            // 防守方被动（对方最快1人防御 + 格挡/回避）
-            foreach (var defender in targets)
-                TriggerDefenderPassives(attacker, defender, skill);
-
-            // 执行技能
-            var results = new List<DamageResult>();
-            foreach (var target in targets)
-            {
-                var result = _damageCalculator.Calculate(attacker, target, skill, _ctx);
-                results.Add(result);
-                target.TakeDamage(result.TotalDamage);
-            }
-
-            // 行动后被动
-            TriggerAfterActionPassives(attacker, targets, skill, results);
-
-            _eventBus.Publish(new OnActionEndEvent(attacker, skill, targets, results));
-        }
-
-        private bool IsBattleOver()
-        {
-            bool allPlayerDead = _ctx.PlayerUnits.All(u => !u.IsAlive);
-            bool allEnemyDead = _ctx.EnemyUnits.All(u => !u.IsAlive);
-            bool allPlayerApDepleted = _ctx.PlayerUnits.All(u => u.CurrentAp <= 0);
-            bool allEnemyApDepleted = _ctx.EnemyUnits.All(u => u.CurrentAp <= 0);
-
-            // 如果一方全死，但另一方还有恢复技能...需要一轮确认
-            return (allPlayerDead && allEnemyDead) || (allPlayerApDepleted && allEnemyApDepleted);
-        }
-
-        private BattleResult JudgeWinner()
-        {
-            float playerHpRatio = _ctx.PlayerUnits.Sum(u => (float)u.CurrentHp) / _ctx.PlayerUnits.Sum(u => u.Data.BaseStats.GetValueOrDefault("HP", 1));
-            float enemyHpRatio = _ctx.EnemyUnits.Sum(u => (float)u.CurrentHp) / _ctx.EnemyUnits.Sum(u => u.Data.BaseStats.GetValueOrDefault("HP", 1));
-            return playerHpRatio > enemyHpRatio ? BattleResult.PlayerWin : BattleResult.EnemyWin;
-        }
-
-        // 被动触发辅助方法（省略具体实现）
-        private List<PassiveSkill> GetTriggerablePassives(BattleUnit unit, PassiveTriggerTiming timing) { throw new NotImplementedException(); }
-        private void ExecutePassive(BattleUnit caster, PassiveSkill passive, BattleUnit target) { }
-        private void TriggerAttackerPassives(BattleUnit attacker, ActiveSkill skill) { }
-        private void TriggerDefenderPassives(BattleUnit attacker, BattleUnit defender, ActiveSkill skill) { }
-        private void TriggerAfterActionPassives(BattleUnit attacker, List<BattleUnit> targets, ActiveSkill skill, List<DamageResult> results) { }
+        public void InitBattle() { /* 填充初始队列，发布BattleStartEvent */ }
+        public void EnqueueAction(PendingAction action) { /* 入队 */ }
+        private void ProcessPendingActions() { /* 执行队列中的反击/追击/先制 */ }
     }
 
     public enum BattleResult { PlayerWin, EnemyWin, Draw }
-    public enum BattleStepResult { Continue, PlayerWin, EnemyWin, Draw }
     public enum SingleActionResult { ActionDone, TurnDone, PlayerWin, EnemyWin, Draw }
+}
+
+// PendingAction — 行动队列
+namespace BattleKing.Skills
+{
+    public class PendingAction
+    {
+        public PendingActionType Type { get; set; }
+        public BattleUnit Actor { get; set; }
+        public BattleUnit Target { get; set; }
+        public int Power { get; set; }
+        public int HitRate { get; set; }
+        public List<string> Tags { get; set; } = new();
+        public AttackType AttackType { get; set; }
+    }
 }
 ```
 
 ---
 
-## 技能系统
+## 技能系统 — 双路径架构
+
+```
+Path A — ISkillEffect (通用):
+  DamageEffect / BuffEffect / HealEffect / StatusAilmentEffect
+  用于主动技能执行: ISkillEffect.Apply(ctx, caster, targets, calc)
+
+Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (阶段感知):
+  ModifyDamageCalc / CounterAttack / TemporalMark / CoverAlly /
+  ModifyCounter / ConsumeCounter / PreemptiveAttack / PursuitAttack /
+  RecoverAp / RecoverPp / RecoverHp / AddBuff / AddDebuff
+  有完整战斗阶段上下文(DamageCalculation/PendingActionQueue/TemporalState)
+  这些类型在SkillEffectFactory中创建PassiveOnlyEffect — Apply()是空操作
+```
 
 ```csharp
 namespace BattleKing.Skills
 {
-    // ==================== ActiveSkill（运行时包装）====================
-    public class ActiveSkill
+    public class PassiveSkillProcessor
     {
-        public ActiveSkillData Data { get; private set; }
-        public List<ISkillEffect> Effects { get; private set; } = new();
+        private EventBus _eventBus;
+        private GameDataRepository _gameData;
+        private BattleContext _ctx;  // 从事件中更新
+        private Action<string> _log;
+        private Action<PendingAction> _enqueueAction;
 
-        public int ApCost => Data.ApCost;
-        public SkillType Type => Data.Type;
-        public AttackType AttackType => Data.AttackType;
-        public int Power => Data.Power;
-        public TargetType TargetType => Data.TargetType;
-        public bool HasPhysicalComponent => Data.Type == SkillType.Physical;
-        public bool HasMixedDamage => /* 根据Data判断 */ false;
+        // 同时发动限制跟踪
+        private HashSet<string> _battleStartFired, _allyBuffFired, _defenseFired, _afterActionFired;
 
-        public ActiveSkill(ActiveSkillData data, GameDataRepository gameData)
-        {
-            Data = data;
-            Effects = SkillEffectFactory.CreateEffects(data.Effects);
-        }
-    }
+        public void SubscribeAll() { /* 订阅所有战斗事件 */ }
 
-    // ==================== PassiveSkill（运行时包装）====================
-    public class PassiveSkill
-    {
-        public PassiveSkillData Data { get; private set; }
-        public List<ISkillEffect> Effects { get; private set; } = new();
+        // 7个事件处理器：
+        // OnBattleStart → 战斗开始时被动
+        // OnBeforeActiveUse → 攻击方被动（自身+友方）
+        // OnBeforeHit → 防守方被动（防御/格挡/回避）+ BeforeHit介入DamageCalculation
+        // OnAfterHit → 被命中后被动
+        // OnAfterActiveUse → 行动后被动
+        // OnKnockdown → 击倒事件
+        // OnBattleEnd → 战斗结束时被动
 
-        public int PpCost => Data.PpCost;
-        public PassiveTriggerTiming TriggerTiming => Data.TriggerTiming;
-        public bool HasSimultaneousLimit => Data.HasSimultaneousLimit;
+        // 条件检查：触发前检查 BattleUnit.PassiveConditions[skillId]
+        private bool CheckPassiveCondition(BattleUnit unit, string skillId) { /* 用ConditionEvaluator评估 */ }
 
-        public PassiveSkill(PassiveSkillData data, GameDataRepository gameData)
-        {
-            Data = data;
-            Effects = SkillEffectFactory.CreateEffects(data.Effects);
-        }
-    }
-
-    // ==================== ISkillEffect ====================
-    public interface ISkillEffect
-    {
-        void Apply(BattleContext ctx, BattleUnit caster, List<BattleUnit> targets, DamageCalculation calc = null);
-    }
-
-    // ==================== SkillEffectFactory ====================
-    //
-    // TWO-PATH ARCHITECTURE for skill effects:
-    //
-    // Path A — ISkillEffect (generic, context-free):
-    //   DamageEffect / BuffEffect / HealEffect / StatusAilmentEffect
-    //   Executed via ISkillEffect.Apply(ctx, caster, targets, calc)
-    //   Used by: active skill execution in BattleEngine
-    //
-    // Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (phase-aware):
-    //   ModifyDamageCalc / CounterAttack / TemporalMark / CoverAlly /
-    //   ModifyCounter / ConsumeCounter / PreemptiveAttack / PursuitAttack /
-    //   RecoverAp / RecoverPp / RecoverHp / AddBuff / AddDebuff / etc.
-    //   Executed directly by PassiveSkillProcessor with full battle-phase context
-    //   (DamageCalculation before a hit, PendingActionQueue, TemporalState, CustomCounters)
-    //   These create PassiveOnlyEffect in the factory — Apply() is a no-op.
-    //
-    // WHY TWO PATHS: Passive skill effects are not fire-and-forget. They need to
-    // intercept the damage pipeline at specific timings, queue extra actions, manage
-    // temporary state, and read/write custom counters. ISkillEffect.Apply() cannot
-    // provide this context. Rather than bloating the interface, passive effects are
-    // dispatched in PassiveSkillProcessor where all context is naturally available.
-    //
-    public static class SkillEffectFactory
-    {
-        public static List<ISkillEffect> CreateEffects(List<SkillEffectData> effectDatas)
-        {
-            var effects = new List<ISkillEffect>();
-            foreach (var data in effectDatas)
-            {
-                effects.Add(data.EffectType switch
-                {
-                    "Damage" => new DamageEffect(data.Parameters),
-                    "Buff" => new BuffEffect(data.Parameters),
-                    "Heal" => new HealEffect(data.Parameters),
-                    "StatusAilment" => new StatusAilmentEffect(data.Parameters),
-                    // All other effect types → PassiveOnlyEffect (handled by PassiveSkillProcessor)
-                    _ => new PassiveOnlyEffect(data.EffectType)
-                });
-            }
-            return effects;
-        }
-    }
-
-    // Sentinel: effects dispatched by PassiveSkillProcessor, not via ISkillEffect
-    public class PassiveOnlyEffect : ISkillEffect
-    {
-        public readonly string EffectType;
-        public PassiveOnlyEffect(string et) => EffectType = et;
-        public void Apply(BattleContext ctx, BattleUnit caster, List<BattleUnit> targets, DamageCalculation calc = null) { }
+        // 结构化效果分发（15+ EffectType）
+        private void ExecuteStructuredEffect(BattleUnit unit, PassiveSkillData skill, ...) { }
     }
 }
 ```
@@ -723,153 +444,92 @@ namespace BattleKing.Skills
 ```csharp
 namespace BattleKing.Ai
 {
-    // ==================== Strategy ====================
     public class Strategy
     {
         public string SkillId { get; set; }
         public Condition Condition1 { get; set; }
         public Condition Condition2 { get; set; }
-        public ConditionMode Mode1 { get; set; }
+        public ConditionMode Mode1 { get; set; }  // Only=仅 / Priority=优先
         public ConditionMode Mode2 { get; set; }
     }
 
-    // ==================== Condition ====================
     public class Condition
     {
         public ConditionCategory Category { get; set; }
-        public string Operator { get; set; }
+        public string Operator { get; set; }    // equals/less_than/greater_than/lowest/highest
         public object Value { get; set; }
     }
 
-    // ==================== StrategyEvaluator ====================
-    public class StrategyEvaluator
+    // ========== ConditionMeta — 条件编辑器元数据 ==========
+    public static class ConditionMeta
     {
-        private BattleContext _ctx;
-        private ConditionEvaluator _conditionEvaluator;
-        private TargetSelector _targetSelector;
+        // 10个可用条件类别及其中文标签
+        public static readonly List<ConditionCategory> AllCategories;
 
-        public StrategyEvaluator(BattleContext ctx)
-        {
-            _ctx = ctx;
-            _conditionEvaluator = new ConditionEvaluator(ctx);
-            _targetSelector = new TargetSelector(ctx);
-        }
+        // 级联: 类别 → 操作符列表
+        public static List<string> GetOperators(ConditionCategory cat);
 
-        // 从上到下评估8条策略，返回第一个满足条件的（技能，目标列表）
-        public (ActiveSkill, List<BattleUnit>) Evaluate(BattleUnit unit)
-        {
-            var availableSkillIds = unit.GetAvailableActiveSkillIds();
+        // 级联: 类别+操作符 → 值列表
+        public static List<string> GetValues(ConditionCategory cat, string op);
 
-            foreach (var strategy in unit.Strategies)
-            {
-                if (!availableSkillIds.Contains(strategy.SkillId)) continue;
+        // UI选择 → Condition对象
+        public static Condition BuildCondition(ConditionCategory cat, string op, string val, bool isOnly);
 
-                var skillData = _ctx.GameData.GetActiveSkill(strategy.SkillId);
-                if (!unit.CanUseActiveSkill(new ActiveSkill(skillData, _ctx.GameData))) continue;
-
-                var targets = _targetSelector.SelectTargets(unit, strategy, skillData);
-                if (targets != null && targets.Count > 0)
-                    return (new ActiveSkill(skillData, _ctx.GameData), targets);
-            }
-
-            return (null, null); // 全部不满足 → 待机
-        }
+        // CategoryLabel — 中文显示名
+        // 操作符映射: 低于→less_than, 高于→greater_than, 等于→equals
+        //             最低→lowest(Only=过滤), 最高→highest(Only=过滤)
+        //             以上→greater_than, 以下→less_than, 有→equals
+        // 值映射: 25%→0.25f, 50%→0.5f, 75%→0.75f, 100%→1.0f
+        //        属性排名→"Str"/"Def"/"Spd"等内部名
     }
 
-    // ==================== ConditionEvaluator ====================
+    // ========== ConditionEvaluator — 12类条件评估 ==========
     public class ConditionEvaluator
     {
         private BattleContext _ctx;
-
-        public ConditionEvaluator(BattleContext ctx) => _ctx = ctx;
 
         public bool Evaluate(Condition condition, BattleUnit subject, BattleUnit target = null)
         {
             return condition.Category switch
             {
-                ConditionCategory.Position => EvaluatePosition(condition, subject, target),
-                ConditionCategory.UnitClass => EvaluateUnitClass(condition, subject, target),
-                ConditionCategory.Hp => EvaluateHp(condition, subject, target),
-                ConditionCategory.ApPp => EvaluateApPp(condition, subject, target),
-                ConditionCategory.Status => EvaluateStatus(condition, subject, target),
-                ConditionCategory.SelfState => EvaluateSelfState(condition, subject),
-                ConditionCategory.EnemyClassExists => EvaluateEnemyClassExists(condition),
-                ConditionCategory.AttributeRank => EvaluateAttributeRank(condition, subject, target),
+                Position => EvaluatePosition,       // 前排/后排
+                UnitClass => EvaluateUnitClass,     // 步兵/骑兵/飞行...
+                Hp => EvaluateHp,                   // HP比例 低于/高于/等于
+                ApPp => EvaluateApPp,               // AP/PP比例
+                Status => EvaluateStatus,           // buff/debuff/异常
+                AttackAttribute => EvaluateAttackAttribute,  // 物理/魔法/列/全体
+                TeamSize => EvaluateTeamSize,       // 敌/友N体以上/以下
+                SelfState => EvaluateSelfState,     // 蓄力/气绝/冻结/黑暗
+                SelfHp => EvaluateSelfHp,           // 自身HP比例
+                SelfApPp => EvaluateSelfApPp,       // 自身AP值
+                EnemyClassExists => EvaluateEnemyClassExists,  // 敌有/无某兵种
+                AttributeRank => EvaluateAttributeRank,  // 最高/最低属性
                 _ => true
             };
         }
 
-        private bool EvaluatePosition(Condition c, BattleUnit subject, BattleUnit target) { throw new NotImplementedException(); }
-        private bool EvaluateUnitClass(Condition c, BattleUnit subject, BattleUnit target) { throw new NotImplementedException(); }
-        private bool EvaluateHp(Condition c, BattleUnit subject, BattleUnit target) { throw new NotImplementedException(); }
-        private bool EvaluateApPp(Condition c, BattleUnit subject, BattleUnit target) { throw new NotImplementedException(); }
-        private bool EvaluateStatus(Condition c, BattleUnit subject, BattleUnit target) { throw new NotImplementedException(); }
-        private bool EvaluateSelfState(Condition c, BattleUnit subject) { throw new NotImplementedException(); }
-        private bool EvaluateEnemyClassExists(Condition c) { throw new NotImplementedException(); }
-        private bool EvaluateAttributeRank(Condition c, BattleUnit subject, BattleUnit target) { throw new NotImplementedException(); }
+        // TeamSize: Value = "enemy:N" 或 "ally:N"，Operator = greater_than/less_than
+        // AttackAttribute: 读取 _ctx.CurrentCalc 判断攻击类型
+        // AttributeRank: 扫描全场比较指定属性值
     }
 
-    // ==================== TargetSelector ====================
+    // ========== TargetSelector — 目标选择 ==========
     public class TargetSelector
     {
-        private BattleContext _ctx;
+        // 4步流程:
+        // Step 1: GetDefaultTargetList(caster, skill) — 按攻击类型和位置排序
+        // Step 2: ApplyCondition(list, condition1, mode1) — 仅=过滤 / 优先=排序
+        // Step 3: ApplyCondition(list, condition2, mode2) — 双优先时条件2优先
+        // Step 4: 根据TargetType截取目标数量
 
-        public TargetSelector(BattleContext ctx) => _ctx = ctx;
+        // lowest/highest 操作符:
+        //   Category=Hp → OrderBy(u.CurrentHp) / OrderByDescending
+        //   Category=ApPp → OrderBy(u.CurrentAp) / OrderByDescending
+        //   Category=AttributeRank → SortByAttributeRank(list, condition, ascending)
 
-        // 目标选择流程：
-        // Step 1: 生成默认目标列表（前排优先，距离近优先）
-        // Step 2: 应用条件1（仅=过滤，优先=重新排序）
-        // Step 3: 应用条件2（同上，双优先时条件2优先）
-        // Step 4: 选择列表第一个；列表为空则策略不发动
-        public List<BattleUnit> SelectTargets(BattleUnit caster, Strategy strategy, ActiveSkillData skill)
-        {
-            var candidates = GetDefaultTargetList(caster, skill);
-
-            candidates = ApplyCondition(candidates, strategy.Condition1, strategy.Mode1, caster);
-            candidates = ApplyCondition(candidates, strategy.Condition2, strategy.Mode2, caster);
-
-            // 优先前排/优先后排：无论放在哪里都最优先执行
-            candidates = ApplyPositionPriority(candidates, strategy);
-
-            if (candidates.Count == 0) return null;
-
-            // 根据TargetType确定最终目标数量
-            return skill.TargetType switch
-            {
-                TargetType.SingleEnemy => new List<BattleUnit> { candidates.First() },
-                TargetType.SingleAlly => new List<BattleUnit> { candidates.First() },
-                TargetType.Column => GetColumnTargets(candidates.First()),
-                TargetType.AllEnemies => candidates.ToList(),
-                _ => new List<BattleUnit> { candidates.First() }
-            };
-        }
-
-        private List<BattleUnit> GetDefaultTargetList(BattleUnit caster, ActiveSkillData skill)
-        {
-            var enemies = caster.IsPlayer ? _ctx.EnemyUnits : _ctx.PlayerUnits;
-            var aliveEnemies = enemies.Where(u => u.IsAlive).ToList();
-
-            // 近战物理：前排有敌人时只以前排为目标
-            if (skill.AttackType == AttackType.Melee)
-            {
-                var frontRow = aliveEnemies.Where(u => u.IsFrontRow).ToList();
-                if (frontRow.Count > 0) aliveEnemies = frontRow;
-            }
-
-            // 默认排序：前排中央 → 前排两侧 → 后排正面 → 后排两侧
-            return aliveEnemies.OrderBy(u => u.Position).ToList();
-        }
-
-        private List<BattleUnit> ApplyCondition(List<BattleUnit> list, Condition condition, ConditionMode mode, BattleUnit caster)
-        {
-            if (condition == null) return list;
-            // 仅=过滤，优先=重新排序
-            // 具体实现省略...
-            return list;
-        }
-
-        private List<BattleUnit> ApplyPositionPriority(List<BattleUnit> list, Strategy strategy) { return list; }
-        private List<BattleUnit> GetColumnTargets(BattleUnit first) { return _ctx.AllUnits.Where(u => u.Position == first.Position).ToList(); }
+        // 默认目标规则:
+        //   近战 → 前排优先，前排全灭才能打后排
+        //   远程/魔法/飞行/贯通 → 全体按位置排序
     }
 }
 ```
@@ -881,158 +541,59 @@ namespace BattleKing.Ai
 ```csharp
 namespace BattleKing.Equipment
 {
-    // ==================== EquipmentSlot ====================
     public class EquipmentSlot
     {
-        public Equipment MainHand { get; set; }      // 武器槽：永远不能为空
-        public Equipment OffHand { get; set; }       // 副手：盾/副手武器/饰品
-        public Equipment Accessory1 { get; set; }
-        public Equipment Accessory2 { get; set; }
-        public Equipment Accessory3 { get; set; }
+        public Equipment MainHand { get; set; }      // 永不为空
+        public Equipment OffHand { get; set; }
+        public Equipment Accessory1, Accessory2, Accessory3 { get; set; }
 
-        public IEnumerable<Equipment> AllEquipped => new[] { MainHand, OffHand, Accessory1, Accessory2, Accessory3 }.Where(e => e != null);
+        public IEnumerable<Equipment> AllEquipped { get; }
 
-        public int GetTotalStat(string statName)
-        {
-            int total = AllEquipped.Sum(e => e.Data.BaseStats.GetValueOrDefault(statName, 0));
+        // 双持规则：剑士/剑圣双持剑时，副手攻击力一半加算
+        public int GetTotalStat(string statName) { }
 
-            // 双持规则：剑士/剑圣双持剑时，副手攻击的一半加算
-            if (CanDualWield() && MainHand?.Data.Category == EquipmentCategory.Sword && OffHand?.Data.Category == EquipmentCategory.Sword)
-            {
-                int mainAtk = MainHand.Data.BaseStats.GetValueOrDefault(statName, 0);
-                int offAtk = OffHand.Data.BaseStats.GetValueOrDefault(statName, 0);
-                if (statName == "phys_atk" || statName == "magic_atk")
-                {
-                    total = mainAtk + offAtk / 2;
-                }
-            }
+        // 装备赋予的技能
+        public List<string> GetGrantedActiveSkillIds() { }
+        public List<string> GetGrantedPassiveSkillIds() { }
 
-            return total;
-        }
+        // 新方法 (2026-05-07)
+        public Equipment GetBySlot(string slotName) { }       // 按名称读槽位
+        public void Unequip(string slotName) { }              // 清空指定槽位
+        public void EquipToSlot(string slotName, EquipmentData data) { }  // 指定槽位装备
 
-        public List<string> GetGrantedActiveSkillIds() => AllEquipped.SelectMany(e => e.Data.GrantedActiveSkillIds).ToList();
-        public List<string> GetGrantedPassiveSkillIds() => AllEquipped.SelectMany(e => e.Data.GrantedPassiveSkillIds).ToList();
-
-        // 装备放入逻辑：武器优先MainHand，已有则放OffHand（支持双持）；盾放OffHand；饰品依次填充
-        public void Equip(EquipmentData data)
-        {
-            var equipment = new Equipment(data);
-            switch (data.Category)
-            {
-                case EquipmentCategory.Sword:
-                case EquipmentCategory.Axe:
-                case EquipmentCategory.Spear:
-                case EquipmentCategory.Bow:
-                case EquipmentCategory.Staff:
-                    if (MainHand == null)
-                        MainHand = equipment;
-                    else
-                        OffHand = equipment;
-                    break;
-                case EquipmentCategory.Shield:
-                case EquipmentCategory.GreatShield:
-                    OffHand = equipment;
-                    break;
-                case EquipmentCategory.Accessory:
-                    if (Accessory1 == null) Accessory1 = equipment;
-                    else if (Accessory2 == null) Accessory2 = equipment;
-                    else if (Accessory3 == null) Accessory3 = equipment;
-                    break;
-            }
-        }
+        // 静态方法
+        public static bool CanEquipCategory(EquipmentCategory cat, CharacterData cd, bool isCc) { }
+        public static List<string> GetSlotNames(CharacterData cd, bool isCc) { }
+        // 槽位顺序 = equippableCategories顺序: 第一个武器→MainHand, 第二个→OffHand,
+        //   Shield/GreatShield→OffHand, Accessory→Accessory1/2/3
 
         public bool ValidateWeaponEquipped() => MainHand != null;
-
-        private bool CanDualWield() { /* 检查职业是否为剑士/剑圣 */ return false; }
     }
 
-    // ==================== 装备槽与格挡规则（2026-05-02更新）====================
-    //
-    // 装备槽统一规则：
-    // - 所有角色基础状态固定3个槽，CC后固定4个槽
-    // - 分配逻辑：武器（含盾/大盾）占多少槽，剩余全是饰品槽
-    //   * 单武器（无副手）：基础=1武器+2饰品，CC后=1武器+3饰品
-    //   * 剑+盾 / 双持：基础=2武器+1饰品，CC后=2武器+2饰品
-    // - EquipmentSlot.Equip 已支持双持：第二把武器自动放入 OffHand
-    //
-    // 格挡规则：
-    // - 所有角色都有基础格挡率（Block属性），无盾也能格挡
-    // - 无盾格挡：减免25%
-    // - 装备盾（Shield）：减免25%（盾提升格挡率 block_rate）
-    // - 装备大盾（GreatShield）：减免50%
-    // - Block属性是格挡概率，不是格挡前提条件
-    //
-    // ==================== Equipment（运行时包装）====================
-    public class Equipment
-    {
-        public EquipmentData Data { get; private set; }
-        public Equipment(EquipmentData data) => Data = data;
-    }
-
-    // ==================== Buff ====================
     public class Buff
     {
-        public string SkillId { get; set; }       // 来源技能ID（用于同技能去重）
-        public string TargetStat { get; set; }     // "Str", "Def", "Spd"...
-        public float Ratio { get; set; }           // +0.3 = +30%
-        public bool IsOneTime { get; set; }        // 一次性buff
-        public bool IsPureBuffOrDebuff { get; set; } // 纯buff/debuff（用于去重判断）
-        public int RemainingTurns { get; set; }    // -1 = 永久
+        public string SkillId { get; set; }
+        public string TargetStat { get; set; }
+        public float Ratio { get; set; }         // +0.2 = +20%
+        public bool IsOneTime { get; set; }
+        public bool IsPureBuffOrDebuff { get; set; }
+        public int RemainingTurns { get; set; }  // -1 = 战斗结束前有效
     }
 
-    // ==================== BuffManager ====================
-    public class BuffManager
+    public static class BuffManager
     {
-        public void ApplyBuff(BattleUnit target, Buff newBuff)
-        {
-            var existing = target.Buffs.FirstOrDefault(b => b.SkillId == newBuff.SkillId);
-
-            // 规则：同技能纯buff/debuff → 不重复施加
-            if (existing != null && newBuff.IsPureBuffOrDebuff)
-                return;
-
-            // 规则：同名效果不同技能 → 可以重叠
-            target.Buffs.Add(newBuff);
-        }
-
-        public void RemoveOneTimeBuffsAfterAction(BattleUnit unit)
-        {
-            unit.Buffs.RemoveAll(b => b.IsOneTime);
-        }
-
-        public float GetTotalBuffRatio(BattleUnit unit, string statName)
-        {
-            return unit.Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
-        }
+        // 同名技能纯buff/debuff → 不重复施加
+        // 同名效果不同技能 → 可重叠
+        public static void ApplyBuff(BattleUnit target, Buff newBuff) { }
+        public static void CleanupAfterAction(BattleUnit unit) { }  // 清除一次性buff
+        public static void CleanupEndOfTurn(BattleUnit unit) { }    // 减回合数，清除过期
+        public static float GetTotalBuffRatio(BattleUnit unit, string statName) { }
     }
 
-    // ==================== ITrait ====================
-    public interface ITrait
+    public static class TraitApplier
     {
-        void OnCalculateDamage(DamageCalculation calc, BattleUnit owner);
-        AttackType ModifyAttackType(AttackType baseType, BattleUnit owner);
-    }
-
-    // ==================== TraitApplier ====================
-    public class TraitApplier
-    {
-        public void ApplyTraitsToDamage(DamageCalculation calc, BattleUnit attacker)
-        {
-            foreach (var trait in attacker.Data.Traits)
-            {
-                // 根据 trait.TraitType 创建对应的 ITrait 实例并应用
-            }
-        }
-
-        public AttackType ModifyAttackType(AttackType baseType, BattleUnit attacker)
-        {
-            var result = baseType;
-            foreach (var trait in attacker.Data.Traits)
-            {
-                // 如雪游侠"无遠隔技能附加遠隔"
-            }
-            return result;
-        }
+        public static float ApplyTraitsToDamage(DamageCalculation calc) { }
+        public static AttackType ModifyAttackType(AttackType baseType, BattleUnit attacker) { }
     }
 }
 ```
@@ -1044,155 +605,52 @@ namespace BattleKing.Equipment
 ```csharp
 namespace BattleKing.Pipeline
 {
-    // ==================== DamageCalculation（中间状态对象）====================
-    public class DamageCalculation
+    public class DamageCalculation  // 可变中间状态 — 被动技能可在BeforeHitEvent中修改
     {
-        public BattleUnit Attacker { get; set; }
-        public BattleUnit Defender { get; set; }
-        public ActiveSkill Skill { get; set; }
+        public BattleUnit Attacker, Defender;
+        public ActiveSkill Skill;
 
-        // 阶段1-2：攻击力/防御力
-        public int FinalAttackPower { get; set; }
-        public int FinalDefense { get; set; }
+        // 可变字段（被动技能介入点）
+        public bool ForceHit { get; set; } = false;
+        public bool ForceEvasion { get; set; } = false;
+        public bool? ForceBlock { get; set; } = null;
+        public float SkillPowerMultiplier { get; set; } = 1.0f;
+        public float DamageMultiplier { get; set; } = 1.0f;
+        public float IgnoreDefenseRatio { get; set; } = 0f;
+        public bool NullifyPhysicalDamage { get; set; } = false;
+        public bool NullifyMagicalDamage { get; set; } = false;
+        public BattleUnit CoverTarget { get; set; } = null;
+        public bool CannotBeCovered { get; set; } = false;
+        public bool CannotBeBlocked { get; set; } = false;
+        public int HitCount { get; set; } = 1;  // 多段攻击
+        public float CounterPowerBonus { get; set; } = 0f;  // 计数器加成
 
-        // 阶段3：基础差值
-        public int BaseDifference => Math.Max(1, FinalAttackPower - FinalDefense);
-
-        // 阶段4-6：乘区
-        public float SkillPowerRatio { get; set; } = 1.0f;
-        public float ClassTraitMultiplier { get; set; } = 1.0f;      // 兵种克制
-        public float CharacterTraitMultiplier { get; set; } = 1.0f;   // 职业Trait
-
-        // 阶段7-8：判定
-        public bool IsHit { get; set; } = true;
-        public bool IsCritical { get; set; } = false;
-        public bool IsBlocked { get; set; } = false;
-        public bool IsEvaded { get; set; } = false;
-        public float CritMultiplier { get; set; } = 1.5f;
-        public float BlockReduction { get; set; } = 0f;  // 0.25/0.50/0.75
-
-        // 混合伤害
-        public int PhysicalDamage { get; set; }
-        public int MagicalDamage { get; set; }
+        // 结果字段
+        public int PhysicalDamage, MagicalDamage;
         public int TotalDamage => PhysicalDamage + MagicalDamage;
-
-        // 状态异常
-        public List<StatusAilment> AppliedAilments { get; set; } = new();
     }
 
-    // ==================== DamageResult ====================
-    public class DamageResult
-    {
-        public int PhysicalDamage { get; set; }
-        public int MagicalDamage { get; set; }
-        public int TotalDamage => PhysicalDamage + MagicalDamage;
-        public bool IsHit { get; set; }
-        public bool IsCritical { get; set; }
-        public bool IsBlocked { get; set; }
-        public bool IsEvaded { get; set; }
-        public List<StatusAilment> AppliedAilments { get; set; } = new();
-    }
-
-    // ==================== DamageCalculator ====================
     public class DamageCalculator
     {
-        public DamageResult Calculate(BattleUnit attacker, BattleUnit defender, ActiveSkill skill, BattleContext ctx)
+        // 主签名 — 接收完整 DamageCalculation
+        public DamageResult Calculate(DamageCalculation calc)
         {
-            var calc = new DamageCalculation
-            {
-                Attacker = attacker,
-                Defender = defender,
-                Skill = skill
-            };
-
-            // 阶段1：计算攻击力
-            calc.FinalAttackPower = attacker.GetCurrentAttackPower(skill.Type);
-
-            // 阶段2：计算防御力
-            calc.FinalDefense = defender.GetCurrentDefense(skill.Type);
-
-            // 阶段3-6：基础伤害 × 技能威力 × 兵种补正 × Trait补正
-            float baseDmg = calc.BaseDifference * (skill.Power / 100f);
-            baseDmg *= GetClassTraitMultiplier(attacker, defender);
-            baseDmg *= GetCharacterTraitMultiplier(attacker, defender, skill);
-
-            // 分离物理/魔法部分
-            if (skill.HasMixedDamage)
-            {
-                calc.PhysicalDamage = (int)(baseDmg * 0.7f); // 示例比例
-                calc.MagicalDamage = (int)(baseDmg * 0.3f);
-            }
-            else
-            {
-                calc.PhysicalDamage = (int)baseDmg;
-            }
-
-            // 阶段7：暴击判定
-            if (RollCrit(attacker, defender, skill))
-            {
-                calc.IsCritical = true;
-                calc.CritMultiplier = Math.Min(3.0f, 1.5f + attacker.Buffs.Where(b => b.TargetStat == "CritDmg").Sum(b => b.Ratio));
-                calc.PhysicalDamage = (int)(calc.PhysicalDamage * calc.CritMultiplier);
-                calc.MagicalDamage = (int)(calc.MagicalDamage * calc.CritMultiplier);
-            }
-
-            // 阶段8：格挡判定（只对物理部分）
-            if (skill.HasPhysicalComponent && RollBlock(defender, skill))
-            {
-                calc.IsBlocked = true;
-                calc.BlockReduction = defender.GetBlockReduction();
-                calc.PhysicalDamage = (int)(calc.PhysicalDamage * (1 - calc.BlockReduction));
-            }
-
-            // 四舍五入
-            calc.PhysicalDamage = (int)Math.Round(calc.PhysicalDamage);
-            calc.MagicalDamage = (int)Math.Round(calc.MagicalDamage);
-
-            return new DamageResult
-            {
-                PhysicalDamage = calc.PhysicalDamage,
-                MagicalDamage = calc.MagicalDamage,
-                IsHit = calc.IsHit,
-                IsCritical = calc.IsCritical,
-                IsBlocked = calc.IsBlocked,
-                IsEvaded = calc.IsEvaded,
-                AppliedAilments = calc.AppliedAilments
-            };
+            // 多段攻击循环: for hit in 0..HitCount
+            //   每hit独立判定: 命中→回避→格挡→暴击
+            //   累积 float totalPhysical, totalMagical
+            //   最后 Math.Round 一次
         }
 
-        private float GetClassTraitMultiplier(BattleUnit attacker, BattleUnit defender)
-        {
-            // 骑兵→步兵=2.0，飞行→骑乘=2.0，弓→飞行=2.0
-            if (attacker.Data.Classes.Contains(UnitClass.Cavalry) && defender.Data.Classes.Contains(UnitClass.Infantry))
-                return 2.0f;
-            if (attacker.Data.Classes.Contains(UnitClass.Flying) && defender.Data.Classes.Contains(UnitClass.Cavalry))
-                return 2.0f;
-            if (attacker.Data.Classes.Contains(UnitClass.Archer) && defender.Data.Classes.Contains(UnitClass.Flying))
-                return 2.0f;
-            return 1.0f;
-        }
+        // 兼容重载
+        public DamageResult Calculate(BattleUnit a, BattleUnit d, ActiveSkill s, BattleContext c)
+            => Calculate(new DamageCalculation { Attacker = a, Defender = d, Skill = s, Context = c });
+    }
 
-        private float GetCharacterTraitMultiplier(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
-        {
-            // 职业Trait介入（如白骑士"物理攻击对步兵2倍"）
-            // 通过 TraitApplier 计算
-            return 1.0f;
-        }
-
-        private bool RollCrit(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
-        {
-            if (defender.Ailments.Contains(StatusAilment.CritSeal)) return false;
-            int critRate = attacker.GetCurrentCritRate();
-            return RandUtil.Roll100() < critRate;
-        }
-
-        private bool RollBlock(BattleUnit defender, ActiveSkill skill)
-        {
-            if (defender.Ailments.Contains(StatusAilment.BlockSeal)) return false;
-            if (!skill.HasPhysicalComponent) return false;
-            int blockRate = defender.GetCurrentBlockRate();
-            return RandUtil.Roll100() < blockRate;
-        }
+    public class DamageResult
+    {
+        public int PhysicalDamage, MagicalDamage, TotalDamage;
+        public bool IsHit, IsCritical, IsBlocked, IsEvaded;
+        public List<StatusAilment> AppliedAilments;
     }
 }
 ```
@@ -1204,173 +662,113 @@ namespace BattleKing.Pipeline
 ```csharp
 namespace BattleKing.Events
 {
-    // ==================== EventBus ====================
-    public class EventBus
-    {
-        private Dictionary<Type, List<Delegate>> _handlers = new();
-
-        public void Subscribe<T>(Action<T> handler) where T : IBattleEvent
-        {
-            var type = typeof(T);
-            if (!_handlers.ContainsKey(type)) _handlers[type] = new List<Delegate>();
-            _handlers[type].Add(handler);
-        }
-
-        public void Publish<T>(T evt) where T : IBattleEvent
-        {
-            var type = typeof(T);
-            if (!_handlers.ContainsKey(type)) return;
-            foreach (var handler in _handlers[type].Cast<Action<T>>())
-                handler(evt);
-        }
-    }
-
-    // ==================== IBattleEvent ====================
     public interface IBattleEvent { }
 
-    // ==================== 具体事件定义 ====================
-    public class OnBattleStartEvent : IBattleEvent
+    public class BattleStartEvent : IBattleEvent    { public BattleContext Context; }
+    public class BeforeActiveUseEvent : IBattleEvent { public BattleUnit Unit; public ActiveSkill Skill; public BattleContext Context; }
+    public class BeforeHitEvent : IBattleEvent
     {
-        public BattleContext Context { get; set; }
+        public BattleUnit Attacker, Defender;
+        public ActiveSkill Skill;
+        public BattleContext Context;
+        public DamageCalculation Calc;  // 可变引用 — 被动技能可修改
     }
+    public class AfterHitEvent : IBattleEvent       { public BattleUnit Attacker, Defender; public DamageResult Result; public BattleContext Context; }
+    public class AfterActiveUseEvent : IBattleEvent  { public BattleUnit Unit; public ActiveSkill Skill; public BattleContext Context; }
+    public class OnKnockdownEvent : IBattleEvent     { public BattleUnit Victim, Killer; public BattleContext Context; }
+    public class BattleEndEvent : IBattleEvent       { public BattleContext Context; }
 
-    public class BeforeAttackEvent : IBattleEvent
+    public class EventBus
     {
-        public BattleUnit Attacker { get; set; }
-        public BattleUnit Defender { get; set; }
-        public ActiveSkill Skill { get; set; }
-        public DamageCalculation Calculation { get; set; }
-    }
-
-    public class AfterAttackEvent : IBattleEvent
-    {
-        public BattleUnit Attacker { get; set; }
-        public BattleUnit Defender { get; set; }
-        public ActiveSkill Skill { get; set; }
-        public DamageResult Result { get; set; }
-    }
-
-    public class OnActionStartEvent : IBattleEvent
-    {
-        public BattleUnit Unit { get; set; }
-    }
-
-    public class OnActionEndEvent : IBattleEvent
-    {
-        public BattleUnit Unit { get; set; }
-        public ActiveSkill Skill { get; set; }
-        public List<BattleUnit> Targets { get; set; }
-        public List<DamageResult> Results { get; set; }
-    }
-
-    public class OnBattleEndEvent : IBattleEvent
-    {
-        public BattleContext Context { get; set; }
-        public BattleResult Result { get; set; }
+        public void Subscribe<T>(Action<T> handler) where T : IBattleEvent { }
+        public void Publish<T>(T evt) where T : IBattleEvent { }
     }
 }
 ```
 
 ---
 
-## 同时发动限制器
+## Main.cs UI 架构
 
-```csharp
-namespace BattleKing.Core
-{
-    public class SimultaneousActivationLimiter
-    {
-        // 按事件类型和阵营追踪已触发的人
-        private Dictionary<string, HashSet<int>> _triggered = new();
+```
+GamePhase 枚举: ModeSelect → PlayerFormation → EnemyChoice →
+    EnemyDragFormation → EquipmentSetup → PassiveSetup → StrategySetup → Battle → Result
 
-        public bool CanTrigger(BattleUnit unit, SimultaneousLimitType limitType, bool isPlayerTeam)
-        {
-            if (limitType == SimultaneousLimitType.None) return true;
+UI 布局 (SetupUi):
+  CanvasLayer
+    └ VBoxContainer (root)
+      ├ Label _statusLabel          (黄色状态栏)
+      ├ HBoxContainer _formationArea
+      │   ├ VBoxContainer _leftPanel   (左侧: 角色池/装备槽/策略编辑)
+      │   ├ VSeparator
+      │   └ VBoxContainer _rightPanel  (右侧: 阵型网格/装备详情/策略说明)
+      ├ HBoxContainer _buttonBar    (底部按钮: 确认/下一步/上一步)
+      └ TextEdit _logLabel          (日志: 战斗中移到右面板)
 
-            string key = $"{limitType}_{(isPlayerTeam ? "player" : "enemy")}";
-            if (!_triggered.ContainsKey(key)) _triggered[key] = new HashSet<int>();
+导航:
+  Stack<GamePhase> _phaseHistory    (上一步栈)
+  Go(GamePhase p) → 入栈当前阶段, 执行阶段方法, 自动 AddBackBtn()
+  GoBack() → 出栈并跳回
 
-            // 该事件类型该阵营已有更快的人触发过了
-            if (_triggered[key].Count > 0) return false;
+关键方法:
+  StarStr(current, max) → "★★★☆☆"   (AP/PP 星星显示)
+  BuildDragUI(teamLabel, slots, onConfirm)  (拖拽布阵, 含 ScrollContainer)
+  BuildConditionRow(parent, unit, slot, isCond1)  (条件编辑器 — 类别/操作符/值级联)
 
-            _triggered[key].Add(unit.Position);
-            return true;
-        }
-
-        public void ResetForNewRound()
-        {
-            _triggered.Clear();
-        }
-    }
-}
+阶段流程:
+  Phase_ModeSelect → 1v1/3v3 + Day + CC
+  Phase_PlayerFormation → 拖拽布阵
+  Phase_EnemyChoice → 预设/自定义敌方
+  Phase_EquipmentSetup → 装备配置（每角色独立，槽位下拉+属性详情）
+  Phase_PassiveSetup → 被动选择（每个被动可设发动条件）
+  Phase_StrategySetup → 策略编程（我方→敌方，8条×条件1+条件2+仅/优先）
+  Phase_Battle → 逐步战斗（StepOneAction + 实时状态刷新）
+  Phase_Result → 再来一局/结束
 ```
 
 ---
 
-## 数据流总结
+## 数据流
 
 ```
-启动时：
+启动:
   GameDataRepository.LoadAll("res://data/")
-    → 加载 characters.json, active_skills.json, passive_skills.json, equipments.json
-    → 存入 Dictionary<string, T>（只读）
+    → 加载6个JSON文件 → Dictionary<string, T>
 
-战斗开始时：
-  BattleEngine.RunBattle()
-    → Phase_BattleStart()：触发战斗开始时被动（同时发动限制）
-    → Phase_ActionLoop()：
-      1. 按速度排序生成行动序列
-      2. 对每个角色：
-         StrategyEvaluator.Evaluate(unit)
-           → 从上到下检查8条策略
-           → ConditionEvaluator 判断条件
-           → TargetSelector 选择目标
-         → 触发攻击方被动（自身强化 + 友方最快1人）
-         → 触发防守方被动（对方最快1人 + 格挡/回避）
-         → DamageCalculator.Calculate()（Pipeline 10阶段）
-         → 应用伤害和状态异常
-         → 触发行动后被动
-    → Phase_BattleEnd()：触发战斗结束时被动（无限制）
-    → JudgeWinner()：比较HP比例
+战斗创建:
+  Main.CreateAllUnits()
+    → CharacterData → new BattleUnit()
+    → DayProgression.Apply(unit, day) → 设置 CurrentLevel
+    → unit.SetCcState(isCc) → 切换装备槽+兵种+技能池
+    → InitialEquipmentIds → Equipment.Equip()
+    → 自动装备 Level≤1 的被动
 
-伤害计算时：
-  DamageCalculator
-    → 获取攻击力（面板 + 装备 + buff）
-    → 获取防御力（面板 + 装备 + buff）
-    → 基础差值（保底1）
-    → × 技能威力 × 兵种补正 × Trait补正
-    → 暴击判定（上限3倍）
-    → 格挡判定（只减物理部分）
-    → 四舍五入
-    → 返回 DamageResult
+策略编程:
+  ShowStrategy()
+    → BuildConditionRow() × 2 per slot
+    → Category → cascades to Operator → cascades to Value → ☐仅
+    → ConditionMeta.BuildCondition() → Condition对象
+    → 存入 Strategy.Condition1/Condition2
+
+战斗执行:
+  BattleEngine.StepOneAction()
+    → BeforeHitEvent { Calc = mutable DamageCalculation }
+    → PassiveSkillProcessor 修改 Calc (ForceHit/ForceBlock/NullifyDamage...)
+    → DamageCalculator.Calculate(calc)  — 多段攻击每hit独立判定
+    → 应用伤害 + buff/debuff/异常
+    → AfterActiveUseEvent → 行动后被动
+    → ProcessPendingActions() → 反击/追击/先制
 ```
 
 ---
 
-## 需要外部实现的接口（Godot 侧）
+## 关键设计决策
 
-```csharp
-// 由 Godot 的 Node/Scene 实现，Core 只调接口
-public interface IBattleScene
-{
-    void PlayAttackAnimation(BattleUnit attacker, BattleUnit defender, ActiveSkill skill);
-    void PlayDamageNumber(BattleUnit target, int damage, bool isCrit, bool isBlocked);
-    void PlayBuffEffect(BattleUnit target, string buffName);
-    void PlayStatusAilmentEffect(BattleUnit target, StatusAilment ailment);
-    void PlayBattleStartEffect();
-    void PlayBattleEndEffect(BattleResult result);
-}
-```
-
-
-## DayProgression
-
-天数进度系统。天数控制技能解锁等级，CC状态独立勾选。
-
-```csharp
-public static class DayProgression
-{
-    // Day→(MaxSkillLevel, CcAvailable) 映射
-    public static void Apply(BattleUnit unit, int day) { unit.CurrentLevel = cfg.MaxSkillLevel; }
-}
-```
+1. **TryGetValue 而非直接索引**: 所有 GameDataRepository.Get*() 方法返回 null 而不抛异常
+2. **Condition.Value 是 object**: System.Text.Json 反序列化数字为 JsonElement，需要 ToFloat()/ToInt() 辅助
+3. **ConditionMode 默认 Priority**: Strategy 的条件默认 Mode=Priority（不满足仍发动），用户勾选"仅"后变为 Only
+4. **Buff.RemainingTurns = -1 = 永久**: 战斗结束前有效的buff用-1表示
+5. **BuffManager 是静态类**: 无状态，直接操作 BattleUnit.Buffs 列表
+6. **被动条件存储在 BattleUnit.PassiveConditions**: Dictionary<skillId, Condition>，由 PassiveSkillProcessor 触发前检查
+7. **装备槽顺序 = equippableCategories 顺序**: GetSlotNames 按顺序解析出 MainHand/OffHand/Accessory1-3
+8. **AP/PP 显示为星星**: StarStr(n, max) → ★★☆☆☆（红色AP，蓝色PP）

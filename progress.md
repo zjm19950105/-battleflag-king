@@ -112,46 +112,39 @@
 
 ---
 
+## 已完成
+
+### Phase 1.3 — 被动技能完整实现与架构改造（2026-05-05 ~ 2026-05-07）
+- [x] **模块1-6全部**: DamageCalculation可变上下文 + PendingActionQueue + TemporalState + 自定义计数器 + Charge + OnKnockdown
+- [x] **7新角色**（->18角色）：巫师/女巫/白骑士/狮鹫骑士/萨满/角斗士/精灵女先知
+- [x] **ConditionEvaluator 3空壳补全**: AttributeRank/TeamSize/AttackAttribute
+- [x] **全部技能数据修正**: 24被动tags + 3效果错误(P0) + 4互换tags + 3多余删除
+- [x] **装备系统**: 80件装备（8大类型全覆盖），战前装备配置UI（EquipmentSetup阶段）
+- [x] **策略条件编辑器**: 12类条件级联选择+仅/优先模式，8条策略完整编辑
+- [x] **被动技能条件策略**: 每个被动可设发动条件，PassiveSkillProcessor触发前检查
+- [x] **敌方策略手动配置**: 我方->敌方依次配置
+- [x] **AP/PP星星显示** + **上一步按钮** + **战斗状态面板增强**（buff/debuff/异常/标记/CC/兵种颜色）
+- [x] **ConditionMeta.cs** 条件编辑器级联元数据
+- [x] **EquipmentSlot**: Unequip/CanEquipCategory/GetSlotNames/EquipToSlot
+- [x] **GameDataRepository**: TryGetValue安全访问 + GetAllEquipment()
+- [x] **BattleContext**: CurrentCalc + GetStatValue()
+- [x] **PassiveSkillProcessor**: CheckPassiveCondition + 事件_context设置
+- [x] 编译通过，0错误0警告
+- [x] **18角色已分配初始装备** + **80件装备池**
+
+---
+
 ## 进行中
 
-### Phase 1.3 — 被动技能完整实现与架构改造
-- [ ] **模块1：DamageCalculation 可变上下文**（最高优先级）
-  - `BeforeHitEvent` 增加 `DamageCalculation Calc` 属性
-  - `DamageCalculation` 扩展：ForceHit/ForceEvasion/ForceBlock/SkillPowerMultiplier/DamageMultiplier/IgnoreDefenseRatio/NullifyDamage/CoverTarget
-  - `DamageCalculator.Calculate` 签名改为接收 `DamageCalculation`
-  - `BattleEngine` 在 BeforeHit 前创建 Calc 并传给事件
-- [ ] **模块2：PendingActionQueue 行动队列**
-  - 新增 `PendingAction` / `PendingActionType`
-  - `BattleEngine` 核心循环支持队列（反击/追击/先制攻击/战斗结束时攻击）
-  - 被动处理器在 `AfterHit` / `BattleStart` / `BattleEnd` 中入队额外攻击
-- [ ] **模块3：TemporalState 临时标记系统**
-  - `BattleUnit` 增加 `TemporalStates` 列表
-  - 管理"1次魔法无效"、"1hit变0"、"致死耐"、"必中下一次"等标记
-- [ ] **模块4：友方目标选择 + 效果结构化**
-  - `PassiveSkillProcessor` 支持选择友方目标（randomAlly/lowestHpAlly/allAllies/columnAllies）
-  - 逐步把 JSON Tags 迁移到结构化的 `Effects` 字段
-- [ ] **模块5：逐个职业实现完整被动技能效果**
-  - 按 wiki 文档填充 `passive_skills.json` 的 `Effects` 数组
-  - 验证：格挡/回避/必中/反击/追击/掩护/先制攻击
+(无 — Phase 1.3 已完成，Phase 1.4 待启动)
 
 ---
 
 ## 待办（按优先级排序）
 
-### 🔴 当前聚焦（Phase 1.3）
-1. **DamageCalculation 可变上下文改造**
-   - 这是所有伤害干预类被动（格挡/回避/必中/免疫/掩护）的基础
-   - 预计影响：BeforeHitEvent.cs, DamageCalculation.cs, DamageCalculator.cs, BattleEngine.cs
+### 🔴 当前聚焦（Phase 1.4）
 
-2. **TemporalState 系统**
-   - 实现"1次免疫"类被动（招架、魔法屏障、纯净领域）
-   - 在 BeforeHit 中检查并消耗标记
 
-3. **PendingActionQueue**
-   - 实现反击/追击/先制攻击（追击斩、广域反击、快速打击、终结打击）
-   - 改造 BattleEngine 核心循环
-
-### 🟡 近期（Phase 1.4）
 4. **条件系统完整实现**
    - 当前只实现了 SelfHp / SelfApPp / lowest/highest 排序
    - 需要：Position（前排/后排）、UnitClass（兵种判定）、Status（异常状态）、EnemyClassExists（敌兵种存在）
