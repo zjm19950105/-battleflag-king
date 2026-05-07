@@ -282,67 +282,37 @@ namespace BattleKing.Core
 
                 var result = _damageCalculator.Calculate(calc);
 
-                // --- Detailed damage log ---
-                string hitDetail;
-                if (!result.IsHit)
-                {
-                    hitDetail = "MISS";
-                }
-                else if (result.IsEvaded)
-                {
-                    hitDetail = "EVADE";
-                }
-                else
-                {
-                    string flags = "";
-                    if (result.IsCritical) flags += $"CRIT(×{calc.CritMultiplier:F1}) ";
-                    if (result.IsBlocked) flags += $"BLOCK(-{calc.BlockReduction*100:F0}%) ";
-                    string formula = $"({calc.FinalAttackPower}ATK - {calc.FinalDefense}DEF)={calc.BaseDifference}";
-                    if (calc.ClassTraitMultiplier != 1f) formula += $" ×兵种{calc.ClassTraitMultiplier:F1}";
-                    if (calc.SkillPowerMultiplier != 1f) formula += $" ×技能{calc.SkillPowerMultiplier:F1}";
-                    if (calc.CounterPowerBonus > 0) formula += $" +计数器{calc.CounterPowerBonus}";
-                    hitDetail = $"{flags}{result.TotalDamage}伤害 {formula}";
-                }
+				bool killed = false;
+				if (result.IsHit && !result.IsEvaded)
+				{
+					int hpBefore = target.CurrentHp;
+					target.TakeDamage(result.TotalDamage);
+					killed = !target.IsAlive;
+				}
 
-                bool killed = false;
-                if (result.IsHit && !result.IsEvaded)
-                {
-                    int hpBefore = target.CurrentHp;
-                    target.TakeDamage(result.TotalDamage);
-                    int hpLost = hpBefore - target.CurrentHp;
-                    hitDetail += $" | {target.Data.Name} HP:{hpBefore}→{target.CurrentHp}(-{hpLost})";
+				var logLines = BattleKing.Ui.BattleLogHelper.FormatAttack(unit, target, skill, calc, result, killed, result.AppliedAilments.ToList());
+				foreach (var l in logLines) Log(l);
 
-                    if (!target.IsAlive)
-                    {
-                        killed = true;
-                        hitDetail += " [击倒!]";
-                        _eventBus.Publish(new OnKnockdownEvent
-                        {
-                            Victim = target,
-                            Killer = unit,
-                            Context = _ctx
-                        });
-                    }
-                }
+				if (killed)
+				{
+					_eventBus.Publish(new OnKnockdownEvent
+					{
+						Victim = target,
+						Killer = unit,
+						Context = _ctx
+					});
+				}
 
-                _eventBus.Publish(new AfterHitEvent
-                {
-                    Attacker = unit,
-                    Defender = target,
-                    Skill = skill,
-                    DamageDealt = result.TotalDamage,
-                    IsHit = result.IsHit,
-                    Context = _ctx
-                });
-
-                // After-hit: show buffs/debuffs that were applied to defender
-                string stateAfter = DumpUnitBrief(target);
-                if (result.AppliedAilments.Count > 0 || killed)
-                    stateAfter += $" | 异常:{string.Join(",", result.AppliedAilments)}";
-
-                Log($"  {unit.Data.Name} → {target.Data.Name} [{skill.Data.Name}] {hitDetail}");
-                if (result.IsHit && !result.IsEvaded)
-                    Log($"    {target.Data.Name}: {stateAfter}");
+				_eventBus.Publish(new AfterHitEvent
+				{
+					Attacker = unit,
+					Defender = target,
+					Skill = skill,
+					DamageDealt = result.TotalDamage,
+					IsHit = result.IsHit,
+					Context = _ctx
+				});
+                // State already shown in multi-line log above
             }
 
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
