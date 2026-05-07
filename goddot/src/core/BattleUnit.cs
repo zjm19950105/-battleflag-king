@@ -43,6 +43,9 @@ namespace BattleKing.Core
         public List<Strategy> Strategies { get; set; } = new List<Strategy>();
         public List<string> EquippedPassiveSkillIds { get; set; } = new List<string>();
 
+        /// <summary>Per-passive trigger conditions (skillId → Condition). Checked by PassiveSkillProcessor before triggering.</summary>
+        public Dictionary<string, Condition> PassiveConditions { get; set; } = new Dictionary<string, Condition>();
+
         // Module 3: Temporal states (1-time immunities, limited-duration effects)
         public List<TemporalState> TemporalStates { get; private set; } = new List<TemporalState>();
 

@@ -588,17 +588,97 @@ public partial class Main : Node2D
 
 		var unit = units[_passiveSetupIdx];
 		_statusLabel.Text = $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{StarStr(unit.GetUsedPp(), unit.MaxPp)}[/color]";
-		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 可用被动:\n" });
+		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 可用被动 (可设置发动条件):\n" });
 
 		foreach (var s in unit.GetAvailablePassiveSkillIds().Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null))
 		{
 			bool on = unit.EquippedPassiveSkillIds.Contains(s.Id);
-			_leftPanel.AddChild(Btn($"{(on ? "[✓]" : "[  ]")} {s.Name} PP{s.PpCost} [{s.TriggerTiming}]", () => {
-				if (on) { unit.EquippedPassiveSkillIds.Remove(s.Id); Log($"  卸下: {s.Name}"); }
+
+			// Toggle button
+			var toggleRow = new HBoxContainer();
+			toggleRow.AddChild(Btn($"{(on ? "[✓]" : "[  ]")} {s.Name} PP{s.PpCost} [{s.TriggerTiming}]", () => {
+				if (on) { unit.EquippedPassiveSkillIds.Remove(s.Id); unit.PassiveConditions.Remove(s.Id); Log($"  卸下: {s.Name}"); }
 				else if (!unit.CanEquipPassive(s.Id)) { Log("  PP不足!"); return; }
 				else { unit.EquippedPassiveSkillIds.Add(s.Id); Log($"  装备: {s.Name}"); }
 				ShowPassive();
 			}));
+			_leftPanel.AddChild(toggleRow);
+
+			// If equipped, show condition selector
+			if (on)
+			{
+				var condRow = new HBoxContainer();
+				condRow.AddChild(new Label { Text = "    发动条件:" });
+
+				var cond = unit.PassiveConditions.TryGetValue(s.Id, out var c) ? c : null;
+				var catOpt = new OptionButton();
+				catOpt.AddItem("(无条件)");
+				int catSel = 0;
+				var cats = ConditionMeta.AllCategories;
+				for (int ci = 0; ci < cats.Count; ci++)
+				{
+					catOpt.AddItem(ConditionMeta.CategoryLabel(cats[ci]));
+					if (cond != null && cats[ci] == cond.Category) catSel = ci + 1;
+				}
+				catOpt.Selected = catSel;
+				catOpt.ItemSelected += (long idx) => {
+					int i = (int)idx;
+					if (i <= 0) { unit.PassiveConditions.Remove(s.Id); }
+					else {
+						var cat = cats[i - 1];
+						var ops = ConditionMeta.GetOperators(cat);
+						var vals = ConditionMeta.GetValues(cat, ops[0]);
+						unit.PassiveConditions[s.Id] = ConditionMeta.BuildCondition(cat, ops[0], vals[0], true);
+					}
+					ShowPassive();
+				};
+				condRow.AddChild(catOpt);
+
+				// If category selected, show operator + value
+				if (catSel > 0)
+				{
+					var curCat = cats[catSel - 1];
+					var ops = ConditionMeta.GetOperators(curCat);
+					var opOpt = new OptionButton();
+					int opSel = 0;
+					for (int oi = 0; oi < ops.Count; oi++)
+					{
+						opOpt.AddItem(ops[oi]);
+						if (cond != null && ops[oi] == (cond.Operator switch { "less_than" => "低于", "greater_than" => "高于", "equals" => "等于", "lowest" => "最低", "highest" => "最高", _ => ops[oi] }))
+							opSel = oi;
+					}
+					opOpt.Selected = opSel;
+					opOpt.ItemSelected += (long _) => ShowPassive();
+					condRow.AddChild(opOpt);
+
+					var vals = ConditionMeta.GetValues(curCat, ops[opSel]);
+					var valOpt = new OptionButton();
+					int valSel = 0;
+					for (int vi = 0; vi < vals.Count; vi++)
+					{
+						valOpt.AddItem(vals[vi]);
+						if (cond != null && vals[vi] == cond.Value?.ToString()) valSel = vi;
+					}
+					valOpt.Selected = valSel;
+					valOpt.ItemSelected += (long _) => ShowPassive();
+					condRow.AddChild(valOpt);
+
+					// Save on each selection
+					catOpt.ItemSelected += (long idx) => {
+						int ii = (int)idx;
+						if (ii <= 0) { unit.PassiveConditions.Remove(s.Id); }
+						else {
+							var cc = cats[ii - 1];
+							var oo = ConditionMeta.GetOperators(cc);
+							var vv = ConditionMeta.GetValues(cc, oo[opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? Math.Min(opOpt.Selected, oo.Count - 1) : 0]);
+							var vo = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? Math.Min(valOpt.Selected, vv.Count - 1) : 0;
+							unit.PassiveConditions[s.Id] = ConditionMeta.BuildCondition(cc, oo[0], vv[vo], true);
+						}
+					};
+				}
+
+				_leftPanel.AddChild(condRow);
+			}
 		}
 
 		AddBtn("→ 下一个", () => { Log($"  [{unit.Data.Name}] 被动完成"); _passiveSetupIdx++; ShowPassive(); });

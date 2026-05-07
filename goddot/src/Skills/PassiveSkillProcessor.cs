@@ -4,6 +4,7 @@ using System.Linq;
 using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Events;
+using BattleKing.Ai;
 using BattleKing.Equipment;
 using BattleKing.Pipeline;
 
@@ -16,6 +17,7 @@ namespace BattleKing.Skills
         private Action<string> _log;
         private Action<PendingAction> _enqueueAction;
 
+        private BattleContext _ctx;
         private HashSet<string> _battleStartFired = new();
         private HashSet<string> _allyBuffFired = new();
         private HashSet<string> _defenseFired = new();
@@ -42,6 +44,7 @@ namespace BattleKing.Skills
 
         private void OnBattleStart(BattleStartEvent evt)
         {
+            _ctx = evt.Context;
             _battleStartFired.Clear();
             _allyBuffFired.Clear();
             _defenseFired.Clear();
@@ -53,6 +56,7 @@ namespace BattleKing.Skills
 
         private void OnBeforeActiveUse(BeforeActiveUseEvent evt)
         {
+            _ctx = evt.Context;
             ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfOnActiveUse, "主动使用前", limitSimultaneous: false);
             ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfBeforeAttack, "攻击前", limitSimultaneous: false);
 
@@ -65,6 +69,7 @@ namespace BattleKing.Skills
 
         private void OnBeforeHit(BeforeHitEvent evt)
         {
+            _ctx = evt.Context;
             // Defender self-defense
             ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeHit, "被攻击前", limitSimultaneous: false,
                 calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender);
@@ -83,6 +88,7 @@ namespace BattleKing.Skills
 
         private void OnAfterHit(AfterHitEvent evt)
         {
+            _ctx = evt.Context;
             ProcessForUnit(evt.Defender, PassiveTriggerTiming.OnBeingHit, "被攻击后", limitSimultaneous: false,
                 attacker: evt.Attacker);
 
@@ -93,6 +99,7 @@ namespace BattleKing.Skills
 
         private void OnAfterActiveUse(AfterActiveUseEvent evt)
         {
+            _ctx = evt.Context;
             _afterActionFired.Clear();
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.AfterAction, "行动后",
                 limitSimultaneous: true, _afterActionFired);
@@ -100,6 +107,7 @@ namespace BattleKing.Skills
 
         private void OnKnockdown(OnKnockdownEvent evt)
         {
+            _ctx = evt.Context;
             // Process OnKnockdown timing passives for all units
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.OnKnockdown, "击倒时",
                 limitSimultaneous: false, knockoutVictim: evt.Victim, knockoutKiller: evt.Killer);
@@ -107,6 +115,7 @@ namespace BattleKing.Skills
 
         private void OnBattleEnd(BattleEndEvent evt)
         {
+            _ctx = evt.Context;
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.BattleEnd, "战斗结束时",
                 limitSimultaneous: false);
         }
@@ -126,11 +135,22 @@ namespace BattleKing.Skills
                 if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                     continue;
 
+                // Check player-set passive condition
+                if (!CheckPassiveCondition(unit, skillId)) continue;
+
                 unit.ConsumePp(skillData.PpCost);
 
                 _log?.Invoke($"  [被动] {unit.Data.Name} 触发 {skillData.Name} ({timingLabel})");
                 ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
             }
+        }
+
+        private bool CheckPassiveCondition(BattleUnit unit, string skillId)
+        {
+            if (!unit.PassiveConditions.TryGetValue(skillId, out var cond) || cond == null)
+                return true;
+            var evaluator = new ConditionEvaluator(_ctx);
+            return evaluator.Evaluate(cond, unit, null);
         }
 
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
@@ -161,6 +181,9 @@ namespace BattleKing.Skills
                             continue;
                         firedSet.Add(timingLabel);
                     }
+
+                    // Check player-set passive condition
+                    if (!CheckPassiveCondition(unit, skillId)) continue;
 
                     unit.ConsumePp(skillData.PpCost);
 
