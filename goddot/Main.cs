@@ -118,6 +118,15 @@ public partial class Main : Node2D
 	private void ClearPanel(Control p) { foreach (var c in p.GetChildren()) c.QueueFree(); }
 	private void ClearAll() { ClearPanel(_leftPanel); ClearPanel(_rightPanel); ClearButtons(); }
 
+	private static string StarStr(int current, int max)
+	{
+		if (max <= 0) return "";
+		string s = "";
+		for (int i = 0; i < current; i++) s += "★";
+		for (int i = current; i < max; i++) s += "☆";
+		return s;
+	}
+
 	private Button Btn(string text, Action onClick)
 	{
 		var b = new Button { Text = text };
@@ -562,7 +571,7 @@ public partial class Main : Node2D
 		}
 
 		var unit = units[_passiveSetupIdx];
-		_statusLabel.Text = $"▶  被动技能 [{unit.Data.Name}] — PP: {unit.GetUsedPp()}/{unit.MaxPp}";
+		_statusLabel.Text = $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{StarStr(unit.GetUsedPp(), unit.MaxPp)}[/color]";
 		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 可用被动:\n" });
 
 		foreach (var s in unit.GetAvailablePassiveSkillIds().Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null))
@@ -693,7 +702,7 @@ public partial class Main : Node2D
 			var pv = u.GetEquippedPassiveSkills();
 			string classStr = u.GetEffectiveClasses()?.Count > 0 ? "(" + string.Join(",", u.GetEffectiveClasses()) + ") " : "";
 			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
-			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
+			label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} [color=red]AP:{StarStr(u.CurrentAp, u.MaxAp)}[/color] [color=blue]PP:{StarStr(u.CurrentPp, u.MaxPp)}[/color]{pvStr}\n");
 		}
 		label.AppendText("\n[color=orange]▸ 敌方[/color]\n");
 		foreach (var u in _enemyUnits)
@@ -705,7 +714,7 @@ public partial class Main : Node2D
 			var pv = u.GetEquippedPassiveSkills();
 			string classStr = u.GetEffectiveClasses()?.Count > 0 ? "(" + string.Join(",", u.GetEffectiveClasses()) + ") " : "";
 			string pvStr = pv.Count > 0 ? " [" + string.Join(",", pv.Select(p => p.Name)) + "]" : "";
-			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}{pvStr}\n");
+			label.AppendText($"  [{u.Position}] [color=#ff8888]{hpBar}[/color] {classStr}{u.Data.Name} HP:{u.CurrentHp} [color=red]AP:{StarStr(u.CurrentAp, u.MaxAp)}[/color] [color=blue]PP:{StarStr(u.CurrentPp, u.MaxPp)}[/color]{pvStr}\n");
 		}
 	}
 
