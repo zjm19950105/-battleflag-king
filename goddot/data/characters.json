@@ -431,10 +431,11 @@
       "Accessory"
     ],
     "innateActiveSkillIds": [
-      "act_full_assault"
+      "act_full_assault",
+      "act_formation_breaker"
     ],
     "innatePassiveSkillIds": [
-      "pas_dodge"
+      "pas_bounce"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
@@ -449,15 +450,17 @@
       "Block": 14,
       "Spd": 13,
       "AP": 2,
-      "PP": 1
+      "PP": 2
     },
-    "growthType": "HP型",
+    "growthType": "AllRounder",
     "traits": [],
     "initialEquipmentIds": [
       "equ_gladiator_axe"
     ],
     "ccClassId": "berserker",
     "ccName": "狂战士",
+    "ccClasses": [],
+    "ccTraits": [],
     "ccEquippableCategories": [
       "Axe",
       "Accessory",
@@ -465,15 +468,14 @@
       "Accessory"
     ],
     "ccInnateActiveSkillIds": [
-      "act_formation_breaker",
       "act_accumulate"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_sky_sniper",
-      "pas_surprise_blade"
+      "pas_wide_counter",
+      "pas_berserk"
     ],
     "ccInitialEquipmentIds": [
-      "equ_gladiator_axe"
+      "eq_berserker_axe"
     ]
   },
   {
@@ -674,8 +676,7 @@
       "act_poison_throw"
     ],
     "innatePassiveSkillIds": [
-      "pas_dodge_step",
-      "pas_stealth_blade"
+      "pas_dodge_step"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
@@ -692,7 +693,6 @@
       "AP": 2,
       "PP": 1
     },
-    "note": "参考文档被动技能为'闪避'、'潜行利刃'，但passive_skills.json中缺少对应条目，当前使用占位技能",
     "growthType": "速度型",
     "traits": [],
     "initialEquipmentIds": [
@@ -711,10 +711,359 @@
       "act_active_steal"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_shadow_step"
+      "pas_stealth_blade"
     ],
     "ccInitialEquipmentIds": [
       "equ_thief_dagger"
     ]
+  },
+  {
+    "id": "wizard",
+    "name": "巫师",
+    "classes": [
+      "Mage",
+      "Infantry"
+    ],
+    "equippableCategories": [
+      "Staff",
+      "Accessory",
+      "Accessory"
+    ],
+    "innateActiveSkillIds": [
+      "act_fireball",
+      "act_thunderstorm"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_counter_magic"
+    ],
+    "innateValorSkillIds": [],
+    "baseStats": {
+      "HP": 60,
+      "Str": 11,
+      "Def": 16,
+      "Mag": 63,
+      "MDef": 54,
+      "Hit": 128,
+      "Eva": 37,
+      "Crit": 9,
+      "Block": 2,
+      "Spd": 18,
+      "AP": 2,
+      "PP": 1
+    },
+    "growthType": "AllRounder",
+    "traits": [],
+    "initialEquipmentIds": [
+      "eq_staff_of_wisdom"
+    ],
+    "ccClassId": "warlock",
+    "ccName": "术士",
+    "ccClasses": [],
+    "ccTraits": [],
+    "ccEquippableCategories": [
+      "Staff",
+      "Accessory",
+      "Accessory",
+      "Accessory"
+    ],
+    "ccInnateActiveSkillIds": [
+      "act_volcano"
+    ],
+    "ccInnatePassiveSkillIds": [
+      "pas_pursuit_magic",
+      "pas_concentration"
+    ],
+    "ccInitialEquipmentIds": [
+      "eq_staff_of_wisdom",
+      "eq_blue_glasses"
+    ]
+  },
+  {
+    "id": "witch",
+    "name": "女巫",
+    "classes": [
+      "Mage",
+      "Infantry"
+    ],
+    "equippableCategories": [
+      "Staff",
+      "Accessory",
+      "Accessory"
+    ],
+    "innateActiveSkillIds": [
+      "act_ice_arrow",
+      "act_magic_missile"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_magic_blade"
+    ],
+    "innateValorSkillIds": [],
+    "baseStats": {
+      "HP": 56,
+      "Str": 7,
+      "Def": 15,
+      "Mag": 55,
+      "MDef": 56,
+      "Hit": 136,
+      "Eva": 52,
+      "Crit": 8,
+      "Block": 4,
+      "Spd": 19,
+      "AP": 2,
+      "PP": 1
+    },
+    "growthType": "AllRounder",
+    "traits": [],
+    "initialEquipmentIds": [
+      "eq_ice_storm_staff"
+    ],
+    "ccClassId": "sorceress",
+    "ccName": "魔女",
+    "ccClasses": [],
+    "ccTraits": [],
+    "ccEquippableCategories": [
+      "Staff",
+      "Accessory",
+      "Accessory",
+      "Accessory"
+    ],
+    "ccInnateActiveSkillIds": [
+      "act_ice_coffin"
+    ],
+    "ccInnatePassiveSkillIds": [
+      "pas_focus",
+      "pas_quick_cast"
+    ],
+    "ccInitialEquipmentIds": [
+      "eq_ice_storm_staff",
+      "eq_cat_ear"
+    ]
+  },
+  {
+    "id": "white_knight",
+    "name": "白骑士",
+    "classes": [
+      "Cavalry",
+      "Mage"
+    ],
+    "equippableCategories": [
+      "Sword",
+      "Shield",
+      "Accessory",
+      "Accessory"
+    ],
+    "innateActiveSkillIds": [
+      "act_hache",
+      "act_row_heal"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_magic_barrier"
+    ],
+    "innateValorSkillIds": [],
+    "baseStats": {
+      "HP": 100,
+      "Str": 39,
+      "Def": 28,
+      "Mag": 53,
+      "MDef": 63,
+      "Hit": 138,
+      "Eva": 17,
+      "Crit": 6,
+      "Block": 24,
+      "Spd": 28,
+      "AP": 2,
+      "PP": 1
+    },
+    "growthType": "AllRounder",
+    "traits": [],
+    "initialEquipmentIds": [
+      "eq_holy_sword"
+    ],
+    "ccClassId": "saint_knight",
+    "ccName": "圣骑士",
+    "ccClasses": [],
+    "ccTraits": [],
+    "ccEquippableCategories": [
+      "Sword",
+      "Shield",
+      "Accessory",
+      "Accessory"
+    ],
+    "ccInnateActiveSkillIds": [
+      "act_holy_blade"
+    ],
+    "ccInnatePassiveSkillIds": [
+      "pas_holy_guard",
+      "pas_row_barrier"
+    ],
+    "ccInitialEquipmentIds": [
+      "eq_holy_sword"
+    ]
+  },
+  {
+    "id": "griffin_knight",
+    "name": "狮鹫骑士",
+    "classes": [
+      "Flying"
+    ],
+    "equippableCategories": [
+      "Sword",
+      "Accessory",
+      "Accessory"
+    ],
+    "innateActiveSkillIds": [
+      "act_dive_strike",
+      "act_wing_gust"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_deflect"
+    ],
+    "innateValorSkillIds": [],
+    "baseStats": {
+      "HP": 76,
+      "Str": 49,
+      "Def": 24,
+      "Mag": 27,
+      "MDef": 44,
+      "Hit": 148,
+      "Eva": 82,
+      "Crit": 16,
+      "Block": 6,
+      "Spd": 42,
+      "AP": 2,
+      "PP": 1
+    },
+    "growthType": "AllRounder",
+    "traits": [
+      {
+        "traitType": "FlyingEvasionHalf"
+      },
+      {
+        "traitType": "PhysAtkVsCavalry2x"
+      }
+    ],
+    "initialEquipmentIds": [
+      "equ_griffin_sword"
+    ],
+    "ccClassId": null,
+    "ccName": null,
+    "ccClasses": [],
+    "ccTraits": [],
+    "ccEquippableCategories": [],
+    "ccInnateActiveSkillIds": [],
+    "ccInnatePassiveSkillIds": [],
+    "ccInitialEquipmentIds": []
+  },
+  {
+    "id": "shaman",
+    "name": "萨满",
+    "classes": [
+      "Mage",
+      "Infantry"
+    ],
+    "equippableCategories": [
+      "Staff",
+      "Accessory",
+      "Accessory"
+    ],
+    "innateActiveSkillIds": [
+      "act_passive_curse",
+      "act_attack_curse"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_quick_curse"
+    ],
+    "innateValorSkillIds": [],
+    "baseStats": {
+      "HP": 100,
+      "Str": 37,
+      "Def": 30,
+      "Mag": 57,
+      "MDef": 70,
+      "Hit": 142,
+      "Eva": 65,
+      "Crit": 20,
+      "Block": 6,
+      "Spd": 39,
+      "AP": 2,
+      "PP": 1
+    },
+    "growthType": "AllRounder",
+    "traits": [],
+    "initialEquipmentIds": [
+      "eq_cursed_staff"
+    ],
+    "ccClassId": "druid",
+    "ccName": "德鲁伊",
+    "ccClasses": [],
+    "ccTraits": [],
+    "ccEquippableCategories": [
+      "Staff",
+      "Accessory",
+      "Accessory",
+      "Accessory"
+    ],
+    "ccInnateActiveSkillIds": [
+      "act_defense_curse",
+      "act_curse_disaster"
+    ],
+    "ccInnatePassiveSkillIds": [
+      "pas_curse_swamp"
+    ],
+    "ccInitialEquipmentIds": [
+      "eq_cursed_staff"
+    ]
+  },
+  {
+    "id": "elf_sibyl",
+    "name": "精灵女先知",
+    "classes": [
+      "Mage",
+      "Infantry"
+    ],
+    "equippableCategories": [
+      "Spear",
+      "Accessory",
+      "Accessory",
+      "Accessory"
+    ],
+    "innateActiveSkillIds": [
+      "act_primal_edge",
+      "act_fairy_heal",
+      "act_elemental_roar"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_healing_touch",
+      "pas_spirit_guard",
+      "pas_elemental_action"
+    ],
+    "innateValorSkillIds": [],
+    "baseStats": {
+      "HP": 64,
+      "Str": 39,
+      "Def": 24,
+      "Mag": 59,
+      "MDef": 53,
+      "Hit": 138,
+      "Eva": 67,
+      "Crit": 8,
+      "Block": 4,
+      "Spd": 31,
+      "AP": 2,
+      "PP": 1
+    },
+    "growthType": "AllRounder",
+    "traits": [],
+    "initialEquipmentIds": [
+      "equ_elf_spear"
+    ],
+    "ccClassId": null,
+    "ccName": null,
+    "ccClasses": [],
+    "ccTraits": [],
+    "ccEquippableCategories": [],
+    "ccInnateActiveSkillIds": [],
+    "ccInnatePassiveSkillIds": [],
+    "ccInitialEquipmentIds": []
   }
 ]

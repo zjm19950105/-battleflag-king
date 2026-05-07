@@ -39,6 +39,8 @@ namespace BattleKing.Ai
                 ConditionCategory.Hp => EvaluateHp(condition, subject, target),
                 ConditionCategory.ApPp => EvaluateApPp(condition, subject, target),
                 ConditionCategory.Status => EvaluateStatus(condition, subject, target),
+                ConditionCategory.AttackAttribute => EvaluateAttackAttribute(condition, subject, target),
+                ConditionCategory.TeamSize => EvaluateTeamSize(condition, subject),
                 ConditionCategory.SelfState => EvaluateSelfState(condition, subject),
                 ConditionCategory.SelfHp => EvaluateSelfHp(condition, subject),
                 ConditionCategory.SelfApPp => EvaluateSelfApPp(condition, subject),
@@ -199,8 +201,82 @@ namespace BattleKing.Ai
 
         private bool EvaluateAttributeRank(Condition c, BattleUnit subject, BattleUnit target)
         {
-            // Stub: default pass for MVP
-            return true;
+            if (target == null) return true;
+            string statName = c.Value?.ToString() ?? "";
+            if (string.IsNullOrEmpty(statName)) return true;
+
+            // Determine comparison pool: all alive enemies (or allies, depending on target)
+            bool targetIsEnemy = !target.IsPlayer;
+            var pool = targetIsEnemy ? _ctx.EnemyUnits : _ctx.PlayerUnits;
+            var alive = pool.Where(u => u != null && u.IsAlive).ToList();
+            if (alive.Count == 0) return true;
+
+            int targetVal = BattleContext.GetStatValue(target, statName);
+
+            return c.Operator switch
+            {
+                "highest" => alive.All(u => BattleContext.GetStatValue(u, statName) <= targetVal),
+                "lowest" => alive.All(u => BattleContext.GetStatValue(u, statName) >= targetVal),
+                "greater_than" => targetVal > ToInt(c.Value),
+                "less_than" => targetVal < ToInt(c.Value),
+                _ => true
+            };
+        }
+
+        /// <summary>
+        /// EvaluateTeamSize — checks number of alive units on a team.
+        /// Value format: "enemy:N" or "ally:N" (e.g. "enemy:2" = 2+ enemies, "ally:3" = 3+ allies).
+        /// </summary>
+        private bool EvaluateTeamSize(Condition c, BattleUnit subject)
+        {
+            string raw = c.Value?.ToString() ?? "";
+            string[] parts = raw.Split(':');
+            if (parts.Length < 2) return true;
+            string team = parts[0]; // "enemy" or "ally"
+            if (!int.TryParse(parts[1], out int threshold)) return true;
+
+            int count;
+            if (team == "enemy")
+                count = _ctx.EnemyUnits.Count(u => u != null && u.IsAlive);
+            else
+                count = _ctx.PlayerUnits.Count(u => u != null && u.IsAlive);
+
+            return c.Operator switch
+            {
+                "greater_than" => count > threshold,
+                "less_than" => count < threshold,
+                "equals" => count == threshold,
+                _ => true
+            };
+        }
+
+        /// <summary>
+        /// EvaluateAttackAttribute — checks the type of attack being made.
+        /// Reads from BattleContext.CurrentCalc set by BattleEngine before BeforeHitEvent.
+        /// </summary>
+        private bool EvaluateAttackAttribute(Condition c, BattleUnit subject, BattleUnit target)
+        {
+            string value = c.Value?.ToString() ?? "";
+            if (string.IsNullOrEmpty(value)) return true;
+
+            var calc = _ctx.CurrentCalc;
+            if (calc == null) return true;
+
+            return c.Operator switch
+            {
+                "equals" => value.ToLower() switch
+                {
+                    "physical" => calc.Skill.Type == Data.SkillType.Physical,
+                    "magical" => calc.Skill.Type == Data.SkillType.Magical,
+                    "row" => calc.Skill.TargetType == Data.TargetType.Row,
+                    "column" => calc.Skill.TargetType == Data.TargetType.Column,
+                    "all" => calc.Skill.TargetType == Data.TargetType.AllEnemies,
+                    "melee" => calc.Skill.AttackType == Data.AttackType.Melee,
+                    "ranged" => calc.Skill.AttackType == Data.AttackType.Ranged,
+                    _ => true
+                },
+                _ => true
+            };
         }
     }
 }

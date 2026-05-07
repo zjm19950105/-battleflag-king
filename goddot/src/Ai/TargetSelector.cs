@@ -132,6 +132,7 @@ namespace BattleKing.Ai
 					{
 						ConditionCategory.Hp => list.OrderBy(u => u.CurrentHp).ThenBy(u => u.Position).ToList(),
 						ConditionCategory.ApPp => list.OrderBy(u => u.CurrentAp).ThenBy(u => u.Position).ToList(),
+						ConditionCategory.AttributeRank => SortByAttributeRank(list, condition, true),
 						_ => list.OrderByDescending(u => _conditionEvaluator.Evaluate(condition, caster, u)).ThenBy(u => u.Position).ToList()
 					};
 				}
@@ -141,11 +142,21 @@ namespace BattleKing.Ai
 					{
 						ConditionCategory.Hp => list.OrderByDescending(u => u.CurrentHp).ThenBy(u => u.Position).ToList(),
 						ConditionCategory.ApPp => list.OrderByDescending(u => u.CurrentAp).ThenBy(u => u.Position).ToList(),
+						ConditionCategory.AttributeRank => SortByAttributeRank(list, condition, false),
 						_ => list.OrderByDescending(u => _conditionEvaluator.Evaluate(condition, caster, u)).ThenBy(u => u.Position).ToList()
 					};
 				}
 				return list.OrderByDescending(u => _conditionEvaluator.Evaluate(condition, caster, u)).ThenBy(u => u.Position).ToList();
 			}
+		}
+
+		private static List<BattleUnit> SortByAttributeRank(List<BattleUnit> list, Condition condition, bool ascending)
+		{
+			string statName = condition.Value?.ToString() ?? "";
+			if (ascending)
+				return list.OrderBy(u => BattleContext.GetStatValue(u, statName)).ThenBy(u => u.Position).ToList();
+			else
+				return list.OrderByDescending(u => BattleContext.GetStatValue(u, statName)).ThenBy(u => u.Position).ToList();
 		}
 
 		private List<BattleUnit> ApplyPositionPriority(List<BattleUnit> list, Strategy strategy)

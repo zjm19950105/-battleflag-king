@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using BattleKing.Data;
+using BattleKing.Pipeline;
 
 namespace BattleKing.Core
 {
@@ -30,5 +31,15 @@ namespace BattleKing.Core
 
         public int GetAliveCount(bool isPlayer) =>
             GetAliveUnits(isPlayer).Count;
+
+        /// <summary>The damage calculation currently being processed (set by BattleEngine before BeforeHitEvent).</summary>
+        public DamageCalculation CurrentCalc { get; set; }
+
+        /// <summary>Get a specific stat value from a unit by name (for AttributeRank condition).</summary>
+        public static int GetStatValue(BattleUnit unit, string statName)
+        {
+            if (unit?.Data?.BaseStats == null) return 0;
+            return unit.Data.BaseStats.TryGetValue(statName, out int val) ? val : 0;
+        }
     }
 }

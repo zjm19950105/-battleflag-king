@@ -270,6 +270,7 @@ namespace BattleKing.Core
                     HitCount = 1  // Default; multi-hit skills override this via effects
                 };
 
+                _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                 _eventBus.Publish(new BeforeHitEvent
                 {
                     Attacker = unit,
@@ -379,6 +380,7 @@ namespace BattleKing.Core
                     if (action.Tags.Contains("CannotBeBlocked"))
                         calc.CannotBeBlocked = true;
 
+                    _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                     _eventBus.Publish(new BeforeHitEvent
                     {
                         Attacker = action.Actor,

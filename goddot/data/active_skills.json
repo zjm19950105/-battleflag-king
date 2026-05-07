@@ -224,7 +224,7 @@
     "targetType": "SingleAlly",
     "effectDescription": "敌单体攻击，自身物防+20%",
     "tags": [
-      "RangedCover"
+      "DefUpSelf"
     ],
     "effects": [],
     "learnCondition": "斗士/先锋 Lv1",
@@ -258,7 +258,9 @@
     "targetType": "AllEnemies",
     "effectDescription": "敌单体2连击，自身物防+50%，命中时PP+1",
     "tags": [
-      "Taunt"
+      "MultiHit2",
+      "DefUpSelf50",
+      "HitPpPlus1"
     ],
     "effects": [],
     "learnCondition": "先锋 Lv20",
@@ -292,7 +294,8 @@
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击，对飞行系威力+50",
     "tags": [
-      "CavalryBonus"
+      "FlyingBonus",
+      "Ranged"
     ],
     "effects": [],
     "learnCondition": "兵士/士官 Lv10",
@@ -309,28 +312,10 @@
     "targetType": "SingleEnemy",
     "effectDescription": "敌前后列贯通攻击，自身有buff时威力+50，对骑兵系格挡不可",
     "tags": [
-      "FlyingBonus",
-      "Ranged"
+      "CavalryBonus"
     ],
     "effects": [],
     "learnCondition": "军士 Lv20",
-    "unlockLevel": 20
-  },
-  {
-    "id": "act_finishing_thrust",
-    "name": "终结戳刺",
-    "apCost": 1,
-    "type": "Physical",
-    "attackType": "Ranged",
-    "power": 100,
-    "hitRate": 100,
-    "targetType": "SingleEnemy",
-    "effectDescription": "敌单体远程攻击，击倒时基础攻击力+50%",
-    "tags": [
-      "KillAtkUp50"
-    ],
-    "effects": [],
-    "learnCondition": "士官 Lv20",
     "unlockLevel": 20
   },
   {
@@ -467,7 +452,8 @@
     "targetType": "Self",
     "effectDescription": "自身HP回复30%，物攻+30%",
     "tags": [
-      "FullHpDamageUp50"
+      "Heal30",
+      "AtkUp"
     ],
     "effects": [],
     "learnCondition": "角斗士/狂战士 Lv10",
@@ -484,8 +470,8 @@
     "targetType": "AllEnemies",
     "effectDescription": "敌全体攻击，自身HP100%时威力+50",
     "tags": [
-      "Heal30",
-      "AtkUp"
+      "FullHpDamageUp50",
+      "AoE"
     ],
     "effects": [],
     "learnCondition": "狂战士 Lv20",
@@ -493,7 +479,7 @@
   },
   {
     "id": "act_heavy_slayer",
-    "name": "重破坏者",
+    "name": "重装破坏",
     "apCost": 1,
     "type": "Physical",
     "attackType": "Melee",
@@ -591,8 +577,7 @@
     "targetType": "Row",
     "effectDescription": "敌一列攻击",
     "tags": [
-      "Ranged",
-      "CritDependent"
+      "Ranged"
     ],
     "effects": [],
     "learnCondition": "神射手 Lv20",
@@ -722,5 +707,389 @@
     "effects": [],
     "learnCondition": "恶棍 Lv30",
     "unlockLevel": 30
+  },
+  {
+    "id": "act_fireball",
+    "name": "火球术",
+    "apCost": 1,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 40,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体3连击魔法攻击，赋予炎上",
+    "tags": [
+      "MultiHit3",
+      "Burn",
+      "Ranged"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 3
+        }
+      }
+    ],
+    "learnCondition": "巫师/术士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_thunderstorm",
+    "name": "雷暴",
+    "apCost": 1,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列魔法攻击，赋予气绝",
+    "tags": [
+      "Stun",
+      "Ranged",
+      "Row"
+    ],
+    "effects": [],
+    "learnCondition": "巫师/术士 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_volcano",
+    "name": "火山",
+    "apCost": 2,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 150,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌前后列贯通魔法攻击，赋予炎上",
+    "tags": [
+      "Burn",
+      "Ranged",
+      "FrontAndBack"
+    ],
+    "effects": [],
+    "learnCondition": "术士 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "act_ice_arrow",
+    "name": "冰箭",
+    "apCost": 1,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体魔法攻击，赋予冻结",
+    "tags": [
+      "Freeze",
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "女巫/魔女 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_magic_missile",
+    "name": "魔法导弹",
+    "apCost": 1,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 70,
+    "hitRate": 100,
+    "targetType": "TwoEnemies",
+    "effectDescription": "敌2体魔法攻击",
+    "tags": [
+      "Ranged",
+      "MultiTarget2"
+    ],
+    "effects": [],
+    "learnCondition": "女巫/魔女 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_ice_coffin",
+    "name": "冰棺",
+    "apCost": 2,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列魔法攻击，赋予冻结；对冻结目标威力+50",
+    "tags": [
+      "Freeze",
+      "Ranged",
+      "Row"
+    ],
+    "effects": [],
+    "learnCondition": "魔女 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "act_hache",
+    "name": "哈希",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，命中时PP+1",
+    "tags": [
+      "HitPpPlus1"
+    ],
+    "effects": [],
+    "learnCondition": "白骑士/圣骑士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_row_heal",
+    "name": "列治愈",
+    "apCost": 2,
+    "type": "Heal",
+    "attackType": "Melee",
+    "power": 50,
+    "hitRate": null,
+    "targetType": "Row",
+    "effectDescription": "友方一列HP中回复",
+    "tags": [
+      "Heal",
+      "Row"
+    ],
+    "effects": [],
+    "learnCondition": "白骑士/圣骑士 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_holy_blade",
+    "name": "圣光刃",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 50,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体2连击，自身HP100%时威力+25，命中时PP+1",
+    "tags": [
+      "MultiHit2",
+      "FullHpDamageUp25",
+      "HitPpPlus1"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 2
+        }
+      }
+    ],
+    "learnCondition": "圣骑士 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "act_dive_strike",
+    "name": "坠落突刺",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，对骑兵系格挡不可且威力+50",
+    "tags": [
+      "CavalryBonus",
+      "Unblockable"
+    ],
+    "effects": [],
+    "learnCondition": "狮鹫骑士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_wing_gust",
+    "name": "风翼突袭",
+    "apCost": 2,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击，对骑兵系格挡不可",
+    "tags": [
+      "CavalryBonus",
+      "Unblockable",
+      "Row"
+    ],
+    "effects": [],
+    "learnCondition": "狮鹫骑士 Lv15",
+    "unlockLevel": 15
+  },
+  {
+    "id": "act_passive_curse",
+    "name": "被动诅咒",
+    "apCost": 1,
+    "type": "Debuff",
+    "attackType": "Ranged",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "Row",
+    "effectDescription": "敌一列PP-1，行动速度-10",
+    "tags": [
+      "PpMinus1",
+      "SpdDown10",
+      "SureHit",
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "萨满/德鲁伊 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_attack_curse",
+    "name": "攻击诅咒",
+    "apCost": 1,
+    "type": "Debuff",
+    "attackType": "Ranged",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "Row",
+    "effectDescription": "敌一列物攻-50%、魔攻-50%",
+    "tags": [
+      "AtkDown50",
+      "MatkDown50",
+      "SureHit",
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "萨满/德鲁伊 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_defense_curse",
+    "name": "防御诅咒",
+    "apCost": 1,
+    "type": "Debuff",
+    "attackType": "Ranged",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "Row",
+    "effectDescription": "敌一列物防-50%、魔防-50%，赋予格挡封印",
+    "tags": [
+      "DefDown50",
+      "MdefDown50",
+      "BlockSeal",
+      "SureHit",
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "德鲁伊 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "act_curse_disaster",
+    "name": "诅咒灾害",
+    "apCost": 2,
+    "type": "Debuff",
+    "attackType": "Ranged",
+    "power": 0,
+    "hitRate": null,
+    "targetType": "Row",
+    "effectDescription": "敌一列已有debuff效果×1.5倍",
+    "tags": [
+      "DebuffAmplify",
+      "SureHit",
+      "Ranged"
+    ],
+    "effects": [],
+    "learnCondition": "德鲁伊 Lv30",
+    "unlockLevel": 30
+  },
+  {
+    "id": "act_primal_edge",
+    "name": "原始利刃",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Melee",
+    "power": 50,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体攻击，自身HP100%时PP+1且小精灵+1",
+    "tags": [
+      "FullHpPpPlus1",
+      "ModifyCounter"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyCounter",
+        "parameters": {
+          "key": "Sprite",
+          "delta": 1
+        }
+      }
+    ],
+    "learnCondition": "精灵女先知 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "act_fairy_heal",
+    "name": "妖精治愈",
+    "apCost": 2,
+    "type": "Heal",
+    "attackType": "Melee",
+    "power": 50,
+    "hitRate": null,
+    "targetType": "Row",
+    "effectDescription": "友方一列HP中回复，赋予1hit伤害无效buff，自身小精灵+1",
+    "tags": [
+      "Heal",
+      "Row",
+      "DamageNullify",
+      "ModifyCounter"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyCounter",
+        "parameters": {
+          "key": "Sprite",
+          "delta": 1
+        }
+      }
+    ],
+    "learnCondition": "精灵女先知 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_elemental_roar",
+    "name": "元素咆哮",
+    "apCost": 2,
+    "type": "Magical",
+    "attackType": "Ranged",
+    "power": 70,
+    "hitRate": 100,
+    "targetType": "AllEnemies",
+    "effectDescription": "敌全体攻击，威力=70+小精灵数×30，消耗全部小精灵",
+    "tags": [
+      "AoE",
+      "ConsumeCounter",
+      "Ranged"
+    ],
+    "effects": [
+      {
+        "effectType": "ConsumeCounter",
+        "parameters": {
+          "key": "Sprite",
+          "all": true
+        }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "CounterPowerBonus": "Sprite"
+        }
+      }
+    ],
+    "learnCondition": "精灵女先知 Lv20",
+    "unlockLevel": 20
   }
 ]

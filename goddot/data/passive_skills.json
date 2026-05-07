@@ -283,7 +283,8 @@
     "hitRate": null,
     "effectDescription": "友方被远程物理攻击前，掩护并无效化伤害",
     "tags": [
-      "AtkUpAlly",
+      "RangedCover",
+      "NullifyDamage",
       "SimultaneousLimit"
     ],
     "effects": [],
@@ -301,8 +302,7 @@
     "hitRate": null,
     "effectDescription": "被物理攻击直前，中格挡防御",
     "tags": [
-      "Heal25",
-      "SingleTarget"
+      "MediumGuard"
     ],
     "effects": [
       {
@@ -326,7 +326,8 @@
     "hitRate": null,
     "effectDescription": "战斗开始时，敌一列攻击引向自身，格挡率+50%",
     "tags": [
-      "Crit100",
+      "Taunt",
+      "BlockUp50",
       "SimultaneousLimit"
     ],
     "effects": [],
@@ -344,7 +345,8 @@
     "hitRate": null,
     "effectDescription": "战斗结束时，友方单体HP回复25%",
     "tags": [
-      "ApPlus1Ally"
+      "Heal25",
+      "BattleEnd"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -361,8 +363,8 @@
     "hitRate": null,
     "effectDescription": "其他友方攻击前(主动)，友方单体会心率100%",
     "tags": [
-      "HpRecoverOnHit",
-      "PercentHeal"
+      "Crit100Ally",
+      "SimultaneousLimit"
     ],
     "effects": [],
     "hasSimultaneousLimit": true,
@@ -379,7 +381,7 @@
     "hitRate": null,
     "effectDescription": "其他友方使用主动时，友方单体AP+1",
     "tags": [
-      "CounterRow"
+      "ApPlus1Ally"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -396,8 +398,7 @@
     "hitRate": 100,
     "effectDescription": "战斗结束时，敌单体攻击",
     "tags": [
-      "DeathAvoidOnce",
-      "ApRecover"
+      "BattleEndAttack"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -414,8 +415,8 @@
     "hitRate": 100,
     "effectDescription": "友方被攻击时，敌单体反击，目标物防-15%",
     "tags": [
-      "DefUp20",
-      "BlockEnhance"
+      "Counter",
+      "DefDown15"
     ],
     "effects": [
       {
@@ -442,16 +443,10 @@
     "hitRate": null,
     "effectDescription": "战斗开始时，友方全体攻击技能附带格挡不可",
     "tags": [
-      "LargeGuardAlly"
+      "IgnoreBlockAll",
+      "SimultaneousLimit"
     ],
-    "effects": [
-      {
-        "effectType": "ModifyDamageCalc",
-        "parameters": {
-          "ForceBlock": true
-        }
-      }
-    ],
+    "effects": [],
     "hasSimultaneousLimit": true,
     "learnCondition": "维京 Lv25",
     "unlockLevel": 25
@@ -466,7 +461,9 @@
     "hitRate": null,
     "effectDescription": "其他友方被攻击前，大格挡掩护",
     "tags": [
-      "MediumGuardRow"
+      "LargeGuard",
+      "CoverAlly",
+      "SimultaneousLimit"
     ],
     "effects": [
       {
@@ -494,7 +491,9 @@
     "hitRate": null,
     "effectDescription": "被物理攻击后，物防+20%，格挡率+20%(可叠加)",
     "tags": [
-      "SureHitNext"
+      "DefUp20",
+      "BlockUp20",
+      "Stackable"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -511,82 +510,28 @@
     "hitRate": null,
     "effectDescription": "其他友方被攻击前，中格挡掩护一列",
     "tags": [
-      "Counter",
-      "Pursuit"
+      "MediumGuardRow",
+      "CoverAlly",
+      "SimultaneousLimit"
     ],
     "effects": [
       {
-        "effectType": "CounterAttack",
+        "effectType": "CoverAlly",
         "parameters": {
-          "power": 75,
-          "hitRate": 90
+          "scope": "Row",
+          "blockType": "Medium"
+        }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
         }
       }
     ],
     "hasSimultaneousLimit": true,
     "learnCondition": "甲胄骑兵 Lv20",
     "unlockLevel": 20
-  },
-  {
-    "id": "pas_sky_sniper",
-    "name": "弹跳",
-    "ppCost": 1,
-    "triggerTiming": "SelfBeforeHit",
-    "type": "Assist",
-    "power": null,
-    "hitRate": null,
-    "effectDescription": "被攻击时，自身HP回复40%",
-    "tags": [
-      "CounterRanged",
-      "FlyingDamageUp150"
-    ],
-    "effects": [],
-    "hasSimultaneousLimit": false,
-    "learnCondition": "狂战士 Lv25",
-    "unlockLevel": 25
-  },
-  {
-    "id": "pas_dodge",
-    "name": "广域反击",
-    "ppCost": 1,
-    "triggerTiming": "SelfBeforeHit",
-    "type": "Physical",
-    "power": 100,
-    "hitRate": 75,
-    "effectDescription": "被主动技能攻击时，敌一列反击",
-    "tags": [
-      "EvasionSkill"
-    ],
-    "effects": [
-      {
-        "effectType": "ModifyDamageCalc",
-        "parameters": {
-          "ForceEvasion": true
-        }
-      }
-    ],
-    "hasSimultaneousLimit": false,
-    "learnCondition": "角斗士/狂战士 Lv15",
-    "unlockLevel": 15
-  },
-  {
-    "id": "pas_surprise_blade",
-    "name": "狂暴",
-    "ppCost": 1,
-    "triggerTiming": "SelfBeforeAttack",
-    "type": "Assist",
-    "power": null,
-    "hitRate": null,
-    "effectDescription": "自身主动攻击前，PP全失，AP+1，致死耐buff",
-    "tags": [
-      "BlockSeal",
-      "PassiveSeal",
-      "SimultaneousLimit"
-    ],
-    "effects": [],
-    "hasSimultaneousLimit": true,
-    "learnCondition": "狂战士 Lv25",
-    "unlockLevel": 25
   },
   {
     "id": "pas_rapid_reload",
@@ -598,8 +543,7 @@
     "hitRate": null,
     "effectDescription": "自身主动攻击前，攻击附带格挡封印",
     "tags": [
-      "SelfPursuit",
-      "HalfPower"
+      "BlockSeal"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -616,8 +560,9 @@
     "hitRate": null,
     "effectDescription": "友方被攻击时，攻击+20%，命中+20(可叠加)",
     "tags": [
-      "MediumGuardAlly",
-      "HealAlly"
+      "AtkUp20",
+      "HitUp20",
+      "Stackable"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -626,7 +571,7 @@
   },
   {
     "id": "pas_block_seal",
-    "name": "重反击",
+    "name": "重装反击",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeHit",
     "type": "Assist",
@@ -634,7 +579,8 @@
     "hitRate": null,
     "effectDescription": "被主动技能攻击时，敌单体反击，重装系无视100%防御",
     "tags": [
-      "BlockSealEnemy"
+      "HeavyCounter",
+      "IgnoreDef100Heavy"
     ],
     "effects": [
       {
@@ -682,7 +628,7 @@
     "hitRate": null,
     "effectDescription": "其他友方攻击时(主动)，敌单体追击",
     "tags": [
-      "HpLowDamageUp"
+      "Pursuit"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -699,7 +645,8 @@
     "hitRate": null,
     "effectDescription": "友方被攻击时，敌单体反击，飞行系威力+100",
     "tags": [
-      "DefDown15Random"
+      "Counter",
+      "FlyingBonus100"
     ],
     "effects": [],
     "hasSimultaneousLimit": false,
@@ -716,7 +663,8 @@
     "hitRate": null,
     "effectDescription": "战斗结束时，友方一列HP回复15%，HP50%以下2倍",
     "tags": [
-      "IgnoreBlockAll",
+      "HealRow15",
+      "BattleEnd",
       "SimultaneousLimit"
     ],
     "effects": [],
@@ -763,7 +711,7 @@
   },
   {
     "id": "pas_dodge_step",
-    "name": "回避步伐",
+    "name": "闪避",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeHit",
     "type": "Physical",
@@ -792,60 +740,6 @@
     "hasSimultaneousLimit": false,
     "learnCondition": "盗贼/流氓 Lv1",
     "unlockLevel": 1
-  },
-  {
-    "id": "pas_quick_action",
-    "name": "快速行动",
-    "ppCost": 1,
-    "triggerTiming": "AllyOnActiveUse",
-    "type": "Assist",
-    "power": null,
-    "hitRate": null,
-    "effectDescription": "其他友方使用主动时，友方单体AP+1",
-    "tags": [
-      "ApPlus1Ally"
-    ],
-    "effects": [],
-    "hasSimultaneousLimit": false,
-    "learnCondition": "盗贼/流氓 Lv10",
-    "unlockLevel": 10
-  },
-  {
-    "id": "pas_shadow_step",
-    "name": "暗影步",
-    "ppCost": 2,
-    "triggerTiming": "SelfBeforeAttack",
-    "type": "Assist",
-    "power": null,
-    "hitRate": null,
-    "effectDescription": "自身主动攻击前，自身速度+30，回避+30",
-    "tags": [
-      "SpdUp30",
-      "EvaUp30"
-    ],
-    "effects": [
-      {
-        "effectType": "AddBuff",
-        "parameters": {
-          "stat": "Spd",
-          "ratio": 0.3,
-          "turns": -1,
-          "target": "Self"
-        }
-      },
-      {
-        "effectType": "AddBuff",
-        "parameters": {
-          "stat": "Eva",
-          "ratio": 0.3,
-          "turns": -1,
-          "target": "Self"
-        }
-      }
-    ],
-    "hasSimultaneousLimit": false,
-    "learnCondition": "流氓 Lv25",
-    "unlockLevel": 25
   },
   {
     "id": "pas_stealth_blade",
@@ -879,6 +773,419 @@
     ],
     "hasSimultaneousLimit": true,
     "learnCondition": "潜行者 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_counter_magic",
+    "name": "反击魔法",
+    "ppCost": 1,
+    "triggerTiming": "OnBeingHit",
+    "type": "Magical",
+    "power": 150,
+    "hitRate": 100,
+    "effectDescription": "被主动技能攻击时，魔法反击",
+    "tags": [
+      "Counter",
+      "Magical"
+    ],
+    "effects": [
+      {
+        "effectType": "CounterAttack",
+        "parameters": {
+          "power": 150,
+          "hitRate": 100,
+          "attackType": "Magical"
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "巫师/术士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_pursuit_magic",
+    "name": "追击魔法",
+    "ppCost": 1,
+    "triggerTiming": "AllyOnActiveUse",
+    "type": "Magical",
+    "power": 100,
+    "hitRate": 100,
+    "effectDescription": "友方魔法攻击时，追击",
+    "tags": [
+      "Pursuit",
+      "Magical"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "术士 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "pas_concentration",
+    "name": "专注",
+    "ppCost": 1,
+    "triggerTiming": "SelfOnActiveUse",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "自身使用主动技能时，AP+1，命中+40",
+    "tags": [
+      "ApPlus1",
+      "HitUp40"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "术士 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_magic_blade",
+    "name": "魔法剑刃",
+    "ppCost": 1,
+    "triggerTiming": "AllyBeforeAttack",
+    "type": "Assist",
+    "power": 50,
+    "hitRate": null,
+    "effectDescription": "友方物理攻击前，附加魔法伤害追击",
+    "tags": [
+      "MagicBlade",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "女巫/魔女 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_focus",
+    "name": "聚焦",
+    "ppCost": 1,
+    "triggerTiming": "AllyBeforeAttack",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "友方物理攻击前，附加必中",
+    "tags": [
+      "SureHit",
+      "SimultaneousLimit"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceHit": true
+        }
+      }
+    ],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "魔女 Lv15",
+    "unlockLevel": 15
+  },
+  {
+    "id": "pas_quick_cast",
+    "name": "快速施法",
+    "ppCost": 2,
+    "triggerTiming": "BattleStart",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "战斗开始时，自身行动速度变为最快，会心-50%",
+    "tags": [
+      "SpeedFastest",
+      "CritDown50",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "魔女 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_magic_barrier",
+    "name": "魔法屏障",
+    "ppCost": 1,
+    "triggerTiming": "AllyBeforeHit",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "友方被魔法攻击前，魔法伤害+异常状态1次无效化",
+    "tags": [
+      "MagicNullify",
+      "AilmentNullify",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "白骑士/圣骑士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_holy_guard",
+    "name": "神圣守护",
+    "ppCost": 1,
+    "triggerTiming": "SelfBeforePhysicalHit",
+    "type": "Physical",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "被物理攻击直前，中格挡防御，debuff无效化",
+    "tags": [
+      "MediumGuard",
+      "DebuffNullify"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "圣骑士 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "pas_row_barrier",
+    "name": "列屏障",
+    "ppCost": 1,
+    "triggerTiming": "AllyBeforeHit",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "友方被魔法攻击前，一列魔法伤害+异常状态1次无效化",
+    "tags": [
+      "MagicNullify",
+      "AilmentNullify",
+      "Row",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "圣骑士 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_deflect",
+    "name": "偏转",
+    "ppCost": 1,
+    "triggerTiming": "SelfBeforeMeleeHit",
+    "type": "Physical",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "被近接攻击直前，近接物理1hit变0，回避+20(可叠加)",
+    "tags": [
+      "NullifyFirstMeleeHit",
+      "EvaUp20",
+      "Stackable"
+    ],
+    "effects": [
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "key": "MeleeHitNullify",
+          "count": 1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "stat": "Eva",
+          "ratio": 0.2,
+          "turns": -1,
+          "target": "Self"
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "狮鹫骑士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_quick_curse",
+    "name": "快速诅咒",
+    "ppCost": 1,
+    "triggerTiming": "SelfBeforeHit",
+    "type": "Debuff",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "敌使用攻击技能前，敌单体物攻-20%，赋予暴击封印",
+    "tags": [
+      "AtkDown20",
+      "CritSeal",
+      "SureHit",
+      "Ranged",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "萨满/德鲁伊 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_curse_swamp",
+    "name": "诅咒沼泽",
+    "ppCost": 2,
+    "triggerTiming": "BattleStart",
+    "type": "Debuff",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "战斗开始时，敌全体行动速度-10、回避-30；骑乘系PP-1",
+    "tags": [
+      "SpdDown10",
+      "EvaDown30",
+      "MountedPpMinus1",
+      "SureHit",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "德鲁伊 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_healing_touch",
+    "name": "治愈之触",
+    "ppCost": 1,
+    "triggerTiming": "AllyOnAttacked",
+    "type": "Assist",
+    "power": 50,
+    "hitRate": null,
+    "effectDescription": "友方被攻击时，友方单体HP小回复，解除全部debuff",
+    "tags": [
+      "Heal",
+      "CleanseDebuff"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "精灵女先知 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_spirit_guard",
+    "name": "精灵加护",
+    "ppCost": 2,
+    "triggerTiming": "BattleStart",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "战斗开始时，友方一列HP中回复，赋予1hit debuff无效buff，自身小精灵+1",
+    "tags": [
+      "HealRow",
+      "DebuffNullify",
+      "ModifyCounter",
+      "SimultaneousLimit"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyCounter",
+        "parameters": {
+          "key": "Sprite",
+          "delta": 1
+        }
+      }
+    ],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "精灵女先知 Lv15",
+    "unlockLevel": 15
+  },
+  {
+    "id": "pas_elemental_action",
+    "name": "元素行动",
+    "ppCost": 1,
+    "triggerTiming": "SelfOnActiveUse",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "自身使用主动技能时，AP+1且小精灵+1",
+    "tags": [
+      "ApPlus1",
+      "ModifyCounter"
+    ],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "amount": 1,
+          "target": "Self"
+        }
+      },
+      {
+        "effectType": "ModifyCounter",
+        "parameters": {
+          "key": "Sprite",
+          "delta": 1
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "精灵女先知 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_bounce",
+    "name": "弹跳",
+    "ppCost": 1,
+    "triggerTiming": "SelfBeforeHit",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "被攻击时，自身HP回复40%",
+    "tags": [
+      "Heal40",
+      "Self"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "角斗士/狂战士 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_wide_counter",
+    "name": "广域反击",
+    "ppCost": 1,
+    "triggerTiming": "OnBeingHit",
+    "type": "Physical",
+    "power": 100,
+    "hitRate": 75,
+    "targetType": "Row",
+    "effectDescription": "被主动技能攻击时，敌一列反击",
+    "tags": [
+      "Counter",
+      "Row"
+    ],
+    "effects": [
+      {
+        "effectType": "CounterAttack",
+        "parameters": {
+          "power": 100,
+          "hitRate": 75,
+          "targetType": "Row"
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "狂战士 Lv20",
+    "unlockLevel": 20
+  },
+  {
+    "id": "pas_berserk",
+    "name": "狂暴",
+    "ppCost": 1,
+    "triggerTiming": "SelfBeforeAttack",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "自身主动攻击前，PP全失，AP+1，致死耐buff",
+    "tags": [
+      "SacrificePp",
+      "ApPlus1",
+      "DeathResist",
+      "SimultaneousLimit"
+    ],
+    "effects": [],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "狂战士 Lv25",
     "unlockLevel": 25
   }
 ]
