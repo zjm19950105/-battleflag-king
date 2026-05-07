@@ -261,26 +261,36 @@ public partial class Main : Node2D
 
 	private void BuildDragUI(string teamLabel, string[] slots, Action onConfirm)
 	{
-		// Left: character pool
-		_leftPanel.AddChild(new Label { Text = "角色池 (可重复拖拽)\n" });
+		// Left: scrollable character pool
+		_leftPanel.AddChild(new Label { Text = $"角色池 ({_allChars.Count}人，拖拽到右侧格子)" });
+		var charScroll = new ScrollContainer();
+		charScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		var charList = new VBoxContainer();
 		foreach (var ch in _allChars)
-			_leftPanel.AddChild(new DraggableChar { Text = ch.Name, CharId = ch.Id });
+			charList.AddChild(new DraggableChar { Text = ch.Name, CharId = ch.Id });
+		charScroll.AddChild(charList);
+		_leftPanel.AddChild(charScroll);
 
 		// Right: 6-slot formation grid
-		_rightPanel.AddChild(new Label { Text = "前 排" });
+		_rightPanel.AddChild(new Label { Text = "══ 前 排 ══" });
 		var frontRow = new HBoxContainer();
 		_rightPanel.AddChild(frontRow);
 		for (int i = 0; i < 3; i++) AddSlot(frontRow, slots, i);
 
-		_rightPanel.AddChild(new Label { Text = "\n後 排" });
+		_rightPanel.AddChild(new Label { Text = "══ 後 排 ══" });
 		var backRow = new HBoxContainer();
 		_rightPanel.AddChild(backRow);
 		for (int i = 3; i < 6; i++) AddSlot(backRow, slots, i);
 
-		// Bottom: confirm
+		// Highlight: confirm button — bold and prominent
 		int filled = slots.Count(s => s != null);
-		var confirmBtn = Btn($"✓ 确认{teamLabel}阵型 ({filled}人)", onConfirm);
-		if (filled < _minSlots) confirmBtn.Disabled = true;
+		var confirmBtn = Btn($"★ 确认{teamLabel}阵型 ({filled}/{_minSlots}) ★", onConfirm);
+		confirmBtn.AddThemeFontSizeOverride("font_size", 20);
+		if (filled < _minSlots)
+		{
+			confirmBtn.Disabled = true;
+			confirmBtn.Text = $"⚠ 还需{_minSlots - filled}人 — 确认{teamLabel}阵型 ({filled}/{_minSlots})";
+		}
 		_buttonBar.AddChild(confirmBtn);
 	}
 
