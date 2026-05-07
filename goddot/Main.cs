@@ -31,7 +31,7 @@ public partial class Main : Node2D
 	private Label _statusLabel;
 	private HBoxContainer _buttonBar;
 	private float _fontScale = 1.0f;
-	private static readonly int BASE_FONT = 16;
+	private static readonly int BASE_FONT = 28;
 
 	private GamePhase _phase;
 	private GameDataRepository _gameData;
@@ -144,8 +144,22 @@ public partial class Main : Node2D
 	private void ReapplyFontScale()
 	{
 		int size = Math.Max(10, (int)(BASE_FONT * _fontScale));
-		_statusLabel.AddThemeFontSizeOverride("font_size", size + 2);
-		_logLabel.AddThemeFontSizeOverride("font_size", size);
+		_statusLabel.AddThemeFontSizeOverride("font_size", size + 4);
+		_logLabel.AddThemeFontSizeOverride("font_size", size + 2);
+		if (GetTree() != null)
+			ApplyFontSizeRecursive(GetTree().Root, size);
+	}
+
+	private void ApplyFontSizeRecursive(Node node, int size)
+	{
+		if (node is Label l) l.AddThemeFontSizeOverride("font_size", size);
+		if (node is Button b) b.AddThemeFontSizeOverride("font_size", size);
+		if (node is CheckBox cb) cb.AddThemeFontSizeOverride("font_size", size);
+		if (node is OptionButton ob) ob.AddThemeFontSizeOverride("font_size", size);
+		if (node is RichTextLabel rl) rl.AddThemeFontSizeOverride("normal_font_size", size);
+		if (node is TextEdit te) { te.AddThemeFontSizeOverride("font_size", size); }
+		foreach (Node child in node.GetChildren())
+			ApplyFontSizeRecursive(child, size);
 	}
 
 	// ── STATE MACHINE ────────────────────────────────────────
@@ -777,7 +791,6 @@ public partial class Main : Node2D
 		_statusLabel.Text = $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{StarStr(unit.GetUsedPp(), unit.MaxPp)}[/color]";
 		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 可用被动 (可设置发动条件):\n" });
 
-		_rightPanel.AddChild(new Label { Text = "(点击被动查看详情)" });
 		foreach (var s in unit.GetAvailablePassiveSkillIds().Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null))
 		{
 			bool on = unit.EquippedPassiveSkillIds.Contains(s.Id);
@@ -867,6 +880,13 @@ public partial class Main : Node2D
 
 				_leftPanel.AddChild(condRow);
 			}
+		}
+
+		// Show first equipped passive detail in right panel
+		var firstEquippedId = unit.EquippedPassiveSkillIds.FirstOrDefault();
+		if (firstEquippedId != null) {
+			var ps = _gameData.GetPassiveSkill(firstEquippedId);
+			if (ps != null) PassiveDetailHelper.Show(_rightPanel, ps, true);
 		}
 
 		AddBtn("→ 下一个", () => { Log($"  [{unit.Data.Name}] 被动完成"); _passiveSetupIdx++; ShowPassive(); });
