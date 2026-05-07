@@ -6,6 +6,7 @@ using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Ai;
 using BattleKing.Equipment;
+using BattleKing.Ui;
 
 public enum GamePhase
 {
@@ -125,14 +126,7 @@ public partial class Main : Node2D
 	private void ClearPanel(Control p) { foreach (var c in p.GetChildren()) c.QueueFree(); }
 	private void ClearAll() { ClearPanel(_leftPanel); ClearPanel(_rightPanel); ClearButtons(); }
 
-	private static string StarStr(int current, int max)
-	{
-		if (max <= 0) return "";
-		string s = "";
-		for (int i = 0; i < current; i++) s += "★";
-		for (int i = current; i < max; i++) s += "☆";
-		return s;
-	}
+	private static string StarStr(int current, int max) => BattleStatusHelper.StarStr(current, max);
 
 	private Button Btn(string text, Action onClick)
 	{
@@ -717,6 +711,7 @@ public partial class Main : Node2D
 		// Bottom buttons
 		AddBtn("→ 确认/下一个角色", () => { _equipSetupIdx++; ShowEquipment(); });
 		AddBtn("→ 全部默认装备", () => { _equipSetupIdx = units.Count; ShowEquipment(); });
+		AddBackBtn();
 	}
 
 	private static string GetExpectedCategory(string slotName, CharacterData cd, bool isCc)
@@ -782,6 +777,7 @@ public partial class Main : Node2D
 		_statusLabel.Text = $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{StarStr(unit.GetUsedPp(), unit.MaxPp)}[/color]";
 		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 可用被动 (可设置发动条件):\n" });
 
+		_rightPanel.AddChild(new Label { Text = "(点击被动查看详情)" });
 		foreach (var s in unit.GetAvailablePassiveSkillIds().Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null))
 		{
 			bool on = unit.EquippedPassiveSkillIds.Contains(s.Id);
@@ -875,6 +871,7 @@ public partial class Main : Node2D
 
 		AddBtn("→ 下一个", () => { Log($"  [{unit.Data.Name}] 被动完成"); _passiveSetupIdx++; ShowPassive(); });
 		AddBtn("→ 全部跳过", () => { _passiveSetupIdx = units.Count; ShowPassive(); });
+		AddBackBtn();
 	}
 
 	private void ApplyPresetStrat(BattleUnit u, (string, int, string) cfg)
@@ -972,6 +969,7 @@ public partial class Main : Node2D
 		AddBtn(nextLabel, () => { _strategySetupIdx++; ShowStrategy(); });
 		string skipLabel = _editingEnemyStrategies ? "→ 敌方全默认(开始战斗)" : "→ 跳过全部策略配置";
 		AddBtn(skipLabel, () => { _strategySetupIdx = units.Count; ShowStrategy(); });
+		AddBackBtn();
 	}
 
 	private void BuildConditionRow(VBoxContainer parent, BattleUnit unit, int slot, bool isCond1)
@@ -1198,74 +1196,11 @@ public partial class Main : Node2D
 		AddBtn("▶ 下一步", () => StepOneAction(unitLabel));
 	}
 
-	private static string ClassColor(UnitClass c) => c switch
-	{
-		UnitClass.Infantry => "#aaaaaa", UnitClass.Cavalry => "#4488ff",
-		UnitClass.Flying => "#44ff88", UnitClass.Heavy => "#ff8844",
-		UnitClass.Scout => "#ff44ff", UnitClass.Archer => "#88ff44",
-		UnitClass.Mage => "#8844ff", _ => "#cccccc"
-	};
+	private static string ClassColor(UnitClass c) => BattleStatusHelper.ClassColor(c);
 
 	private void AppendUnitStatus(RichTextLabel label, BattleUnit u)
 	{
-		if (u == null) return;
-		if (!u.IsAlive) { label.AppendText($"  [s]× {u.Data.Name}[/s]\n"); return; }
-
-		int maxHp = Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
-		int hpPct = u.CurrentHp * 100 / maxHp;
-		string hpBar = new string('█', Math.Min(10, hpPct / 10)) + new string('░', Math.Max(0, 10 - hpPct / 10));
-
-		// Class tags with color
-		var classes = u.GetEffectiveClasses();
-		string classStr = "";
-		if (classes?.Count > 0)
-			classStr = "[" + string.Join(" ", classes.Select(c => $"[color={ClassColor(c)}]{c}[/color]")) + "] ";
-
-		// CC indicator
-		string ccStr = u.IsCc ? " [color=yellow]CC[/color]" : "";
-
-		label.AppendText($"  [{u.Position}] [color=#88ff88]{hpBar}[/color] {classStr}[color=white]{u.Data.Name}[/color]{ccStr} HP:{u.CurrentHp}/{maxHp} [color=red]AP:{StarStr(u.CurrentAp, u.MaxAp)}[/color] [color=blue]PP:{StarStr(u.CurrentPp, u.MaxPp)}[/color]\n");
-
-		// Buffs
-		var buffs = u.Buffs.Where(b => b.Ratio > 0).ToList();
-		if (buffs.Count > 0)
-		{
-			string buffStr = string.Join(" ", buffs.Select(b => {
-				string turns = b.RemainingTurns == -1 ? "∞" : b.RemainingTurns.ToString();
-				return $"[color=#88ff88]{b.TargetStat}+{(int)(b.Ratio*100)}%[{turns}回合][/color]";
-			}));
-			label.AppendText($"    Buff: {buffStr}\n");
-		}
-
-		// Debuffs
-		var debuffs = u.Buffs.Where(b => b.Ratio < 0).ToList();
-		if (debuffs.Count > 0)
-		{
-			string debuffStr = string.Join(" ", debuffs.Select(b => {
-				string turns = b.RemainingTurns == -1 ? "∞" : b.RemainingTurns.ToString();
-				return $"[color=#ff8888]{b.TargetStat}{(int)(b.Ratio*100)}%[{turns}回合][/color]";
-			}));
-			label.AppendText($"    Debuff: {debuffStr}\n");
-		}
-
-		// Ailments
-		if (u.Ailments.Count > 0)
-		{
-			string ailStr = string.Join(" ", u.Ailments.Select(a => $"[color=#ff4444]{a}[/color]"));
-			label.AppendText($"    异常: {ailStr}\n");
-		}
-
-		// Temporal states
-		if (u.TemporalStates.Count > 0)
-		{
-			string tmpStr = string.Join(" ", u.TemporalStates.Select(t => $"[color=#ffaa44]{t.Key}({t.RemainingCount})[/color]"));
-			label.AppendText($"    标记: {tmpStr}\n");
-		}
-
-		// Equipped passives
-		var pv = u.GetEquippedPassiveSkills();
-		if (pv.Count > 0)
-			label.AppendText($"    被动: [color=#888888]{string.Join(", ", pv.Select(p => p.Name))}[/color]\n");
+		BattleStatusHelper.AppendUnit(label, u);
 	}
 
 	private void RefreshBattleStatus(RichTextLabel label)
