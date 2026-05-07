@@ -185,6 +185,10 @@
 ---
 
 ## 最近会话记录
+- **2026/05/07（续）**: UI全面升级 — HSplitContainer可拖动分栏、A+/A-字体缩放(28px基准)、全部Show*页面上一步按钮、被动详情右面板显示、战斗面板全属性(SPD/物攻/物防/魔攻/魔防/命中/回避/会心/格挡)、战斗日志多行详细格式(BattleLogHelper)。
+- **2026/05/07（代码审查）**: simplify skill 发现7个改进点(DumpUnitBrief重复/hitChance公式不一致/PassiveDetailHelper样板代码/默认策略硬编码应迁移JSON/"非毒"值缺ConditionMeta支持/冗余lambda包装)
+- **2026/05/07（自动化测试）**: 创建goddot-test项目(NUnit 4 + .NET 8), 54个用例(51通过)覆盖 DamageCalculator/ConditionEvaluator/BuffManager/TargetSelector/EquipmentSlot。发现"仅+HP最低"和"同時発動制限per-side"2个bug已修复。
+
 - **2026/05/02**：MCP连接解决。用户确认 Godot 编辑器就绪。修复 BattleEngine 日志输出。CC框架接入。12角色数据填充完成。装备槽统一规则（3→4）和无盾格挡减25%。
 - **2026/05/03**：启动 Phase 1.2 实施。计划8步：队伍组建、阵型布置、敌人配置、被动技能选择、策略编程、条件系统、被动接入战斗、3v3验证。
 - **2026/05/03**：实现角色选择控制台 + 阵型布置。遇到 Windows GUI stdin 问题，改用 Godot LineEdit UI。实现 async/await 输入流程。

@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      {
+        "command": "ls",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "git status",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "git add *",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "git commit *",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "git log *",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "git diff *",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "mkdir *",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      },
+      {
+        "command": "cat *",
+        "path": "C:\\Users\\ASUS\\战旗之王"
+      }
+    ]
+  },
+  "mcpServers": {
+    "godot-ai": {
+      "transport": "sse",
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}

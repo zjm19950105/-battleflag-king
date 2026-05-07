@@ -1,5 +1,60 @@
 # 战旗之王 — Claude Code 项目文档
 
+## 🤖 新 AI 维护者快速上手（CodeX / ChatGPT Pro 交接）
+
+> **项目**: 战旗之王 — 圣兽之王风格的编程自动战斗游戏
+> **技术栈**: Godot 4.6 + C# (.NET 8) + NUnit 测试
+> **最后更新**: 2026-05-07
+
+### 第一次打开项目必做的事
+
+1. 阅读本文档（CLAUDE.md）— 概念框架、机制规则
+2. 阅读 `docs/csharp-architecture.md` — 类设计、数据流
+3. 运行测试确认环境正常: `cd goddot-test && dotnet test`
+4. 在 Godot 中 F5 跑一次验证 UI 正常
+
+### 代码修改后必做
+
+1. **跑测试**: `cd goddot-test && dotnet test`（54个用例，耗时<1秒）
+2. **跑 simplify**: 类型 `/simplify` 让 Claude Code 自动审查代码重复/质量问题
+3. **编译确认**: `cd goddot && dotnet build`（0错误0警告）
+4. **Godot 验证**: F5 跑场景确认 UI 没崩
+
+### 数值/数据修改规则
+
+- **所有数值在 JSON 里**，不在 C# 代码里
+- 改完 JSON 后跑 `dotnet test` 验证测试仍通过
+- 新增角色 → 同步更新 characters.json + active/passive_skills.json + equipments.json
+
+### 当前已知问题
+
+- 3个测试用例失败（多段攻击/仅前排过滤/Row同排）— 需要深入引擎调试
+- BattleEngine 日志 BattleLogHelper 已接入但 hitChance 显示公式与实际计算不一致
+- 被动技能"非毒"/"非buff"等值在 ConditionMeta 中未定义
+- 默认策略硬编码在 Main.cs 中，应迁移到 strategy_presets.json
+
+### 关键文件索引
+
+| 类别 | 路径 | 说明 |
+|------|------|------|
+| 入口 | `goddot/Main.cs` | UI + 游戏循环（~1400行） |
+| 战斗引擎 | `goddot/src/core/BattleEngine.cs` | StepOneAction + 伤害流程 |
+| 伤害计算 | `goddot/src/Pipeline/DamageCalculator.cs` | 命中/回避/暴击/格挡流水线 |
+| 被动处理 | `goddot/src/Skills/PassiveSkillProcessor.cs` | 事件驱动 + 同时发动限制 |
+| 条件评估 | `goddot/src/Ai/ConditionEvaluator.cs` | 12类条件(HP/兵种/位置等) |
+| 策略UI | `goddot/src/Ai/ConditionMeta.cs` | 条件编辑器级联元数据 |
+| 装备系统 | `goddot/src/Equipment/EquipmentSlot.cs` | 5槽装备 + 双持规则 |
+| UI辅助 | `goddot/src/ui/BattleStatusHelper.cs` | 战斗面板全属性显示 |
+| UI辅助 | `goddot/src/ui/PassiveDetailHelper.cs` | 被动技能详情卡片 |
+| UI辅助 | `goddot/src/ui/BattleLogHelper.cs` | 战斗日志多行格式化 |
+| 测试 | `goddot-test/TestDataFactory.cs` | 内存创建测试数据 |
+| 测试 | `goddot-test/DamageCalculatorTest.cs` | 伤害计算11个用例 |
+| 测试 | `goddot-test/ConditionEvaluatorTest.cs` | 条件评估17个用例 |
+| 数据 | `goddot/data/characters.json` | 18个角色 |
+| 数据 | `goddot/data/active_skills.json` | 55个主动技能 |
+| 数据 | `goddot/data/passive_skills.json` | 50个被动技能 |
+| 数据 | `goddot/data/equipments.json` | 80件装备 |
+
 ## 项目概述
 - **名称**：战旗之王（暂定）
 - **类型**：编程自动战斗 + 大巴扎爬塔（受圣兽之王启发）
@@ -331,6 +386,15 @@ BattleUnit (运行时实例)
   - [x] 策略选择 OptionButton 下拉框
   - [x] 战斗双栏面板 + 被动效果日志增强
   - [x] 编译通过，0错误0警告
+
+- [x] **自动化测试框架**: 54个NUnit测试用例(51通过), 5个测试类
+  - DamageCalculator: 基础/暴击/格挡/多段/ForceHit/兵种克制
+  - ConditionEvaluator: HP/兵种/位置/状态/编成人数/属性排名(17用例)
+  - BuffManager: 叠层/去重/一次性/回合清除
+  - TargetSelector: 前排遮挡/远程/仅/优先/贯通/双优先
+  - EquipmentSlot: 装备/卸下/双持/槽位/CanEquip
+  - 运行: `cd goddot-test && dotnet test`
+- [x] **Claude Code Skills 配置**: review/simplify 技能已可用, 改代码后自动触发
 
 ### 当前聚焦
 **Phase 1.4 — 6v6 完整竞技场**
