@@ -174,11 +174,11 @@ public partial class Main : Node2D
 		dayOpt.ItemSelected += (long idx) => { int d = (int)idx + 1; ccCheck.Disabled = (d < 5); if (d < 5) { ccCheck.ButtonPressed = false; _selectedCc = false; } };
 		_leftPanel.AddChild(Btn("[1v1 对战] — 双方各上场1人", () => {
 			_minSlots = 1;
-			Go(GamePhase.PassiveSetup);  // skip conditions for speed
+			Go(GamePhase.PlayerFormation);
 		}));
 		_leftPanel.AddChild(Btn("[3v3 对战] — 双方各上场3人", () => {
 			_minSlots = 3;
-			Go(GamePhase.PassiveSetup);  // skip conditions for speed
+			Go(GamePhase.PlayerFormation);
 		}));
 	}
 
