@@ -49,6 +49,7 @@ namespace BattleKing.Data
         public ActiveSkillData GetActiveSkill(string id) => ActiveSkills.TryGetValue(id, out var v) ? v : null;
         public PassiveSkillData GetPassiveSkill(string id) => PassiveSkills.TryGetValue(id, out var v) ? v : null;
         public EquipmentData GetEquipment(string id) => Equipments.TryGetValue(id, out var v) ? v : null;
+        public List<EquipmentData> GetAllEquipment() => Equipments.Values.ToList();
         public EnemyFormationData GetEnemyFormation(string id) => EnemyFormations.TryGetValue(id, out var v) ? v : null;
         public StrategyPresetData GetStrategyPreset(string id) => StrategyPresets.TryGetValue(id, out var v) ? v : null;
     }

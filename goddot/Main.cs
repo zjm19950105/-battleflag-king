@@ -5,6 +5,7 @@ using System.Linq;
 using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Ai;
+using BattleKing.Equipment;
 
 public enum GamePhase
 {
@@ -12,6 +13,7 @@ public enum GamePhase
 	PlayerFormation,
 	EnemyChoice,
 	EnemyDragFormation,
+	EquipmentSetup,
 	PassiveSetup,
 	StrategySetup,
 	Battle,
@@ -46,6 +48,7 @@ public partial class Main : Node2D
 	private List<BattleUnit> _playerUnits;
 	private List<BattleUnit> _enemyUnits;
 	private List<(string, int, string)> _enemyConfig;
+	private int _equipSetupIdx;
 	private int _passiveSetupIdx;
 	private int _strategySetupIdx;
 	private BattleResult _battleResult;
@@ -148,6 +151,7 @@ public partial class Main : Node2D
 			case GamePhase.Result:             Phase_Result(); break;
 			case GamePhase.EnemyChoice:       Phase_EnemyChoice(); break;
 			case GamePhase.EnemyDragFormation: Phase_EnemyDragFormation(); break;
+			case GamePhase.EquipmentSetup:     Phase_EquipmentSetup(); break;
 
 		}
 	}
@@ -233,7 +237,7 @@ public partial class Main : Node2D
 			if (n < _minSlots) { Log($"至少需要{_minSlots}人 (当前{n})"); return; }
 			Log($"敌方阵型确认 ({n}人)");
 			CreateAllUnits(preset: false);
-			Go(GamePhase.PassiveSetup);
+			Go(GamePhase.EquipmentSetup);
 		});
 	}
 
@@ -400,6 +404,143 @@ public partial class Main : Node2D
 	}
 
 	// ── PHASE 3: PASSIVE SETUP ───────────────────────────────
+
+	// ── PHASE 3: EQUIPMENT SETUP ──────────────────────────
+
+	private void Phase_EquipmentSetup() { _equipSetupIdx = 0; ShowEquipment(); }
+
+	private void ShowEquipment()
+	{
+		ClearAll();
+		var units = _playerUnits.Where(u => u != null).ToList();
+		if (_equipSetupIdx >= units.Count) { Go(GamePhase.PassiveSetup); return; }
+
+		var unit = units[_equipSetupIdx];
+		var cd = unit.Data;
+		bool isCc = unit.IsCc;
+		var slots = EquipmentSlot.GetSlotNames(cd, isCc);
+		var allEquip = _gameData.GetAllEquipment();
+
+		_statusLabel.Text = $"▶  装备配置 [{cd.Name}] — {slots.Count}槽";
+
+		// Left panel: slot dropdowns
+		var slotScroll = new ScrollContainer();
+		slotScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		var slotList = new VBoxContainer();
+		slotScroll.AddChild(slotList);
+		slotList.AddChild(new Label { Text = $"{cd.Name} 装备槽:\n" });
+
+		// Build filtered equipment lists per slot
+		foreach (var slotName in slots)
+		{
+			var current = unit.Equipment.GetBySlot(slotName);
+			string slotLabel = slotName switch
+			{
+				"MainHand" => "主手", "OffHand" => "副手", _ => slotName
+			};
+
+			var row = new HBoxContainer();
+			row.AddChild(new Label { Text = $"[{slotLabel}] " });
+
+			var dropdown = new OptionButton();
+			dropdown.AddItem("(空)");
+			int selectedIdx = 0;
+
+			// Determine which equipment fits this slot
+			string expectedCat = GetExpectedCategory(slotName, cd, isCc);
+			var candidates = new List<EquipmentData>();
+			if (expectedCat != null)
+			{
+				foreach (var eq in allEquip)
+				{
+					if (eq.Category.ToString() == expectedCat && EquipmentSlot.CanEquipCategory(eq.Category, cd, isCc))
+						candidates.Add(eq);
+				}
+			}
+
+			for (int i = 0; i < candidates.Count; i++)
+			{
+				var eq = candidates[i];
+				string desc = eq.Name;
+				foreach (var kv in eq.BaseStats)
+					desc += $" {kv.Key}+{kv.Value}";
+				if (eq.SpecialEffects.Count > 0)
+					desc += $" [{string.Join(",", eq.SpecialEffects)}]";
+				dropdown.AddItem(desc);
+				if (current != null && eq.Id == current.Data.Id)
+					selectedIdx = i + 1;
+			}
+			dropdown.Selected = selectedIdx;
+
+			string slotCapture = slotName;
+			var capsCopy = candidates;
+			dropdown.ItemSelected += (long sel) => {
+				int s = (int)sel;
+				if (s == 0) unit.Equipment.Unequip(slotCapture);
+				else if (s - 1 < capsCopy.Count)
+					unit.Equipment.EquipToSlot(slotCapture, capsCopy[s - 1]);
+				UpdateEquipDetail(unit);
+			};
+			row.AddChild(dropdown);
+			slotList.AddChild(row);
+		}
+
+		_leftPanel.AddChild(slotScroll);
+
+		// Right panel: stat overview
+		UpdateEquipDetail(unit);
+
+		// Bottom buttons
+		AddBtn("→ 确认/下一个角色", () => { _equipSetupIdx++; ShowEquipment(); });
+		AddBtn("→ 全部默认装备", () => { _equipSetupIdx = units.Count; ShowEquipment(); });
+	}
+
+	private static string GetExpectedCategory(string slotName, CharacterData cd, bool isCc)
+	{
+		var types = isCc && cd.CcEquippableCategories?.Count > 0 ? cd.CcEquippableCategories : cd.EquippableCategories;
+		var slots = EquipmentSlot.GetSlotNames(cd, isCc);
+		int idx = slots.IndexOf(slotName);
+		if (idx < 0 || idx >= types.Count) return null;
+		return types[idx].ToString();
+	}
+
+	private void UpdateEquipDetail(BattleUnit unit)
+	{
+		ClearPanel(_rightPanel);
+		var cd = unit.Data;
+
+		var detailLabel = new RichTextLabel { BbcodeEnabled = true };
+		detailLabel.AddThemeFontSizeOverride("normal_font_size", 16);
+		detailLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		_rightPanel.AddChild(detailLabel);
+
+		detailLabel.AppendText($"[color=yellow]══ {cd.Name} 属性 ══[/color]\n\n");
+
+		var statNames = new[] { "HP", "Str", "Def", "Mag", "MDef", "Hit", "Eva", "Crit", "Block", "Spd", "AP", "PP" };
+		foreach (var sn in statNames)
+		{
+			if (!cd.BaseStats.ContainsKey(sn)) continue;
+			int baseVal = cd.BaseStats[sn];
+			int equipVal = unit.Equipment.GetTotalStat(sn);
+			int buffVal = (int)(baseVal * BattleKing.Equipment.BuffManager.GetTotalBuffRatio(unit, sn));
+			int total = baseVal + equipVal + buffVal;
+
+			string line = $"{sn}: {baseVal}";
+			if (equipVal > 0) line += $" [color=#88ff88]+{equipVal}[/color]";
+			if (equipVal < 0) line += $" [color=#ff8888]{equipVal}[/color]";
+			if (buffVal != 0) line += $" [color=#8888ff]+{buffVal}(buff)[/color]";
+			if (equipVal != 0 || buffVal != 0) line += $" [color=yellow]= {total}[/color]";
+
+			detailLabel.AppendText(line + "\n");
+		}
+
+		detailLabel.AppendText("\n[color=cyan]══ 当前装备 ══[/color]\n");
+		foreach (var e in unit.Equipment.AllEquipped)
+		{
+			string stats = string.Join(" ", e.Data.BaseStats.Select(kv => $"{kv.Key}+{kv.Value}"));
+			detailLabel.AppendText($"{e.Data.Name}: {stats}\n");
+		}
+	}
 
 	private void Phase_PassiveSetup() { _passiveSetupIdx = 0; ShowPassive(); }
 

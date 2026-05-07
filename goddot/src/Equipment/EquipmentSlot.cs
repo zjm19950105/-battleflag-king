@@ -88,5 +88,67 @@ namespace BattleKing.Equipment
         {
             return MainHand != null;
         }
+
+        /// <summary>Get equipment in a named slot (for UI display).</summary>
+        public Equipment GetBySlot(string slotName) => slotName switch
+        {
+            "MainHand" => MainHand,
+            "OffHand" => OffHand,
+            "Accessory1" => Accessory1,
+            "Accessory2" => Accessory2,
+            "Accessory3" => Accessory3,
+            _ => null
+        };
+
+        /// <summary>Unequip (clear) a named slot.</summary>
+        public void Unequip(string slotName)
+        {
+            switch (slotName)
+            {
+                case "MainHand": MainHand = null; break;
+                case "OffHand": OffHand = null; break;
+                case "Accessory1": Accessory1 = null; break;
+                case "Accessory2": Accessory2 = null; break;
+                case "Accessory3": Accessory3 = null; break;
+            }
+        }
+
+        /// <summary>Check if a character can equip this type of equipment.</summary>
+        public static bool CanEquipCategory(EquipmentCategory cat, CharacterData cd, bool isCc)
+        {
+            if (cat == EquipmentCategory.Accessory) return true;
+            var types = isCc && cd.CcEquippableCategories?.Count > 0 ? cd.CcEquippableCategories : cd.EquippableCategories;
+            return types.Contains(cat);
+        }
+
+        /// <summary>Get ordered slot names for a character based on equippableCategories.</summary>
+        public static List<string> GetSlotNames(CharacterData cd, bool isCc)
+        {
+            var types = isCc && cd.CcEquippableCategories?.Count > 0 ? cd.CcEquippableCategories : cd.EquippableCategories;
+            var slots = new List<string>();
+            int accIdx = 0;
+            foreach (var t in types)
+            {
+                if (t == EquipmentCategory.Accessory) { accIdx++; slots.Add("Accessory" + accIdx); }
+                else if (t == EquipmentCategory.Shield || t == EquipmentCategory.GreatShield) slots.Add("OffHand");
+                else if (slots.Count == 0) slots.Add("MainHand");  // first weapon = MainHand
+                else slots.Add("OffHand");  // second weapon = OffHand (dual-wield)
+            }
+            return slots;
+        }
+
+        /// <summary>Equip into a specific named slot (for UI-driven equipment changes).</summary>
+        public void EquipToSlot(string slotName, EquipmentData data)
+        {
+            var equipment = data != null ? new Equipment(data) : null;
+            switch (slotName)
+            {
+                case "MainHand": MainHand = equipment; break;
+                case "OffHand": OffHand = equipment; break;
+                case "Accessory1": Accessory1 = equipment; break;
+                case "Accessory2": Accessory2 = equipment; break;
+                case "Accessory3": Accessory3 = equipment; break;
+            }
+        }
     }
 }

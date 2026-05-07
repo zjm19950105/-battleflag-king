@@ -36,12 +36,9 @@
     "growthType": "平衡型",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_bronze_sword"
+      "equ_recruit_sword"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_bronze_sword",
-      "equ_bronze_sword"
-    ],
+    "ccInitialEquipmentIds": [],
     "ccClassId": "swordmaster",
     "ccName": "剑圣",
     "ccEquippableCategories": [
@@ -93,12 +90,10 @@
     "growthType": "攻击特化型",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_bronze_sword"
-    ],
-    "ccInitialEquipmentIds": [
-      "equ_bronze_sword",
+      "equ_recruit_sword",
       "equ_mercenary_wood_shield"
     ],
+    "ccInitialEquipmentIds": [],
     "ccClassId": "landsknecht",
     "ccName": "兰茨克内希特",
     "ccEquippableCategories": [
@@ -170,10 +165,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_rapid_order"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_lord_sword",
-      "equ_lord_shield"
-    ],
+    "ccInitialEquipmentIds": [],
     "ccClasses": [
       "Cavalry"
     ],
@@ -239,10 +231,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_hundred_crit"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_fighter_axe",
-      "equ_fighter_shield"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "soldier",
@@ -297,9 +286,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_formation_counter"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_soldier_spear"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "huskarl",
@@ -338,7 +325,8 @@
     "growthType": "攻击型",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_huskarl_axe"
+      "equ_huskarl_axe",
+      "equ_huskarl_shield"
     ],
     "ccClassId": "viking",
     "ccName": "维京",
@@ -354,10 +342,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_calm_cover"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_huskarl_axe",
-      "equ_huskarl_shield"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "hoplite",
@@ -414,10 +399,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_pursuit"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_hoplite_spear",
-      "equ_hoplite_greatshield"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "gladiator",
@@ -474,9 +456,7 @@
       "pas_wide_counter",
       "pas_berserk"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_gladiator_axe"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "warrior",
@@ -531,9 +511,7 @@
       "pas_block_seal",
       "pas_emergency_cover"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_warrior_axe"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "hunter",
@@ -593,9 +571,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_fervor"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_hunter_bow"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "shooter",
@@ -640,10 +616,7 @@
     "initialEquipmentIds": [
       "equ_shooter_bow"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_shooter_bow",
-      "equ_shooter_greatshield"
-    ],
+    "ccInitialEquipmentIds": [],
     "ccClassId": "shield_shooter",
     "ccName": "盾射手",
     "ccEquippableCategories": [
@@ -713,9 +686,7 @@
     "ccInnatePassiveSkillIds": [
       "pas_stealth_blade"
     ],
-    "ccInitialEquipmentIds": [
-      "equ_thief_dagger"
-    ]
+    "ccInitialEquipmentIds": []
   },
   {
     "id": "wizard",
@@ -753,7 +724,9 @@
     },
     "growthType": "AllRounder",
     "traits": [],
-    "initialEquipmentIds": [],
+    "initialEquipmentIds": [
+      "equ_apprentice_staff"
+    ],
     "ccClassId": "warlock",
     "ccName": "术士",
     "ccClasses": [],
@@ -809,7 +782,9 @@
     },
     "growthType": "AllRounder",
     "traits": [],
-    "initialEquipmentIds": [],
+    "initialEquipmentIds": [
+      "equ_ice_staff"
+    ],
     "ccClassId": "sorceress",
     "ccName": "魔女",
     "ccClasses": [],
@@ -979,7 +954,9 @@
     },
     "growthType": "AllRounder",
     "traits": [],
-    "initialEquipmentIds": [],
+    "initialEquipmentIds": [
+      "equ_cursed_staff"
+    ],
     "ccClassId": "druid",
     "ccName": "德鲁伊",
     "ccClasses": [],
@@ -1040,7 +1017,7 @@
     "growthType": "AllRounder",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_soldier_spear"
+      "equ_holy_spear"
     ],
     "ccClassId": null,
     "ccName": null,
