@@ -134,12 +134,22 @@ public partial class Main : Node2D
 		return b;
 	}
 	private void AddBtn(string text, Action onClick) => _buttonBar.AddChild(Btn(text, onClick));
+	private void AddBackBtn() {
+		var backTo = _phaseHistory.Count > 0 ? _phaseHistory.Peek() : GamePhase.ModeSelect;
+		_buttonBar.AddChild(Btn("← 上一步", () => GoBack()));
+	}
 	private void ClearButtons() { foreach (var c in _buttonBar.GetChildren()) c.QueueFree(); }
 
 	// ── STATE MACHINE ────────────────────────────────────────
 
+	private Stack<GamePhase> _phaseHistory = new();
+	private bool _suppressHistory;
+
 	private void Go(GamePhase p)
 	{
+		if (!_suppressHistory && _phase != p)
+			_phaseHistory.Push(_phase);
+		_suppressHistory = false;
 		_phase = p;
 		// Before clearing: reparent log if it was moved to right panel
 		if (_logOriginalParent != null)
@@ -163,6 +173,18 @@ public partial class Main : Node2D
 			case GamePhase.EquipmentSetup:     Phase_EquipmentSetup(); break;
 
 		}
+		// Back button for all phases except ModeSelect
+		if (p != GamePhase.ModeSelect) AddBackBtn();
+	}
+
+	private void GoBack()
+	{
+		if (_phaseHistory.Count > 0)
+		{
+			_suppressHistory = true;
+			Go(_phaseHistory.Pop());
+		}
+		else Go(GamePhase.ModeSelect);
 	}
 
 	// ── PHASE 0: MODE SELECT ──────────────────────────────
