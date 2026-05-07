@@ -315,6 +315,23 @@ BattleUnit (运行时实例)
   - [x] 多轮对战支持（"是否再来一局"）
   - [x] 被动技能架构文档：`docs/被动技能实现融入现有框架.md`
 
+- [x] **Phase 1.3 — 被动技能完整实现与架构改造（含主动技能联动）**：
+  - [x] DamageCalculation 13可变字段 + 多段攻击每hit独立判定
+  - [x] PendingActionQueue 行动队列（反击/追击/先制）
+  - [x] TemporalState 临时标记系统（1次免疫/致死耐）
+  - [x] 自定义计数器 Dictionary<string,int> + 10+ EffectType
+  - [x] Charge 蓄力状态机 + OnKnockdownEvent
+  - [x] CcClasses 框架（CC后兵种变化）
+  - [x] CC Trait 系统（领主物攻对步兵2倍等）
+  - [x] Buff 生命周期框架（默认1回合持续，回合末清理）
+  - [x] 12角色数据全面审计修正
+  - [x] 单行动步进（StepOneAction）
+  - [x] 拖拽布阵 UI + 1v1/3v3 模式选择
+  - [x] 战前条件面板（Day+CC独立控制）
+  - [x] 策略选择 OptionButton 下拉框
+  - [x] 战斗双栏面板 + 被动效果日志增强
+  - [x] 编译通过，0错误0警告
+
 ### 当前聚焦
 **Phase 1.3 — 被动技能完整实现与架构改造**
 

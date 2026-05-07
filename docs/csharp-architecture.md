@@ -606,6 +606,8 @@ namespace BattleKing.Core
     }
 
     public enum BattleResult { PlayerWin, EnemyWin, Draw }
+    public enum BattleStepResult { Continue, PlayerWin, EnemyWin, Draw }
+    public enum SingleActionResult { ActionDone, TurnDone, PlayerWin, EnemyWin, Draw }
 }
 ```
 
@@ -1357,5 +1359,18 @@ public interface IBattleScene
     void PlayStatusAilmentEffect(BattleUnit target, StatusAilment ailment);
     void PlayBattleStartEffect();
     void PlayBattleEndEffect(BattleResult result);
+}
+```
+
+
+## DayProgression
+
+天数进度系统。天数控制技能解锁等级，CC状态独立勾选。
+
+```csharp
+public static class DayProgression
+{
+    // Day→(MaxSkillLevel, CcAvailable) 映射
+    public static void Apply(BattleUnit unit, int day) { unit.CurrentLevel = cfg.MaxSkillLevel; }
 }
 ```
