@@ -51,6 +51,7 @@ public partial class Main : Node2D
 	private int _equipSetupIdx;
 	private int _passiveSetupIdx;
 	private int _strategySetupIdx;
+	private bool _editingEnemyStrategies;
 	private BattleResult _battleResult;
 	private Node _logOriginalParent;
 
@@ -581,13 +582,6 @@ public partial class Main : Node2D
 		var units = _playerUnits.Where(u => u != null).ToList();
 		if (_passiveSetupIdx >= units.Count)
 		{
-			// Enemy preset strategies
-			var eu = _enemyUnits.Where(u => u != null).ToList();
-			for (int i = 0; i < eu.Count; i++)
-			{
-				var cfg = _enemyConfig != null && i < _enemyConfig.Count ? _enemyConfig[i] : ("", 0, "preset_aggressive");
-				ApplyPresetStrat(eu[i], cfg);
-			}
 			Go(GamePhase.StrategySetup);
 			return;
 		}
@@ -624,17 +618,33 @@ public partial class Main : Node2D
 
 	// ── PHASE 4: STRATEGY SETUP ──────────────────────────────
 
-	private void Phase_StrategySetup() { _strategySetupIdx = 0; ShowStrategy(); }
+	private void Phase_StrategySetup() { _strategySetupIdx = 0; _editingEnemyStrategies = false; ShowStrategy(); }
 
 	private void ShowStrategy()
 	{
 		ClearAll();
-		var units = _playerUnits.Where(u => u != null).ToList();
-		if (_strategySetupIdx >= units.Count) { Go(GamePhase.Battle); return; }
+		var units = _editingEnemyStrategies
+			? _enemyUnits.Where(u => u != null).ToList()
+			: _playerUnits.Where(u => u != null).ToList();
+
+		if (_strategySetupIdx >= units.Count)
+		{
+			if (!_editingEnemyStrategies)
+			{
+				// All player units done — now configure enemy strategies
+				_strategySetupIdx = 0;
+				_editingEnemyStrategies = true;
+				ShowStrategy();
+				return;
+			}
+			Go(GamePhase.Battle);
+			return;
+		}
 
 		var unit = units[_strategySetupIdx];
+		string teamLabel = _editingEnemyStrategies ? "[敌方]" : "[我方]";
 		var avail = unit.GetAvailableActiveSkillIds().Select(id => _gameData.GetActiveSkill(id)).Where(s => s != null).ToList();
-		_statusLabel.Text = $"▶  策略编程 [{unit.Data.Name}] — 技能条件组合";
+		_statusLabel.Text = $"▶  策略编程 {teamLabel} [{unit.Data.Name}] — 技能条件组合";
 
 		// Left: scrollable strategy editor
 		var stratScroll = new ScrollContainer();
@@ -686,8 +696,10 @@ public partial class Main : Node2D
 		UpdateSkillDetail(unit);
 
 		// Bottom
-		AddBtn("→ 下一个角色", () => { _strategySetupIdx++; ShowStrategy(); });
-		AddBtn("→ 全部默认跳过", () => { _strategySetupIdx = units.Count; ShowStrategy(); });
+		string nextLabel = _editingEnemyStrategies ? "→ 下一个敌方角色" : "→ 下一个我方角色";
+		AddBtn(nextLabel, () => { _strategySetupIdx++; ShowStrategy(); });
+		string skipLabel = _editingEnemyStrategies ? "→ 敌方全默认(开始战斗)" : "→ 跳过全部策略配置";
+		AddBtn(skipLabel, () => { _strategySetupIdx = units.Count; ShowStrategy(); });
 	}
 
 	private void BuildConditionRow(VBoxContainer parent, BattleUnit unit, int slot, bool isCond1)
