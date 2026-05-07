@@ -24,11 +24,13 @@ public partial class Main : Node2D
 {
 	private TextEdit _logLabel;
 	
-	private Control _formationArea;  // HBoxContainer: left pool + right grid
+	private HSplitContainer _splitter;
 	private VBoxContainer _leftPanel;
 	private VBoxContainer _rightPanel;
 	private Label _statusLabel;
 	private HBoxContainer _buttonBar;
+	private float _fontScale = 1.0f;
+	private static readonly int BASE_FONT = 16;
 
 	private GamePhase _phase;
 	private GameDataRepository _gameData;
@@ -84,17 +86,21 @@ public partial class Main : Node2D
 		root.AddChild(_statusLabel);
 
 		// 2) Formation area: left character pool | right grid
-		_formationArea = new HBoxContainer();
-		_formationArea.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		root.AddChild(_formationArea);
+		_splitter = new HSplitContainer();
+		_splitter.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+#pragma warning disable CS0618
+			_splitter.SplitOffset = 400;
+#pragma warning restore CS0618
+			_splitter.DraggerVisibility = Godot.SplitContainer.DraggerVisibilityEnum.Visible;
+		root.AddChild(_splitter);
 
 		_leftPanel = new VBoxContainer();
-		_leftPanel.CustomMinimumSize = new Vector2(180, 0);
-		_formationArea.AddChild(_leftPanel);
-		_formationArea.AddChild(new VSeparator());
+		_leftPanel.CustomMinimumSize = new Vector2(300, 0);
+		_splitter.AddChild(_leftPanel);
+		
 		_rightPanel = new VBoxContainer();
 		_rightPanel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		_formationArea.AddChild(_rightPanel);
+		_splitter.AddChild(_rightPanel);
 
 		// 3) Button bar (prominent)
 		_buttonBar = new HBoxContainer();
@@ -140,6 +146,13 @@ public partial class Main : Node2D
 		_buttonBar.AddChild(Btn("← 上一步", () => GoBack()));
 	}
 	private void ClearButtons() { foreach (var c in _buttonBar.GetChildren()) c.QueueFree(); }
+
+	private void ReapplyFontScale()
+	{
+		int size = Math.Max(10, (int)(BASE_FONT * _fontScale));
+		_statusLabel.AddThemeFontSizeOverride("font_size", size + 2);
+		_logLabel.AddThemeFontSizeOverride("font_size", size);
+	}
 
 	// ── STATE MACHINE ────────────────────────────────────────
 
