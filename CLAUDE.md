@@ -15,7 +15,7 @@
 
 ### 代码修改后必做
 
-1. **跑测试**: `cd goddot-test && dotnet test`（54个用例，耗时<1秒）
+1. **跑测试**: `cd goddot-test && dotnet test`（75个用例，耗时<1秒）
 2. **跑 simplify**: 类型 `/simplify` 让 Claude Code 自动审查代码重复/质量问题
 3. **编译确认**: `cd goddot && dotnet build`（0错误0警告）
 4. **Godot 验证**: F5 跑场景确认 UI 没崩
@@ -28,10 +28,10 @@
 
 ### 当前已知问题
 
-- 3个测试用例失败（多段攻击/仅前排过滤/Row同排）— 需要深入引擎调试
-- BattleEngine 日志 BattleLogHelper 已接入但 hitChance 显示公式与实际计算不一致
-- 被动技能"非毒"/"非buff"等值在 ConditionMeta 中未定义
-- 默认策略硬编码在 Main.cs 中，应迁移到 strategy_presets.json
+- 当前 75/75 测试全部通过，0 失败 ✓
+- BattleEngine 日志 BattleLogHelper 已接入但 hitChance 显示公式与实际计算不一致（`BattleLogHelper.cs:26` 用 `(Hit - Eva) × skillHit%`，`DamageCalculator.cs:209` 实际是 `skillHit + Hit - Eva`）
+- active_skills.json 的 55 个技能 Effects 数组仍以占位为主，需基于参考文档批量填充（effectType handler 已在 SkillEffectExecutor 中全部就绪）
+- 部分被动技能 Effects 数组为空，需要类似填充
 
 ### 关键文件索引
 
@@ -46,6 +46,8 @@
 | 装备系统 | `goddot/src/Equipment/EquipmentSlot.cs` | 5槽装备 + 双持规则 |
 | UI辅助 | `goddot/src/ui/BattleStatusHelper.cs` | 战斗面板全属性显示 |
 | UI辅助 | `goddot/src/ui/PassiveDetailHelper.cs` | 被动技能详情卡片 |
+| 技能效果 | `goddot/src/Skills/SkillEffectExecutor.cs` | 主动/被动效果统一执行器（~600行） |
+| 技能效果 | `goddot/src/Skills/SkillEffectExecutionState.cs` | 效果执行中间状态 |
 | UI辅助 | `goddot/src/ui/BattleLogHelper.cs` | 战斗日志多行格式化 |
 | 测试 | `goddot-test/TestDataFactory.cs` | 内存创建测试数据 |
 | 测试 | `goddot-test/DamageCalculatorTest.cs` | 伤害计算11个用例 |
@@ -387,7 +389,7 @@ BattleUnit (运行时实例)
   - [x] 战斗双栏面板 + 被动效果日志增强
   - [x] 编译通过，0错误0警告
 
-- [x] **自动化测试框架**: 54个NUnit测试用例(51通过), 5个测试类
+- [x] **自动化测试框架**: 75个NUnit测试用例(75通过), 6个测试类
   - DamageCalculator: 基础/暴击/格挡/多段/ForceHit/兵种克制
   - ConditionEvaluator: HP/兵种/位置/状态/编成人数/属性排名(17用例)
   - BuffManager: 叠层/去重/一次性/回合清除

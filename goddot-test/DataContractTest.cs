@@ -62,14 +62,14 @@ namespace BattleKing.Tests
                 Assert.That(passiveSkills, Has.Count.EqualTo(50));
                 Assert.That(equipments, Has.Count.EqualTo(80));
                 Assert.That(enemyFormations, Has.Count.EqualTo(5));
-                Assert.That(strategyPresets, Has.Count.EqualTo(3));
+                Assert.That(strategyPresets, Has.Count.EqualTo(21));
 
                 Assert.That(repository.Characters, Has.Count.EqualTo(18));
                 Assert.That(repository.ActiveSkills, Has.Count.EqualTo(55));
                 Assert.That(repository.PassiveSkills, Has.Count.EqualTo(50));
                 Assert.That(repository.Equipments, Has.Count.EqualTo(80));
                 Assert.That(repository.EnemyFormations, Has.Count.EqualTo(5));
-                Assert.That(repository.StrategyPresets, Has.Count.EqualTo(3));
+                Assert.That(repository.StrategyPresets, Has.Count.EqualTo(21));
             });
         }
 

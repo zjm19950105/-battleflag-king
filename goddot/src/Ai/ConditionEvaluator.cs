@@ -125,16 +125,24 @@ namespace BattleKing.Ai
             if (unit == null) return true;
 
             string value = c.Value?.ToString() ?? "";
-            return c.Operator switch
+
+            // "非毒"/"非炎上" etc. — negated ailment check
+            bool negate = value.StartsWith("非");
+            if (negate) value = value.Substring(1);
+
+            bool result = c.Operator switch
             {
                 "equals" => value.ToLower() switch
                 {
                     "buff" => unit.Buffs.Any(b => b.Ratio > 0),
                     "debuff" => unit.Buffs.Any(b => b.Ratio < 0),
+                    "格挡封印" => unit.Ailments.Contains(StatusAilment.BlockSeal),
                     _ => unit.Ailments.Any(a => a.ToString().Equals(value, StringComparison.OrdinalIgnoreCase))
                 },
                 _ => true
             };
+
+            return negate ? !result : result;
         }
 
         private bool EvaluateSelfState(Condition c, BattleUnit subject)

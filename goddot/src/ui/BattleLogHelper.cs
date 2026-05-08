@@ -23,8 +23,17 @@ namespace BattleKing.Ui
             int atkHit = attacker.GetCurrentStat("Hit");
             int defEva = defender.GetCurrentStat("Eva");
             int skillHit = skill.Data.HitRate ?? 100;
-            float hitChance = Math.Max(0, (atkHit - defEva)) * skillHit / 100f;
-            lines.Add("  命中:(" + atkHit + "-" + defEva + ")×" + skillHit + "%=" + hitChance.ToString("F0") + "% | 闪避:" + defEva + "% | 格挡:" + defender.GetCurrentBlockRate() + "% | 会心:" + attacker.GetCurrentCritRate() + "%");
+            int hitChance = skillHit + atkHit - defEva;
+            string hitFormula = skillHit + "+" + atkHit + "-" + defEva;
+            bool defIsFlying = defender.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true;
+            bool atkIsGrounded = attacker.GetEffectiveClasses()?.Contains(UnitClass.Flying) != true;
+            if (defIsFlying && atkIsGrounded && skill.AttackType == AttackType.Melee)
+            {
+                hitChance /= 2;
+                hitFormula += "/2(飞行半减)";
+            }
+            hitChance = Math.Clamp(hitChance, 0, 100);
+            lines.Add("  命中:" + hitFormula + "=" + hitChance + "% | 闪避:" + defEva + "% | 格挡:" + defender.GetCurrentBlockRate() + "% | 会心:" + attacker.GetCurrentCritRate() + "%");
 
             // Hit result
             if (!result.IsHit)

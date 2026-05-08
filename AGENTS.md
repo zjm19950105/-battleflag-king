@@ -15,7 +15,7 @@
 
 ### 代码修改后必做
 
-1. **跑测试**: `cd goddot-test && dotnet test`（54个用例，耗时<1秒）
+1. **跑测试**: `cd goddot-test && dotnet test`（75个用例，耗时<1秒）
 2. **跑 simplify**: 类型 `/simplify` 让 Codex 自动审查代码重复/质量问题
 3. **编译确认**: `cd goddot && dotnet build`（0错误0警告）
 4. **Godot 验证**: F5 跑场景确认 UI 没崩
@@ -28,10 +28,9 @@
 
 ### 当前已知问题
 
-- 3个测试用例失败（多段攻击/仅前排过滤/Row同排）— 需要深入引擎调试
-- BattleEngine 日志 BattleLogHelper 已接入但 hitChance 显示公式与实际计算不一致
-- 被动技能"非毒"/"非buff"等值在 ConditionMeta 中未定义
-- 默认策略硬编码在 Main.cs 中，应迁移到 strategy_presets.json
+- 当前 75/75 测试全部通过，0 失败 ✓
+- active_skills.json 的 55 个技能 Effects 数组仍以占位为主，需基于参考文档批量填充（effectType handler 已在 SkillEffectExecutor 中全部就绪）
+- 部分被动技能 Effects 数组为空，需要类似填充
 
 ### 关键文件索引
 

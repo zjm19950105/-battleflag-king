@@ -45,6 +45,8 @@
 | 上午 | Codex | **文档**: effect extension doctrine（效果扩展教条）、codex-architecture-diagnosis.md、AGENTS.md 创建 | `AGENTS.md`, `docs/codex-architecture-diagnosis.md` |
 | 下午 | Claude Code | **协作协议文件创建 + Codex 反馈修正**: 根据 Codex 审查结果修正任务看板（3 失败测试→已过期、补充 effectType 缺口详情、hitChance 公式具体行号），同步修正 AGENTS.md/CLAUDE.md 测试数量为 69/69 | `codex与claudecode的交流.md`, `AGENTS.md`, `CLAUDE.md` |
 | 下午 | Codex | **主动技能 effects 全管线竣工**: 审计确认项目无真实 EffectType enum、当前以字符串 effectType 驱动；补齐 SkillEffectExecutor 的 ApDamage/PpDamage、GrantSkill、RemoveBuff/CleanseDebuff、HealRatio、AddDebuff、TemporalMark、CoverAlly、Counter/Pursuit/Preemptive handler，并补充 ModifyDamageCalc 参数覆盖。新增/扩展测试后 `dotnet test` 75/75 通过，`goddot` 主项目 `dotnet build` 0 警告 0 错误 | `SkillEffectExecutor.cs`, `BattleUnit.cs`, `SkillEffectExecutorTest.cs`, `docs/csharp-architecture.md` |
+| 下午 | Claude Code | **C1 默认策略迁移**: Main.cs ApplyDefaultStrategies 180行 switch → 16行 JSON 查找；strategy_presets.json 新增18个角色默认策略；新增 PresetStrategyData.SkillId 字段；DataContractTest 期望值 3→21 | `Main.cs`, `strategy_presets.json`, `StrategyPresetData.cs`, `DataContractTest.cs` |
+| 下午 | Claude Code | **C2 ConditionMeta 补全 + C3 hitChance 公式修正**: ConditionMeta.Status 新增非毒/非炎上/非冻结/非气绝/非黑暗 5个反向值；ConditionEvaluator 新增"非"前缀取反逻辑；BattleLogHelper 公式从 (Hit-Eva)×skillHit% 改为 skillHit+Hit-Eva + 飞行近战半减 | `ConditionMeta.cs`, `ConditionEvaluator.cs`, `BattleLogHelper.cs` |
 
 ---
 
@@ -55,14 +57,15 @@
 | # | 任务 | 指派给 | 状态 | 备注 |
 |---|------|--------|------|------|
 | 1 | 主动技能 effects 管线接通 | Codex | ✅ 已完成 | SkillEffectExecutor 已接入 BattleEngine.cs:261 |
-| 2 | EffectType 扩展：补充缺失的效果类型（RecoverAp/TemporalMark/CoverAlly/CounterAttack/PreemptiveAttack 等被动效果，以及 ApDamage 主动效果的 JSON 证据） | Codex | 🔄 进行中 | 当前 active JSON 只有 AddBuff/ConsumeCounter/ModifyCounter/ModifyDamageCalc；passive 还缺 |
-| 3 | ~~修复 3 个失败测试~~ | ~~Codex~~ | ❌ 已过期 | 当前 69/69 全绿，0 失败 |
-| 4 | **主动技能 effects 全 effectType 管线竣工**（含 ApDamage/GrantSkill/RemoveBuff/StealApPp/Knockback/HealRatio 等所有已定义的 effectType 在 SkillEffectExecutor 中实现到可测试） | Codex | ⬜ 待办 | SkillEffectExecutor 当前 ~425 行，仍有 effectType 分支待补齐 |
-| 5 | hitChance 公式一致性修正 | Codex | ⬜ 待办 | `BattleLogHelper.cs:26` 用 `(Hit - Eva) × skillHit%`，`DamageCalculator.cs:209` 实际是 `skillHit + Hit - Eva`，含飞行近战半减 |
-| 6 | 职业定位描述数据结构化 + ID 引用规则 | Claude Code | ⬜ 待办 | 方案已有，需新建 CharacterRoleDescriptionData 模型 + JSON + 显示层解析 |
-| 7 | 默认策略从 Main.cs 迁移到 strategy_presets.json | Claude Code | ⬜ 待办 | `Main.cs:462` 仍有大型 ApplyDefaultStrategies 硬编码 |
-| 8 | ConditionMeta 补"非毒/非buff"等未定义值 | Claude Code | ⬜ 待办 | `Main.cs:564` 已硬编码用"非毒"，但 `ConditionMeta.cs:60` 状态值列表缺反向状态；Evaluator 未处理 |
+| 2 | 主动技能 effects 全管线竣工（补齐全 effectType handler + 测试） | Codex | ✅ 已完成 | 75/75 全绿；handler 覆盖 ApDamage/PpDamage/GrantSkill/RemoveBuff/CleanseDebuff/HealRatio/AddDebuff/TemporalMark/CoverAlly/Counter/Pursuit/Preemptive + ModifyDamageCalc 子参数 |
+| 3 | ~~修复 3 个失败测试~~ | ~~Codex~~ | ❌ 已过期 | 75/75 全绿 |
+| 4 | hitChance 公式一致性修正 | Claude Code | ✅ 已完成 | `BattleLogHelper.cs` 公式改为 `skillHit+Hit-Eva` + 飞行近战半减 |
+| 5 | 默认策略迁移到 JSON | Claude Code | ✅ 已完成 | `Main.cs:462-640` 180行 switch → 16行 JSON 查找；`strategy_presets.json` 3→21 条 preset |
+| 6 | ConditionMeta 补反向状态 + Evaluator 取反 | Claude Code | ✅ 已完成 | 新增 非毒/非炎上/非冻结/非气绝/非黑暗 5值；Evaluator 新增"非"前缀取反 |
+| 7 | **主动技能 JSON Effects 数组示范贯通**（选2-3个代表性技能，写入完整 Effects 数组，建立集成测试验证全管线：Main→Strategy→SkillEffectExecutor→BattleEngine→正确结果） | Codex | ⬜ 待办 | Handler 已就绪，JSON 仍只有 4 种 effectType。需示范端到端后，Claude Code 批量铺量其余 52 个技能 |
+| 8 | 职业定位描述数据结构化 + ID 引用规则 | Claude Code | ⬜ 待办 | 方案已有，需新建 CharacterRoleDescriptionData 模型 + JSON + 显示层解析 |
 | 9 | 6v6 模式入口 + 流程（当前 UI 6 格但入口仍是 1v1/3v3） | TBD | ⬜ 待办 | `Main.cs:232` 无 6v6 流程 |
+| 10 | 主动/被动技能 JSON Effects 批量填充（基于 Codex 示范模板 + 参考文档） | Claude Code | ⬜ 待办 | 依赖 #7 完成 |
 
 ---
 
@@ -108,34 +111,35 @@
 
 ---
 
-**给 Codex 的提示词（2026-05-08）**:
+**给 Codex 的提示词（2026-05-08 第二轮）**:
 
 ```
 项目: C:\Users\ASUS\战旗之王
-先读: AGENTS.md + docs/csharp-architecture.md + codex与claudecode的交流.md + docs/codex-architecture-diagnosis.md
+先读: AGENTS.md + docs/csharp-architecture.md + codex与claudecode的交流.md
 
-当前状态: 69/69 测试全绿，0错误0警告编译。上次你完成了主动技能 effects 管线初通（SkillEffectExecutor ~425行接入 BattleEngine:261）。
+当前状态: 75/75 测试全绿，0错误0警告编译。你上次完成了所有 effectType handler（ApDamage/PpDamage/GrantSkill/RemoveBuff/HealRatio/AddDebuff/TemporalMark/CoverAlly/Counter/Pursuit/Preemptive + ModifyDamageCalc 子参数），但 active_skills.json 的 55 个技能中 Effects 数组仍未使用这些新 handler。
 
-你的任务: 主动技能 effects 全管线竣工
+Claude Code 这轮完成了: 默认策略 JSON 迁移、ConditionMeta 反向状态补全、hitChance 公式修正（详见 codex与claudecode的交流.md 第二节）。
 
-背景: SkillEffectExecutor.cs 的 switch 分支仍有多个 effectType 未实现。active_skills.json 的 55 个技能中，Effects 数组当前只用了 AddBuff/ConsumeCounter/ModifyCounter/ModifyDamageCalc 四种。对照 C# EffectType 枚举和 docs/effect-extension-doctrine.md（如果存在），补齐所有已定义但未实现的 effectType handler。
+你的任务: 主动技能 JSON Effects 示范贯通
 
-具体步骤（用 subagent 执行重度代码）:
-1. 审计: 列出 C# EffectType 枚举所有值 vs SkillEffectExecutor.cs switch 已实现分支 vs active_skills.json 实际使用的 effectType。输出缺口清单。
-2. 按优先级实现缺失 handler:
-   - ApDamage（扣对方 AP）
-   - GrantSkill（临时赋予技能）
-   - RemoveBuff（驱散 buff/debuff）
-   - HealRatio（按比例回血）
-   - ModifyCounter（自定义计数器增减）
-   - 以及其他枚举已定义但 switch 未覆盖的 effectType
-3. 每个新 handler 至少写 1 个测试用例到 SkillEffectExecutorTest.cs
-4. 如有必要，更新 docs/csharp-architecture.md 的 EffectType 文档
-5. 最终: dotnet test (全绿) + dotnet build (0错误0警告)
+选 3 个代表性主动技能，在 active_skills.json 中写入完整的 Effects 数组，建立集成测试验证全管线: Strategy→SkillEffectExecutor→BattleEngine→正确战斗结果。
 
-工作区提示: git 当前 ahead 4 commits，有 2 个已跟踪文件被删除（battle_log.txt, build.bat），codex与claudecode的交流.md 是未跟踪文件。你不需要处理这些。
+选角建议:
+- 1 个物理攻击技（如 act_sharp_slash 锐利斩击）— 覆盖 AddBuff/ModifyDamageCalc
+- 1 个 debuff 技（如 act_smash 粉碎）— 覆盖 AddDebuff
+- 1 个治疗技（如 act_row_heal 列治愈）— 覆盖 HealRatio
 
-完成后: commit，并在 codex与claudecode的交流.md 第二节记录变更。
+具体步骤:
+1. 读取 active_skills.json 中这 3 个技能的当前 Effects 数组（可能为空或仅占位）
+2. 对照参考文档 C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\ 中的技能效果描述，写入结构化的 Effects 数组
+3. 在 SkillEffectExecutorTest.cs 中为这 3 个技能添加集成测试：创建 BattleUnit → 设置 Strategy → 执行 SkillEffectExecutor → 验证 HP/buff/debuff 变化正确
+4. 如果 JSON Effects 格式需要扩展（例如某些 handler 需要新字段），同步更新 SkillEffectData 模型
+5. dotnet test (全绿) + dotnet build (0错误0警告)
+
+注意: 数值必须对照参考文档，不得擅自修改。效果扩展教条见 docs/effect-extension-doctrine.md。
+
+完成后: commit，并在 codex与claudecode的交流.md 第二节记录变更。Claude Code 将基于你的 3 个示范模板批量填充其余 52 个技能的 Effects 数组。
 ```
 
 ---
@@ -144,10 +148,10 @@
 
 | 项目 | 状态 |
 |------|------|
-| 分支 | `main` → `origin/main` ahead 4 |
+| 分支 | `main` → `origin/main` ahead 5 (Codex 4 commits + 待 commit Claude Code 改动) |
 | 已删除未提交 | `battle_log.txt`, `build.bat` |
 | 未跟踪 | `codex与claudecode的交流.md` |
-| 测试 | 69/69 全绿 |
+| 测试 | 75/75 全绿 |
 | 编译 | 0 错误 0 警告 |
 
 ---

@@ -461,181 +461,22 @@ public partial class Main : Node2D
 
 	private void ApplyDefaultStrategies(BattleUnit unit)
 	{
-		// Helper: build Condition from UI-friendly strings
-		Condition C(ConditionCategory cat, string op, string val, bool only = false)
-			=> ConditionMeta.BuildCondition(cat, op, val, only);
+		string presetId = "char_default_" + unit.Data.Id;
+		var ps = _gameData.GetStrategyPreset(presetId);
+		if (ps == null) return;
 
-		var s = new List<Strategy>();
-		string id = unit.Data.Id;
+		var ids = unit.GetAvailableActiveSkillIds();
+		unit.Strategies = ps.Strategies.Select(s => {
+			string sid = !string.IsNullOrEmpty(s.SkillId) ? s.SkillId
+				: s.SkillIndex >= 0 && s.SkillIndex < ids.Count ? ids[s.SkillIndex] : ids.FirstOrDefault();
+			return sid != null ? new Strategy { SkillId = sid, Condition1 = s.Condition1, Condition2 = s.Condition2, Mode1 = s.Mode1, Mode2 = s.Mode2 } : null;
+		}).Where(s => s != null).ToList();
 
-		switch (id)
+		if (unit.Strategies.Count > 0)
 		{
-			// ── 剑士: 锐利斩击(必中高爆) + 贯穿(击倒PP+1) ──
-			case "swordsman":
-				s.Add(new Strategy { SkillId = "act_sharp_slash", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_pierce", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_sharp_slash", Condition1 = C(ConditionCategory.UnitClass, "等于", "斥候"), Mode1 = ConditionMode.Priority }); // Scout=high evade, sure-hit counters
-				s.Add(new Strategy { SkillId = "act_sharp_slash" });
-				s.Add(new Strategy { SkillId = "act_pierce" });
-				break;
-
-			// ── 佣兵: mega斩(高威力150) + 杀戮连锁(击倒AP+1) ──
-			case "mercenary":
-				s.Add(new Strategy { SkillId = "act_kill_chain", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_mega_slash", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_mega_slash", Condition1 = C(ConditionCategory.UnitClass, "等于", "重装"), Mode1 = ConditionMode.Priority }); // high HP pool, needs 150 power
-				s.Add(new Strategy { SkillId = "act_kill_chain" });
-				s.Add(new Strategy { SkillId = "act_mega_slash" });
-				break;
-
-			// ── 领主: 利刃斩(必中+HP吸收) + 骑兵斩杀(对骑兵AP/PP/格挡封印) ──
-			case "lord":
-				s.Add(new Strategy { SkillId = "act_cavalry_bane", Condition1 = C(ConditionCategory.UnitClass, "等于", "骑兵"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_lord_slash", Condition1 = C(ConditionCategory.SelfHp, "低于", "75%"), Mode1 = ConditionMode.Only }); // heal when damaged
-				s.Add(new Strategy { SkillId = "act_lord_slash", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_cavalry_bane", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_lord_slash" });
-				break;
-
-			// ── 战士: 格挡斩(自身物防+20%) + 盾击(赋予气绝) ──
-			case "fighter":
-				s.Add(new Strategy { SkillId = "act_shield_bash", Condition1 = C(ConditionCategory.Status, "等于", "buff"), Mode1 = ConditionMode.Priority }); // stun buffed enemies
-				s.Add(new Strategy { SkillId = "act_arrow_cover", Condition1 = C(ConditionCategory.SelfHp, "低于", "75%"), Mode1 = ConditionMode.Only }); // def buff when hurt
-				s.Add(new Strategy { SkillId = "act_shield_bash", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_arrow_cover" });
-				s.Add(new Strategy { SkillId = "act_shield_bash" });
-				break;
-
-			// ── 士兵: 长枪突刺(对骑兵贯通) + 标枪(对飞行) ──
-			case "soldier":
-				s.Add(new Strategy { SkillId = "act_enhanced_spear", Condition1 = C(ConditionCategory.UnitClass, "等于", "骑兵"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_spear_pierce", Condition1 = C(ConditionCategory.UnitClass, "等于", "飞行"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_enhanced_spear", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_spear_pierce", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_enhanced_spear" });
-				break;
-
-			// ── 家臣: 粉碎(物防-20%) + 回旋斧(3hit/Row) ──
-			case "huskarl":
-				s.Add(new Strategy { SkillId = "act_whirlwind_slash", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌2体"), Mode1 = ConditionMode.Only }); // AoE only with 2+ enemies
-				s.Add(new Strategy { SkillId = "act_smash", Condition1 = C(ConditionCategory.Status, "等于", "buff"), Mode1 = ConditionMode.Priority }); // strip defense from buffed
-				s.Add(new Strategy { SkillId = "act_smash", Condition1 = C(ConditionCategory.Hp, "最高", "-"), Mode1 = ConditionMode.Priority }); // debuff high-HP targets
-				s.Add(new Strategy { SkillId = "act_whirlwind_slash", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_smash" });
-				break;
-
-			// ── 重装步兵: 刺击(HP<50%时威力+50) ──
-			case "hoplite":
-				s.Add(new Strategy { SkillId = "act_spike", Condition1 = C(ConditionCategory.SelfHp, "低于", "50%"), Mode1 = ConditionMode.Only }); // maximize low-HP bonus
-				s.Add(new Strategy { SkillId = "act_spike", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_spike", Condition1 = C(ConditionCategory.UnitClass, "等于", "重装"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_spike" });
-				break;
-
-			// ── 角斗士: 广域粉碎(Row/150) + 巨大蓄力(自回30%+物攻+30%) ──
-			case "gladiator":
-				s.Add(new Strategy { SkillId = "act_formation_breaker", Condition1 = C(ConditionCategory.SelfHp, "低于", "50%"), Mode1 = ConditionMode.Only }); // heal when low
-				s.Add(new Strategy { SkillId = "act_full_assault", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌2体"), Mode1 = ConditionMode.Only }); // Row with 2+ enemies
-				s.Add(new Strategy { SkillId = "act_full_assault", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_formation_breaker", Condition1 = C(ConditionCategory.SelfHp, "低于", "75%"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_full_assault" });
-				break;
-
-			// ── 勇士: 重装破坏(对重装无视防御) + 突击打击(击倒AP+1) ──
-			case "warrior":
-				s.Add(new Strategy { SkillId = "act_heavy_slayer", Condition1 = C(ConditionCategory.UnitClass, "等于", "重装"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_charge_strike", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority }); // finish off
-				s.Add(new Strategy { SkillId = "act_heavy_slayer", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_charge_strike" });
-				s.Add(new Strategy { SkillId = "act_heavy_slayer" });
-				break;
-
-			// ── 猎人: 单体射击(P:100) + 双重射击(2体) ──
-			case "hunter":
-				s.Add(new Strategy { SkillId = "act_dual_shot", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌2体"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_single_shot", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_dual_shot", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_single_shot", Condition1 = C(ConditionCategory.UnitClass, "等于", "斥候"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_single_shot" });
-				break;
-
-			// ── 射手: 强力弩箭(P:120) + 毒性弩箭(赋予毒) ──
-			case "shooter":
-				s.Add(new Strategy { SkillId = "act_poison_bolt", Condition1 = C(ConditionCategory.Status, "等于", "非毒"), Mode1 = ConditionMode.Only }); // don't double-poison
-				s.Add(new Strategy { SkillId = "act_heavy_bolt", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_poison_bolt", Condition1 = C(ConditionCategory.Hp, "最高", "-"), Mode1 = ConditionMode.Priority }); // poison healthy targets
-				s.Add(new Strategy { SkillId = "act_heavy_bolt" });
-				break;
-
-			// ── 盗贼: 被动偷取(偷PP) + 毒性投掷(赋予毒) ──
-			case "thief":
-				s.Add(new Strategy { SkillId = "act_passive_steal", Condition1 = C(ConditionCategory.ApPp, "最高", "PP"), Mode1 = ConditionMode.Priority }); // steal from high-PP
-				s.Add(new Strategy { SkillId = "act_poison_throw", Condition1 = C(ConditionCategory.Status, "等于", "非毒"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_passive_steal", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_poison_throw", Condition1 = C(ConditionCategory.Hp, "最高", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_passive_steal" });
-				break;
-
-			// ── 巫师: 火球术(3hit+炎上) + 雷暴(Row+气绝) ──
-			case "wizard":
-				s.Add(new Strategy { SkillId = "act_thunderstorm", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌2体"), Mode1 = ConditionMode.Only }); // Row AoE
-				s.Add(new Strategy { SkillId = "act_fireball", Condition1 = C(ConditionCategory.Status, "等于", "非炎上"), Mode1 = ConditionMode.Only }); // don't re-burn
-				s.Add(new Strategy { SkillId = "act_thunderstorm", Condition1 = C(ConditionCategory.Status, "等于", "非气绝"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_fireball", Condition1 = C(ConditionCategory.Hp, "最高", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_fireball" });
-				break;
-
-			// ── 女巫: 冰箭(冻结) + 魔法导弹(2体) ──
-			case "witch":
-				s.Add(new Strategy { SkillId = "act_ice_arrow", Condition1 = C(ConditionCategory.Status, "等于", "非冻结"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_magic_missile", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌2体"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_ice_arrow", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_magic_missile" });
-				s.Add(new Strategy { SkillId = "act_ice_arrow" });
-				break;
-
-			// ── 白骑士: 哈希(命中PP+1) + 列治愈(友HP回复) ──
-			case "white_knight":
-				s.Add(new Strategy { SkillId = "act_row_heal", Condition1 = C(ConditionCategory.SelfHp, "低于", "75%"), Mode1 = ConditionMode.Only }); // self-heal too
-				s.Add(new Strategy { SkillId = "act_hache", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_row_heal", Condition1 = C(ConditionCategory.SelfHp, "低于", "50%"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_hache" });
-				break;
-
-			// ── 狮鹫骑士: 坠落突刺(对骑兵) + 风翼突袭(Row对骑兵) ──
-			case "griffin_knight":
-				s.Add(new Strategy { SkillId = "act_dive_strike", Condition1 = C(ConditionCategory.UnitClass, "等于", "骑兵"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_wing_gust", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌2体"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_dive_strike", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_wing_gust" });
-				s.Add(new Strategy { SkillId = "act_dive_strike" });
-				break;
-
-			// ── 萨满: 被动诅咒(PP-1/减速) + 攻击诅咒(减攻双50%) ──
-			case "shaman":
-				s.Add(new Strategy { SkillId = "act_attack_curse", Condition1 = C(ConditionCategory.Status, "等于", "buff"), Mode1 = ConditionMode.Priority }); // counter buffed
-				s.Add(new Strategy { SkillId = "act_passive_curse", Condition1 = C(ConditionCategory.ApPp, "最高", "PP"), Mode1 = ConditionMode.Priority }); // drain PP from high-PP
-				s.Add(new Strategy { SkillId = "act_attack_curse", Condition1 = C(ConditionCategory.Hp, "最高", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_passive_curse" });
-				s.Add(new Strategy { SkillId = "act_attack_curse" });
-				break;
-
-			// ── 精灵女先知: 原始利刃(HP100%时精灵+1) + 妖精治愈(友HP回复) + 元素咆哮(全体+精灵消费) ──
-			case "elf_sibyl":
-				s.Add(new Strategy { SkillId = "act_fairy_heal", Condition1 = C(ConditionCategory.SelfHp, "低于", "50%"), Mode1 = ConditionMode.Only });
-				s.Add(new Strategy { SkillId = "act_elemental_roar", Condition1 = C(ConditionCategory.TeamSize, "以上", "敌3体"), Mode1 = ConditionMode.Only }); // AoE with 3+ enemies
-				s.Add(new Strategy { SkillId = "act_primal_edge", Condition1 = C(ConditionCategory.Hp, "最低", "-"), Mode1 = ConditionMode.Priority });
-				s.Add(new Strategy { SkillId = "act_elemental_roar" });
-				s.Add(new Strategy { SkillId = "act_primal_edge" });
-				break;
-		}
-
-		// Fill remaining slots
-		if (s.Count > 0) {
-			var firstId = s[0].SkillId;
-			while (s.Count < 8)
-				s.Add(new Strategy { SkillId = firstId });
-			unit.Strategies = s;
+			var firstId = unit.Strategies[0].SkillId;
+			while (unit.Strategies.Count < 8)
+				unit.Strategies.Add(new Strategy { SkillId = firstId });
 		}
 	}
 
@@ -900,7 +741,8 @@ public partial class Main : Node2D
 		var ps = _gameData.GetStrategyPreset(pid);
 		var ids = u.GetAvailableActiveSkillIds();
 		u.Strategies = ps.Strategies.Select(s => {
-			string sid = s.SkillIndex >= 0 && s.SkillIndex < ids.Count ? ids[s.SkillIndex] : ids.FirstOrDefault();
+			string sid = !string.IsNullOrEmpty(s.SkillId) ? s.SkillId
+				: s.SkillIndex >= 0 && s.SkillIndex < ids.Count ? ids[s.SkillIndex] : ids.FirstOrDefault();
 			return sid != null ? new Strategy { SkillId = sid, Condition1 = s.Condition1, Condition2 = s.Condition2, Mode1 = s.Mode1, Mode2 = s.Mode2 } : null;
 		}).Where(s => s != null).ToList();
 	}

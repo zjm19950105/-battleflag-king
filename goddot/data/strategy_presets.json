@@ -40,5 +40,200 @@
       { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" },
       { "skillIndex": 0, "condition1": { "category": "SelfHp", "operator": "greater_than", "value": 50 }, "condition2": null, "mode1": "Only", "mode2": "Only" }
     ]
+  },
+  {
+    "id": "char_default_swordsman",
+    "name": "剑士 默认策略",
+    "strategies": [
+      { "skillId": "act_sharp_slash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_pierce",     "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_sharp_slash", "condition1": { "category": "UnitClass", "operator": "equals", "value": "斥候" }, "mode1": "Priority" },
+      { "skillId": "act_sharp_slash" },
+      { "skillId": "act_pierce" }
+    ]
+  },
+  {
+    "id": "char_default_mercenary",
+    "name": "佣兵 默认策略",
+    "strategies": [
+      { "skillId": "act_kill_chain", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_mega_slash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_mega_slash", "condition1": { "category": "UnitClass", "operator": "equals", "value": "重装" }, "mode1": "Priority" },
+      { "skillId": "act_kill_chain" },
+      { "skillId": "act_mega_slash" }
+    ]
+  },
+  {
+    "id": "char_default_lord",
+    "name": "领主 默认策略",
+    "strategies": [
+      { "skillId": "act_cavalry_bane", "condition1": { "category": "UnitClass", "operator": "equals", "value": "骑兵" }, "mode1": "Only" },
+      { "skillId": "act_lord_slash",    "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
+      { "skillId": "act_lord_slash",    "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_cavalry_bane", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_lord_slash" }
+    ]
+  },
+  {
+    "id": "char_default_fighter",
+    "name": "战士 默认策略",
+    "strategies": [
+      { "skillId": "act_shield_bash", "condition1": { "category": "Status", "operator": "equals", "value": "buff" }, "mode1": "Priority" },
+      { "skillId": "act_arrow_cover", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
+      { "skillId": "act_shield_bash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_arrow_cover" },
+      { "skillId": "act_shield_bash" }
+    ]
+  },
+  {
+    "id": "char_default_soldier",
+    "name": "士兵 默认策略",
+    "strategies": [
+      { "skillId": "act_enhanced_spear", "condition1": { "category": "UnitClass", "operator": "equals", "value": "骑兵" }, "mode1": "Only" },
+      { "skillId": "act_spear_pierce",   "condition1": { "category": "UnitClass", "operator": "equals", "value": "飞行" }, "mode1": "Only" },
+      { "skillId": "act_enhanced_spear", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_spear_pierce",   "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_enhanced_spear" }
+    ]
+  },
+  {
+    "id": "char_default_huskarl",
+    "name": "家臣 默认策略",
+    "strategies": [
+      { "skillId": "act_whirlwind_slash", "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌2体" }, "mode1": "Only" },
+      { "skillId": "act_smash",           "condition1": { "category": "Status", "operator": "equals", "value": "buff" }, "mode1": "Priority" },
+      { "skillId": "act_smash",           "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_whirlwind_slash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_smash" }
+    ]
+  },
+  {
+    "id": "char_default_hoplite",
+    "name": "重装步兵 默认策略",
+    "strategies": [
+      { "skillId": "act_spike", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
+      { "skillId": "act_spike", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_spike", "condition1": { "category": "UnitClass", "operator": "equals", "value": "重装" }, "mode1": "Priority" },
+      { "skillId": "act_spike" }
+    ]
+  },
+  {
+    "id": "char_default_gladiator",
+    "name": "角斗士 默认策略",
+    "strategies": [
+      { "skillId": "act_formation_breaker", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
+      { "skillId": "act_full_assault",      "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌2体" }, "mode1": "Only" },
+      { "skillId": "act_full_assault",      "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_formation_breaker", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
+      { "skillId": "act_full_assault" }
+    ]
+  },
+  {
+    "id": "char_default_warrior",
+    "name": "勇士 默认策略",
+    "strategies": [
+      { "skillId": "act_heavy_slayer",  "condition1": { "category": "UnitClass", "operator": "equals", "value": "重装" }, "mode1": "Only" },
+      { "skillId": "act_charge_strike", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_heavy_slayer",  "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_charge_strike" },
+      { "skillId": "act_heavy_slayer" }
+    ]
+  },
+  {
+    "id": "char_default_hunter",
+    "name": "猎人 默认策略",
+    "strategies": [
+      { "skillId": "act_dual_shot",   "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌2体" }, "mode1": "Only" },
+      { "skillId": "act_single_shot", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_dual_shot",   "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_single_shot", "condition1": { "category": "UnitClass", "operator": "equals", "value": "斥候" }, "mode1": "Priority" },
+      { "skillId": "act_single_shot" }
+    ]
+  },
+  {
+    "id": "char_default_shooter",
+    "name": "射手 默认策略",
+    "strategies": [
+      { "skillId": "act_poison_bolt", "condition1": { "category": "Status", "operator": "equals", "value": "非毒" }, "mode1": "Only" },
+      { "skillId": "act_heavy_bolt",  "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_poison_bolt", "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_heavy_bolt" }
+    ]
+  },
+  {
+    "id": "char_default_thief",
+    "name": "盗贼 默认策略",
+    "strategies": [
+      { "skillId": "act_passive_steal", "condition1": { "category": "ApPp", "operator": "highest", "value": "PP" }, "mode1": "Priority" },
+      { "skillId": "act_poison_throw",  "condition1": { "category": "Status", "operator": "equals", "value": "非毒" }, "mode1": "Only" },
+      { "skillId": "act_passive_steal", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_poison_throw",  "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_passive_steal" }
+    ]
+  },
+  {
+    "id": "char_default_wizard",
+    "name": "巫师 默认策略",
+    "strategies": [
+      { "skillId": "act_thunderstorm", "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌2体" }, "mode1": "Only" },
+      { "skillId": "act_fireball",     "condition1": { "category": "Status", "operator": "equals", "value": "非炎上" }, "mode1": "Only" },
+      { "skillId": "act_thunderstorm", "condition1": { "category": "Status", "operator": "equals", "value": "非气绝" }, "mode1": "Only" },
+      { "skillId": "act_fireball",     "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_fireball" }
+    ]
+  },
+  {
+    "id": "char_default_witch",
+    "name": "女巫 默认策略",
+    "strategies": [
+      { "skillId": "act_ice_arrow",     "condition1": { "category": "Status", "operator": "equals", "value": "非冻结" }, "mode1": "Only" },
+      { "skillId": "act_magic_missile", "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌2体" }, "mode1": "Only" },
+      { "skillId": "act_ice_arrow",     "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_magic_missile" },
+      { "skillId": "act_ice_arrow" }
+    ]
+  },
+  {
+    "id": "char_default_white_knight",
+    "name": "白骑士 默认策略",
+    "strategies": [
+      { "skillId": "act_row_heal", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
+      { "skillId": "act_hache",    "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_row_heal", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
+      { "skillId": "act_hache" }
+    ]
+  },
+  {
+    "id": "char_default_griffin_knight",
+    "name": "狮鹫骑士 默认策略",
+    "strategies": [
+      { "skillId": "act_dive_strike", "condition1": { "category": "UnitClass", "operator": "equals", "value": "骑兵" }, "mode1": "Only" },
+      { "skillId": "act_wing_gust",   "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌2体" }, "mode1": "Only" },
+      { "skillId": "act_dive_strike", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_wing_gust" },
+      { "skillId": "act_dive_strike" }
+    ]
+  },
+  {
+    "id": "char_default_shaman",
+    "name": "萨满 默认策略",
+    "strategies": [
+      { "skillId": "act_attack_curse",  "condition1": { "category": "Status", "operator": "equals", "value": "buff" }, "mode1": "Priority" },
+      { "skillId": "act_passive_curse", "condition1": { "category": "ApPp", "operator": "highest", "value": "PP" }, "mode1": "Priority" },
+      { "skillId": "act_attack_curse",  "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_passive_curse" },
+      { "skillId": "act_attack_curse" }
+    ]
+  },
+  {
+    "id": "char_default_elf_sibyl",
+    "name": "精灵女先知 默认策略",
+    "strategies": [
+      { "skillId": "act_fairy_heal",     "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
+      { "skillId": "act_elemental_roar", "condition1": { "category": "TeamSize", "operator": "greater_than", "value": "敌3体" }, "mode1": "Only" },
+      { "skillId": "act_primal_edge",    "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_elemental_roar" },
+      { "skillId": "act_primal_edge" }
+    ]
   }
 ]

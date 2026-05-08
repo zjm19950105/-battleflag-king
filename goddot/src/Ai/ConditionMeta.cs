@@ -62,7 +62,7 @@ namespace BattleKing.Ai
                 : new() { "1", "2", "3", "4" },
             ConditionCategory.SelfHp => new() { "25%", "50%", "75%", "100%" },
             ConditionCategory.SelfApPp => new() { "1", "2", "3", "4" },
-            ConditionCategory.Status => new() { "buff", "debuff", "毒", "炎上", "冻结", "气绝", "黑暗", "被动封印", "格挡封印" },
+            ConditionCategory.Status => new() { "buff", "debuff", "毒", "炎上", "冻结", "气绝", "黑暗", "被动封印", "格挡封印", "非毒", "非炎上", "非冻结", "非气绝", "非黑暗" },
             ConditionCategory.EnemyClassExists => new() { "步兵", "骑兵", "飞行", "重装", "斥候", "弓兵", "术士", "精灵", "兽人", "有翼人" },
             ConditionCategory.AttributeRank => new() { "HP", "物攻", "魔攻", "物防", "魔防", "速度", "命中", "回避", "会心", "格挡" },
             ConditionCategory.TeamSize => op == "以上"

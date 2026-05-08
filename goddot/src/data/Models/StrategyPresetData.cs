@@ -12,7 +12,8 @@ namespace BattleKing.Data
 
     public class PresetStrategyData
     {
-        public int SkillIndex { get; set; } // 0=第一个可用技能, 1=第二个...
+        public string SkillId { get; set; }   // 优先使用：精确技能ID（如 "act_sharp_slash"）
+        public int SkillIndex { get; set; }   // 备用：技能池索引，SkillId 非空时忽略
         public Condition Condition1 { get; set; }
         public Condition Condition2 { get; set; }
         public ConditionMode Mode1 { get; set; }
