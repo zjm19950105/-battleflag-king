@@ -102,13 +102,15 @@ namespace BattleKing.Core
         public int GetCurrentAttackPower(SkillType damageType)
         {
             string stat = damageType == SkillType.Magical ? "Mag" : "Str";
-            return GetCurrentStat(stat) + Equipment.GetTotalStat("phys_atk");
+            string equipmentStat = damageType == SkillType.Magical ? "mag_atk" : "phys_atk";
+            return GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat);
         }
 
         public int GetCurrentDefense(SkillType damageType)
         {
             string stat = damageType == SkillType.Magical ? "MDef" : "Def";
-            return GetCurrentStat(stat) + Equipment.GetTotalStat("phys_def");
+            string equipmentStat = damageType == SkillType.Magical ? "mag_def" : "phys_def";
+            return GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat);
         }
 
         public int GetCurrentSpeed() => GetCurrentStat("Spd");

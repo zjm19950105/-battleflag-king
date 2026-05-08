@@ -78,7 +78,7 @@ namespace BattleKing.Tests
             };
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
-            ClassicAssert.GreaterOrEqual(0, targets.Count); // Row may return 1 or 2
+            ClassicAssert.GreaterOrEqual(targets.Count, 1);
             ClassicAssert.IsTrue(targets.All(t => t.IsFrontRow));
         }
 
@@ -127,10 +127,45 @@ namespace BattleKing.Tests
             var strategy = new Strategy { SkillId = "test_skill" };
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
-            ClassicAssert.GreaterOrEqual(0, targets.Count); // Row may return 1 or 2
+            ClassicAssert.GreaterOrEqual(targets.Count, 2);
             // All targets should be in the same row as the first target
             bool isFront = targets[0].IsFrontRow;
             ClassicAssert.IsTrue(targets.All(t => t.IsFrontRow == isFront));
+        }
+
+        [Test]
+        public void Row_只攻击敌方同排_不误伤友方()
+        {
+            AddEnemies((1, 80), (2, 60), (4, 50));
+            var ally = TestDataFactory.CreateUnit(isPlayer: true);
+            ally.Position = 3;
+            _ctx.PlayerUnits.Add(ally);
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var skill = TestDataFactory.CreateSkill(targetType: TargetType.Row);
+            var strategy = new Strategy { SkillId = "test_skill" };
+
+            var targets = _selector.SelectTargets(caster, strategy, skill.Data);
+
+            ClassicAssert.AreEqual(2, targets.Count);
+            ClassicAssert.IsTrue(targets.All(t => !t.IsPlayer));
+        }
+
+        [Test]
+        public void Column_只攻击敌方同列_不误伤友方()
+        {
+            AddEnemies((1, 80), (4, 50), (2, 60));
+            var ally = TestDataFactory.CreateUnit(isPlayer: true);
+            ally.Position = 1;
+            _ctx.PlayerUnits.Add(ally);
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var skill = TestDataFactory.CreateSkill(targetType: TargetType.Column);
+            var strategy = new Strategy { SkillId = "test_skill" };
+
+            var targets = _selector.SelectTargets(caster, strategy, skill.Data);
+
+            ClassicAssert.AreEqual(2, targets.Count);
+            ClassicAssert.IsTrue(targets.All(t => !t.IsPlayer));
+            ClassicAssert.IsTrue(targets.All(t => t.Position == 1 || t.Position == 4));
         }
 
         // ────────── 双优先条件 ──────────

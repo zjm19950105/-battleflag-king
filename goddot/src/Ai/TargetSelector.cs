@@ -18,6 +18,9 @@ namespace BattleKing.Ai
 
 		public List<BattleUnit> SelectTargets(BattleUnit caster, Strategy strategy, ActiveSkillData skill)
 		{
+			if (skill.TargetType == TargetType.Self)
+				return new List<BattleUnit> { caster };
+
 			var candidates = GetDefaultTargetList(caster, skill);
 			candidates = ApplyCondition(candidates, strategy.Condition1, strategy.Mode1, caster);
 			candidates = ApplyCondition(candidates, strategy.Condition2, strategy.Mode2, caster);
@@ -28,7 +31,6 @@ namespace BattleKing.Ai
 
 			return skill.TargetType switch
 			{
-				TargetType.Self => new List<BattleUnit> { caster },
 				TargetType.SingleEnemy => new List<BattleUnit> { candidates.First() },
 				TargetType.SingleAlly => new List<BattleUnit> { candidates.First() },
 				TargetType.TwoEnemies => candidates.Take(2).ToList(),
@@ -86,14 +88,14 @@ namespace BattleKing.Ai
 		{
 			if (first == null) return new List<BattleUnit>();
 			var targets = new List<BattleUnit> { first };
+			var sidePool = _ctx.GetAliveUnits(first.IsPlayer);
 
 			// Find the unit in the opposite row, same column
 			int col = (first.Position - 1) % 3;
 			bool firstIsFront = first.IsFrontRow;
 			int oppositePos = firstIsFront ? (col + 1 + 3) : (col + 1);
 
-			var opposite = _ctx.AllUnits.FirstOrDefault(u =>
-				u != null && u.IsAlive && u.Position == oppositePos && u != first);
+			var opposite = sidePool.FirstOrDefault(u => u.Position == oppositePos && u != first);
 			if (opposite != null)
 				targets.Add(opposite);
 
@@ -107,15 +109,20 @@ namespace BattleKing.Ai
 		{
 			if (first == null) return new List<BattleUnit>();
 			int col = (first.Position - 1) % 3;
-			return _ctx.AllUnits.Where(u =>
-				u != null && u.IsAlive && (u.Position - 1) % 3 == col).ToList();
+			return _ctx.GetAliveUnits(first.IsPlayer)
+				.Where(u => (u.Position - 1) % 3 == col)
+				.OrderBy(u => u.Position)
+				.ToList();
 		}
 
 		private List<BattleUnit> GetRowTargets(BattleUnit first)
 		{
 			if (first == null) return new List<BattleUnit>();
 			bool isFront = first.IsFrontRow;
-			return _ctx.AllUnits.Where(u => u.IsAlive && u.IsFrontRow == isFront).ToList();
+			return _ctx.GetAliveUnits(first.IsPlayer)
+				.Where(u => u.IsFrontRow == isFront)
+				.OrderBy(u => u.Position)
+				.ToList();
 		}
 
 		private List<BattleUnit> ApplyCondition(List<BattleUnit> list, Condition condition, ConditionMode mode, BattleUnit caster)

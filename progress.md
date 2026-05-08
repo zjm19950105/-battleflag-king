@@ -185,6 +185,8 @@
 ---
 
 ## 最近会话记录
+- **2026/05/08（内容数据约束）**: 用户确认职业/角色描述来源于 `unicorn-overlord-class-compendium.md` 中每个职业的标题、`| 兵种 | XXX |` 与 `#### 角色定位` 段落。已记录硬性架构规则：描述中所有会改名/本地化的职业、兵种、技能、装备名称不得硬编码为显示字符串，必须用稳定 ID 字段或引用 token 存储，由显示层通过数据仓库解析当前名称。后续新增 `CharacterRoleDescriptionData` 或等价 JSON 时遵守该规则，确保例如“飞龙”改名后，射手描述中的相关名称自动同步。
+- **2026/05/08（Codex 接手 Phase A）**: 完成测试地基修正与底层规则小修。新增 `docs/codex-architecture-diagnosis.md`，明确下一阶段先做核心战斗规则层中改，不优先扩 6v6/角色。修复 TargetSelector 测试断言写反，新增 Row/Column 不误伤友方测试；TargetSelector 的 Row/Column/FrontAndBack 改为只在 anchor 所属阵营扩展。DamageCalculator 测试禁用随机暴击/格挡，消除红测随机性。修复魔法攻防装备读取：魔法攻击使用 `mag_atk`/`mag_def`，不再混入 `phys_atk`/`phys_def`。EquipmentSlot 兼容 `hit`/`block_rate` 数据键。新增 `DataContractTest` 覆盖真实 JSON 加载、数量、ID 唯一、引用完整、装备 stat key 白名单。`dotnet test`：63/63 通过；`dotnet build`：0错误0警告。
 - **2026/05/07（续）**: UI全面升级 — HSplitContainer可拖动分栏、A+/A-字体缩放(28px基准)、全部Show*页面上一步按钮、被动详情右面板显示、战斗面板全属性(SPD/物攻/物防/魔攻/魔防/命中/回避/会心/格挡)、战斗日志多行详细格式(BattleLogHelper)。
 - **2026/05/07（代码审查）**: simplify skill 发现7个改进点(DumpUnitBrief重复/hitChance公式不一致/PassiveDetailHelper样板代码/默认策略硬编码应迁移JSON/"非毒"值缺ConditionMeta支持/冗余lambda包装)
 - **2026/05/07（自动化测试）**: 创建goddot-test项目(NUnit 4 + .NET 8), 54个用例(51通过)覆盖 DamageCalculator/ConditionEvaluator/BuffManager/TargetSelector/EquipmentSlot。发现"仅+HP最低"和"同時発動制限per-side"2个bug已修复。

@@ -21,8 +21,8 @@ namespace BattleKing.Tests
         [Test]
         public void 物理攻击_基础公式_攻减防乘威力()
         {
-            var attacker = TestDataFactory.CreateUnit(str: 50);
-            var defender = TestDataFactory.CreateUnit(def: 30);
+            var attacker = TestDataFactory.CreateUnit(str: 50, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 30, block: 0);
             var skill = TestDataFactory.CreateSkill(power: 100);
             var c = TestDataFactory.CreateCalc(attacker, defender, skill);
             // ATK=50, DEF=30, diff=20, power=100/100=1.0 → 20 damage
@@ -33,8 +33,8 @@ namespace BattleKing.Tests
         [Test]
         public void 物理攻击_威力倍率生效()
         {
-            var a = TestDataFactory.CreateUnit(str: 60);
-            var d = TestDataFactory.CreateUnit(def: 10);
+            var a = TestDataFactory.CreateUnit(str: 60, crit: 0);
+            var d = TestDataFactory.CreateUnit(def: 10, block: 0);
             var skill = TestDataFactory.CreateSkill(power: 150);
             var c = TestDataFactory.CreateCalc(a, d, skill);
             // (60-10)=50, power=150/100=1.5 → 75
@@ -45,8 +45,8 @@ namespace BattleKing.Tests
         [Test]
         public void 保底伤害_攻小于防时保底1()
         {
-            var a = TestDataFactory.CreateUnit(str: 10);
-            var d = TestDataFactory.CreateUnit(def: 50);
+            var a = TestDataFactory.CreateUnit(str: 10, crit: 0);
+            var d = TestDataFactory.CreateUnit(def: 50, block: 0);
             var skill = TestDataFactory.CreateSkill(power: 100);
             var c = TestDataFactory.CreateCalc(a, d, skill);
             var result = _calc.Calculate(c);
@@ -86,8 +86,8 @@ namespace BattleKing.Tests
         [Test]
         public void 多段攻击_每hit独立判定()
         {
-            var a = TestDataFactory.CreateUnit(str: 40);
-            var d = TestDataFactory.CreateUnit(def: 10);
+            var a = TestDataFactory.CreateUnit(str: 40, crit: 0);
+            var d = TestDataFactory.CreateUnit(def: 10, block: 0);
             var skill = TestDataFactory.CreateSkill(power: 20);
             var c = new DamageCalculation { Attacker = a, Defender = d, Skill = skill, HitCount = 9 };
             var result = _calc.Calculate(c);
@@ -109,8 +109,8 @@ namespace BattleKing.Tests
         [Test]
         public void 兵种克制_骑兵打步兵2倍()
         {
-            var a = TestDataFactory.CreateUnit(str: 50, classes: new() { UnitClass.Cavalry });
-            var d = TestDataFactory.CreateUnit(def: 20, classes: new() { UnitClass.Infantry });
+            var a = TestDataFactory.CreateUnit(str: 50, crit: 0, classes: new() { UnitClass.Cavalry });
+            var d = TestDataFactory.CreateUnit(def: 20, block: 0, classes: new() { UnitClass.Infantry });
             var skill = TestDataFactory.CreateSkill(power: 100);
             var c = TestDataFactory.CreateCalc(a, d, skill);
 
@@ -122,8 +122,8 @@ namespace BattleKing.Tests
         [Test]
         public void 兵种克制_飞行打骑兵2倍()
         {
-            var a = TestDataFactory.CreateUnit(str: 50, classes: new() { UnitClass.Flying });
-            var d = TestDataFactory.CreateUnit(def: 20, classes: new() { UnitClass.Cavalry });
+            var a = TestDataFactory.CreateUnit(str: 50, crit: 0, classes: new() { UnitClass.Flying });
+            var d = TestDataFactory.CreateUnit(def: 20, block: 0, classes: new() { UnitClass.Cavalry });
             var skill = TestDataFactory.CreateSkill(power: 100);
             var c = TestDataFactory.CreateCalc(a, d, skill);
             var result = _calc.Calculate(c);
@@ -161,12 +161,28 @@ namespace BattleKing.Tests
         [Test]
         public void 魔法攻击_魔攻减魔防()
         {
-            var a = TestDataFactory.CreateUnit(mag: 50);
-            var d = TestDataFactory.CreateUnit(mdef: 20);
+            var a = TestDataFactory.CreateUnit(mag: 50, crit: 0);
+            var d = TestDataFactory.CreateUnit(mdef: 20, block: 0);
             var skill = TestDataFactory.CreateSkill(power: 100, type: SkillType.Magical);
             var c = TestDataFactory.CreateCalc(a, d, skill);
             var result = _calc.Calculate(c);
             ClassicAssert.AreEqual(30, result.TotalDamage);
+        }
+
+        [Test]
+        public void 魔法攻击_使用魔攻魔防装备_不混入物攻物防()
+        {
+            var a = TestDataFactory.CreateUnit(mag: 30, crit: 0);
+            a.Equipment.Equip(TestDataFactory.CreateEquipment("eq_staff", "法杖", EquipmentCategory.Staff,
+                new() { { "mag_atk", 20 }, { "phys_atk", 99 } }));
+            var d = TestDataFactory.CreateUnit(mdef: 10, block: 0);
+            d.Equipment.Equip(TestDataFactory.CreateEquipment("eq_ward", "护符", EquipmentCategory.Accessory,
+                new() { { "mag_def", 5 }, { "phys_def", 99 } }));
+            var skill = TestDataFactory.CreateSkill(power: 100, type: SkillType.Magical);
+
+            var result = _calc.Calculate(TestDataFactory.CreateCalc(a, d, skill));
+
+            ClassicAssert.AreEqual(35, result.TotalDamage);
         }
     }
 }

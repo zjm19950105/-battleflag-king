@@ -60,6 +60,18 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void 装备属性别名_hit和block_rate_计入面板()
+        {
+            var ring = TestDataFactory.CreateEquipment("eq_acc", "命中戒指", EquipmentCategory.Accessory,
+                new() { { "hit", 5 }, { "block_rate", 10 } });
+
+            _slot.Equip(ring);
+
+            ClassicAssert.AreEqual(5, _slot.GetTotalStat("Hit"));
+            ClassicAssert.AreEqual(10, _slot.GetTotalStat("Block"));
+        }
+
+        [Test]
         public void EquipToSlot_指定槽位()
         {
             var sword = TestDataFactory.CreateEquipment("eq_s1", "剑", EquipmentCategory.Sword,

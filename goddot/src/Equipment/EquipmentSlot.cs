@@ -18,26 +18,38 @@ namespace BattleKing.Equipment
 
         public int GetTotalStat(string statName)
         {
-            int total = AllEquipped.Sum(e => e.Data.BaseStats.GetValueOrDefault(statName, 0));
+            int total = AllEquipped.Sum(e => GetEquipmentStat(e, statName));
 
             // Dual-wield rule: Sword + Sword -> mainAtk + offAtk/2 for phys_atk and magic_atk
             if (CanDualWield()
                 && MainHand?.Data.Category == EquipmentCategory.Sword
                 && OffHand?.Data.Category == EquipmentCategory.Sword)
             {
-                if (statName == "phys_atk" || statName == "magic_atk")
+                if (statName == "phys_atk" || statName == "mag_atk")
                 {
-                    int mainAtk = MainHand.Data.BaseStats.GetValueOrDefault(statName, 0);
-                    int offAtk = OffHand.Data.BaseStats.GetValueOrDefault(statName, 0);
+                    int mainAtk = GetEquipmentStat(MainHand, statName);
+                    int offAtk = GetEquipmentStat(OffHand, statName);
                     // Replace the summed value with dual-wield calculation
                     total = mainAtk + offAtk / 2;
                     // Add accessory stats back
                     total += new[] { Accessory1, Accessory2, Accessory3 }
                         .Where(e => e != null)
-                        .Sum(e => e.Data.BaseStats.GetValueOrDefault(statName, 0));
+                        .Sum(e => GetEquipmentStat(e, statName));
                 }
             }
 
+            return total;
+        }
+
+        private static int GetEquipmentStat(Equipment equipment, string statName)
+        {
+            if (equipment?.Data?.BaseStats == null) return 0;
+
+            int total = equipment.Data.BaseStats.GetValueOrDefault(statName, 0);
+            if (statName == "Hit")
+                total += equipment.Data.BaseStats.GetValueOrDefault("hit", 0);
+            if (statName == "Block")
+                total += equipment.Data.BaseStats.GetValueOrDefault("block_rate", 0);
             return total;
         }
 

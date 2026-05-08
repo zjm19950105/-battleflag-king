@@ -249,6 +249,59 @@ namespace BattleKing.Data
 }
 ```
 
+### 职业描述与命名引用约束（2026-05-08）
+
+职业/角色说明文本来自参考资料：
+
+`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\unicorn-overlord-class-compendium.md`
+
+提取规则：
+
+1. 每个职业以标题为主键来源，例如 `【射手 / 盾射手 (Shooter / Shield Shooter)】`。
+2. 兵种来自该职业表格中的 `| 兵种 | XXX |`。
+3. 角色定位来自标题后的 `#### 角色定位` 段落，优先提取 `主要角色` 列表。
+
+展示格式示例：
+
+```text
+【射手 / 盾射手 (Shooter / Shield Shooter)】角色定位：
+步兵系：
+- 高单体火力弩兵（弓兵系中最高物攻）
+- 飞行系特攻（2倍伤害）
+- CC后前列坦克（大盾装备+掩护技）
+- 战后回复辅助
+```
+
+硬性约束：
+
+- 描述数据中不得写死其他职业、兵种、角色、技能、装备的最终显示名。
+- 所有可被改名/本地化的名称必须通过稳定 ID 引用，再由显示层从同一个数据源解析当前名称。
+- 例如描述中提到“飞龙、羽剑士”等目标时，存储层应记录 `ReferencedClassIds` / `ReferencedCharacterIds` / `ReferencedUnitClassIds`，渲染时再解析为当前显示名。
+- 后续如果“飞龙”改名，射手描述里的相关名称必须自动同步，不允许靠全文搜索替换。
+- 原始参考文本只可作为导入来源或备注，不作为最终 UI 文案的唯一数据形态。
+
+建议后续新增数据模型：
+
+```csharp
+public class CharacterRoleDescriptionData
+{
+    public string CharacterId { get; set; }
+    public string BaseTitleSource { get; set; }      // 原参考标题，仅用于追溯
+    public List<UnitClass> UnitClasses { get; set; }
+    public List<string> RoleBullets { get; set; }    // 可带 {class:xxx}/{character:xxx} 引用 token
+    public List<string> ReferencedCharacterIds { get; set; }
+    public List<UnitClass> ReferencedUnitClassIds { get; set; }
+    public List<string> ReferencedSkillIds { get; set; }
+    public List<string> ReferencedEquipmentIds { get; set; }
+}
+```
+
+渲染规则：
+
+`CharacterRoleDescriptionData` -> `GameDataRepository` 名称解析 -> UI 文案。
+
+不要在 `Main.cs` 或 UI helper 中拼硬编码职业名。职业显示名、CC显示名、技能名、装备名和描述中的引用名都必须从数据层统一解析。
+
 ---
 
 ## 核心运行时
@@ -520,7 +573,7 @@ namespace BattleKing.Ai
         // Step 1: GetDefaultTargetList(caster, skill) — 按攻击类型和位置排序
         // Step 2: ApplyCondition(list, condition1, mode1) — 仅=过滤 / 优先=排序
         // Step 3: ApplyCondition(list, condition2, mode2) — 双优先时条件2优先
-        // Step 4: 根据TargetType截取目标数量
+        // Step 4: 根据TargetType截取目标数量或按阵型形状扩展
 
         // lowest/highest 操作符:
         //   Category=Hp → OrderBy(u.CurrentHp) / OrderByDescending
@@ -530,6 +583,11 @@ namespace BattleKing.Ai
         // 默认目标规则:
         //   近战 → 前排优先，前排全灭才能打后排
         //   远程/魔法/飞行/贯通 → 全体按位置排序
+        //
+        // 2026-05-08 修正:
+        //   Self 目标不依赖敌方候选池，直接返回 caster。
+        //   Row / Column / FrontAndBack 先选中 anchor，再只在 anchor 所属阵营扩展形状，
+        //   禁止从 BattleContext.AllUnits 二次捞目标导致误伤友方。
     }
 }
 ```
@@ -551,6 +609,10 @@ namespace BattleKing.Equipment
 
         // 双持规则：剑士/剑圣双持剑时，副手攻击力一半加算
         public int GetTotalStat(string statName) { }
+        // 2026-05-08: 兼容装备数据别名:
+        //   GetTotalStat("Hit")   同时读取 "Hit" + "hit"
+        //   GetTotalStat("Block") 同时读取 "Block" + "block_rate"
+        //   双持魔攻键统一为 "mag_atk"，不是旧的 "magic_atk"
 
         // 装备赋予的技能
         public List<string> GetGrantedActiveSkillIds() { }
@@ -635,6 +697,9 @@ namespace BattleKing.Pipeline
         // 主签名 — 接收完整 DamageCalculation
         public DamageResult Calculate(DamageCalculation calc)
         {
+            // 攻防读取:
+            //   物理: Str + phys_atk vs Def + phys_def
+            //   魔法: Mag + mag_atk  vs MDef + mag_def
             // 多段攻击循环: for hit in 0..HitCount
             //   每hit独立判定: 命中→回避→格挡→暴击
             //   累积 float totalPhysical, totalMagical
