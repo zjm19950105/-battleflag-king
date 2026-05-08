@@ -15,7 +15,7 @@
 
 ### 代码修改后必做
 
-1. **跑测试**: `cd goddot-test && dotnet test`（75个用例，耗时<1秒）
+1. **跑测试**: `cd goddot-test && dotnet test`（78个用例，耗时<1秒）
 2. **跑 simplify**: 类型 `/simplify` 让 Claude Code 自动审查代码重复/质量问题
 3. **编译确认**: `cd goddot && dotnet build`（0错误0警告）
 4. **Godot 验证**: F5 跑场景确认 UI 没崩
@@ -28,10 +28,10 @@
 
 ### 当前已知问题
 
-- 当前 75/75 测试全部通过，0 失败 ✓
-- BattleEngine 日志 BattleLogHelper 已接入但 hitChance 显示公式与实际计算不一致（`BattleLogHelper.cs:26` 用 `(Hit - Eva) × skillHit%`，`DamageCalculator.cs:209` 实际是 `skillHit + Hit - Eva`）
-- active_skills.json 的 55 个技能 Effects 数组仍以占位为主，需基于参考文档批量填充（effectType handler 已在 SkillEffectExecutor 中全部就绪）
+- 当前 78/78 测试全部通过，0 失败 ✓
+- active_skills.json 的 55 个技能 Effects 数组仅 3 个技能有完整模板（锐利斩击/粉碎/列治愈），其余 52 个待批量填充
 - 部分被动技能 Effects 数组为空，需要类似填充
+- 角色描述 UI 显示层（token 解析渲染：{char:ID}→当前显示名）尚未实现
 
 ### 关键文件索引
 
@@ -56,6 +56,9 @@
 | 数据 | `goddot/data/active_skills.json` | 55个主动技能 |
 | 数据 | `goddot/data/passive_skills.json` | 50个被动技能 |
 | 数据 | `goddot/data/equipments.json` | 80件装备 |
+| 数据 | `goddot/data/character_role_descriptions.json` | 18角色定位描述（{char:ID} token引用） |
+| 数据 | `goddot/data/class_display_names.json` | 43职业ID→显示名映射（token解析用） |
+| 数据模型 | `goddot/src/data/Models/CharacterRoleDescriptionData.cs` | 角色定位描述模型 |
 
 ## 项目概述
 - **名称**：战旗之王（暂定）
@@ -389,7 +392,7 @@ BattleUnit (运行时实例)
   - [x] 战斗双栏面板 + 被动效果日志增强
   - [x] 编译通过，0错误0警告
 
-- [x] **自动化测试框架**: 75个NUnit测试用例(75通过), 6个测试类
+- [x] **自动化测试框架**: 78个NUnit测试用例(78通过), 6个测试类
   - DamageCalculator: 基础/暴击/格挡/多段/ForceHit/兵种克制
   - ConditionEvaluator: HP/兵种/位置/状态/编成人数/属性排名(17用例)
   - BuffManager: 叠层/去重/一次性/回合清除

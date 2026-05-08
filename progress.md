@@ -186,8 +186,10 @@
 
 ## 最近会话记录
 - **2026/05/08（Codex 第二轮 — 主动技能 effects 全管线竣工）**: 补齐 SkillEffectExecutor 的 ApDamage/PpDamage/GrantSkill/RemoveBuff/CleanseDebuff/HealRatio/AddDebuff/TemporalMark/CoverAlly/Counter/Pursuit/Preemptive handler + ModifyDamageCalc 子参数（ForceBlock/DamageMultiplier/NullifyPhysicalDamage/NullifyMagicalDamage）。BattleUnit 新增战斗期临时技能池。SkillEffectExecutorTest 新增/扩展测试。`docs/csharp-architecture.md` 同步更新。`dotnet test`：75/75 通过；`dotnet build`：0错误0警告。
-- **2026/05/08（Claude Code — 文档修正+三块苦力活）**: 1) 根据 Codex 审查修正 AGENTS.md/CLAUDE.md 测试数为 75/75；2) C1 默认策略迁移：Main.cs ApplyDefaultStrategies 180行 switch → 16行 JSON 查找，strategy_presets.json 3→21条 preset，PresetStrategyData 新增 SkillId 字段；3) C2 ConditionMeta 补全：新增非毒/非炎上/非冻结/非气绝/非黑暗 5个反向状态值，ConditionEvaluator 新增”非”前缀取反逻辑；4) C3 hitChance 公式修正：BattleLogHelper 公式改为 skillHit+Hit-Eva + 飞行近战半减。
-- **2026/05/08（Codex 第一轮 — Phase A）**: 测试地基修正 + 主动技能管线初通 + 被动效果执行重构。新增 `docs/codex-architecture-diagnosis.md`。`dotnet test`：63/63 通过。
+- **2026/05/08（Claude Code — 文档修正+三块苦力活）**: 1) 根据 Codex 审查修正 AGENTS.md/CLAUDE.md 测试数；2) C1 默认策略迁移：Main.cs 180行 switch → 16行 JSON；3) C2 ConditionMeta 补全：5个反向状态值 + Evaluator “非”前缀取反；4) C3 hitChance 公式修正：BattleLogHelper 公式匹配 DamageCalculator。
+- **2026/05/08（Claude Code — 职业定位描述数据结构化 + ID引用规则）**: 新建 CharacterRoleDescriptionData 模型 + character_role_descriptions.json（18角色）+ class_display_names.json（43职业ID→显示名映射）。描述文本使用 {char:ID}/{class:ID} token 引用其他职业，UI渲染层解析 class_display_names.json 显示当前名称。改名时只需更新 class_display_names.json 一处，所有描述自动联动。技术注释见 docs/csharp-architecture.md。
+- **2026/05/08（Codex 第二轮 — Effects 示范贯通）**: 为 act_sharp_slash/act_smash/act_row_heal 写入完整 Effects 模板，AddBuff 支持 amount 平铺属性点数与 oneTime。新增 3 条 BattleEngine 集成测试。78/78 测试通过。
+- **2026/05/08（Codex 第一轮 — Phase A）**: 测试地基修正 + 主动技能管线初通 + 被动效果执行重构。新增 `docs/codex-architecture-diagnosis.md`。
 - **2026/05/07（续）**: UI全面升级 — HSplitContainer可拖动分栏、A+/A-字体缩放(28px基准)、全部Show*页面上一步按钮、被动详情右面板显示、战斗面板全属性(SPD/物攻/物防/魔攻/魔防/命中/回避/会心/格挡)、战斗日志多行详细格式(BattleLogHelper)。
 - **2026/05/07（代码审查）**: simplify skill 发现7个改进点(DumpUnitBrief重复/hitChance公式不一致/PassiveDetailHelper样板代码/默认策略硬编码应迁移JSON/"非毒"值缺ConditionMeta支持/冗余lambda包装)
 - **2026/05/07（自动化测试）**: 创建goddot-test项目(NUnit 4 + .NET 8), 54个用例(51通过)覆盖 DamageCalculator/ConditionEvaluator/BuffManager/TargetSelector/EquipmentSlot。发现"仅+HP最低"和"同時発動制限per-side"2个bug已修复。

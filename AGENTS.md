@@ -15,7 +15,7 @@
 
 ### 代码修改后必做
 
-1. **跑测试**: `cd goddot-test && dotnet test`（75个用例，耗时<1秒）
+1. **跑测试**: `cd goddot-test && dotnet test`（78个用例，耗时<1秒）
 2. **跑 simplify**: 类型 `/simplify` 让 Codex 自动审查代码重复/质量问题
 3. **编译确认**: `cd goddot && dotnet build`（0错误0警告）
 4. **Godot 验证**: F5 跑场景确认 UI 没崩
@@ -28,9 +28,10 @@
 
 ### 当前已知问题
 
-- 当前 75/75 测试全部通过，0 失败 ✓
-- active_skills.json 的 55 个技能 Effects 数组仍以占位为主，需基于参考文档批量填充（effectType handler 已在 SkillEffectExecutor 中全部就绪）
+- 当前 78/78 测试全部通过，0 失败 ✓
+- active_skills.json 的 55 个技能 Effects 数组仅 3 个有完整模板（锐利斩击/粉碎/列治愈），其余 52 个待批量填充
 - 部分被动技能 Effects 数组为空，需要类似填充
+- 角色描述使用 {char:ID}/{class:ID} token 系统，显示层解析 class_display_names.json 渲染，改名全局联动
 
 ### 关键文件索引
 

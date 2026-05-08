@@ -70,6 +70,8 @@ namespace BattleKing.Tests
                 Assert.That(repository.Equipments, Has.Count.EqualTo(80));
                 Assert.That(repository.EnemyFormations, Has.Count.EqualTo(5));
                 Assert.That(repository.StrategyPresets, Has.Count.EqualTo(21));
+                Assert.That(repository.ClassDisplayNames, Has.Count.GreaterThanOrEqualTo(32), "all compendium classes");
+                Assert.That(repository.CharacterRoleDescriptions, Has.Count.EqualTo(18));
             });
         }
 
@@ -84,6 +86,7 @@ namespace BattleKing.Tests
                 AssertIdsAreUnique(LoadList<EquipmentData>("equipments.json"), x => x.Id, "equipments");
                 AssertIdsAreUnique(LoadList<EnemyFormationData>("enemy_formations.json"), x => x.Id, "enemy_formations");
                 AssertIdsAreUnique(LoadList<StrategyPresetData>("strategy_presets.json"), x => x.Id, "strategy_presets");
+                AssertIdsAreUnique(LoadList<CharacterRoleDescriptionData>("character_role_descriptions.json"), x => x.CharacterId, "character_role_descriptions");
             });
         }
 

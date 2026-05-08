@@ -13,6 +13,8 @@ namespace BattleKing.Data
         public Dictionary<string, EquipmentData> Equipments { get; private set; }
         public Dictionary<string, EnemyFormationData> EnemyFormations { get; private set; }
         public Dictionary<string, StrategyPresetData> StrategyPresets { get; private set; }
+        public Dictionary<string, string> ClassDisplayNames { get; private set; }
+        public Dictionary<string, CharacterRoleDescriptionData> CharacterRoleDescriptions { get; private set; }
 
         public void LoadAll(string dataPath)
         {
@@ -33,6 +35,11 @@ namespace BattleKing.Data
 
             StrategyPresets = LoadJsonFile<List<StrategyPresetData>>(Path.Combine(dataPath, "strategy_presets.json"))
                 .ToDictionary(p => p.Id);
+
+            ClassDisplayNames = LoadJsonFile<Dictionary<string, string>>(Path.Combine(dataPath, "class_display_names.json"));
+
+            CharacterRoleDescriptions = LoadJsonFile<List<CharacterRoleDescriptionData>>(Path.Combine(dataPath, "character_role_descriptions.json"))
+                .ToDictionary(r => r.CharacterId);
         }
 
         private static T LoadJsonFile<T>(string filePath)

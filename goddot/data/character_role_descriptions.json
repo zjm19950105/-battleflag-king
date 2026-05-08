@@ -1,0 +1,261 @@
+[
+  {
+    "characterId": "swordsman",
+    "displayName": "剑士 / 剑圣 (Swordsman / Swordmaster)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "高速物理输出",
+      "斥候/飞行系特攻（必中技）",
+      "会心特化",
+      "HP/物防低，生存力差"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["scout", "flying"]
+  },
+  {
+    "characterId": "mercenary",
+    "displayName": "佣兵 / 兰茨克内希特 (Mercenary / Landsknecht)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "单体火力特化",
+      "反击手",
+      "命中低、速度慢"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "lord",
+    "displayName": "领主 / 高阶领主 (Lord / High Lord)",
+    "unitClasses": ["infantry", "cavalry"],
+    "mainRoles": [
+      "全能型前线战士",
+      "自我恢复+格挡掩护的混合坦克",
+      "转职后成为全能骑兵，可列攻击"
+    ],
+    "characteristics": [
+      "利刃斩提供稳定自我恢复，续航能力强",
+      "贵族守护在低血量时可反复使用（HP50%以下PP+1）",
+      "光辉掩护可保护后排脆皮队友",
+      "步兵怕{char:knight}特攻（被伤害2倍）",
+      "没有必中技能，对{char:snow_ranger}/{char:thief}系命中不稳定",
+      "重装系也是苦手（伤害刮痧）",
+      "【CC后】转骑兵后对步兵系伤害2倍",
+      "【CC后】旋转利刃（无视50%物防列攻击）可有效打击重装系",
+      "【CC后】快速命令开局全队提速，战略价值极高",
+      "【CC后】不再怕{char:knight}特攻（自己变骑兵了），但怕{char:griffin_knight}特攻（被伤害2倍）"
+    ],
+    "referencedCharacterIds": ["knight", "snow_ranger", "thief", "griffin_knight"],
+    "referencedClassIds": ["infantry", "cavalry", "heavy", "flying"]
+  },
+  {
+    "characterId": "fighter",
+    "displayName": "战士 / 先锋 (Fighter / Vanguard)",
+    "unitClasses": ["heavy", "infantry"],
+    "mainRoles": [
+      "远程攻击掩护",
+      "副坦克",
+      "仇恨控制"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "soldier",
+    "displayName": "士兵 / 军士 (Soldier / Sergeant)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "贯穿攻击手（前后列贯通）",
+      "辅助支援",
+      "{class:cavalry}/{class:flying}系对策",
+      "战后回复"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["cavalry", "flying"]
+  },
+  {
+    "characterId": "huskarl",
+    "displayName": "家臣 / 维京 (Huskarl / Viking)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "高物攻+中速",
+      "防御debuff手",
+      "反击手",
+      "HP/物防较低"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "hoplite",
+    "displayName": "重装步兵 / 甲胄骑兵 (Hoplite / Cataphract)",
+    "unitClasses": ["heavy", "infantry"],
+    "mainRoles": [
+      "最强物理坦克",
+      "列防御核心",
+      "仇恨吸收",
+      "魔防极低、速度极慢"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "gladiator",
+    "displayName": "角斗士 / 狂战士 (Gladiator / Berserker)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "范围攻击手",
+      "自我回复坦克",
+      "反击手",
+      "物防极低"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "warrior",
+    "displayName": "勇士 / 破坏者 (Warrior / Breaker)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "重装特攻手（所有攻击技附带不可格挡）",
+      "单体高火力物理输出",
+      "命中较低（140）"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["heavy"]
+  },
+  {
+    "characterId": "hunter",
+    "displayName": "猎人 / 狙击手 (Hunter / Sniper)",
+    "unitClasses": ["archer", "infantry"],
+    "mainRoles": [
+      "远程物理输出",
+      "{class:flying}/{class:scout}系特攻",
+      "追击手",
+      "极高命中、必中被动"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["flying", "scout"]
+  },
+  {
+    "characterId": "shooter",
+    "displayName": "射手 / 盾射手 (Shooter / Shield Shooter)",
+    "unitClasses": ["infantry"],
+    "mainRoles": [
+      "高单体火力弩兵（弓兵系中最高物攻）",
+      "{class:flying}系特攻（2倍伤害）",
+      "CC后前列坦克（大盾装备+掩护技）",
+      "战后回复辅助"
+    ],
+    "characteristics": [
+      "物攻59为弓兵系最高，对高物防{char:wyvern_knight}、{char:feather_sword}等也能造成大伤害",
+      "命中162低于{char:hunter}（182），无必中buff，对高回避敌人需命中补强",
+      "行动速度慢（21），不适合先手击杀",
+      "CC后可装备大盾，格挡率30%，可前列运用"
+    ],
+    "referencedCharacterIds": ["wyvern_knight", "feather_sword", "hunter"],
+    "referencedClassIds": ["flying"]
+  },
+  {
+    "characterId": "thief",
+    "displayName": "盗贼 / 潜行者 (Thief / Rogue)",
+    "unitClasses": ["infantry", "scout"],
+    "mainRoles": [
+      "回避型坦克",
+      "状态异常妨害",
+      "斥候系特攻"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["scout"]
+  },
+  {
+    "characterId": "wizard",
+    "displayName": "巫师 / 术士 (Wizard / Warlock)",
+    "unitClasses": ["mage", "infantry"],
+    "mainRoles": [
+      "最强魔法输出之一",
+      "列攻击+气绝控制",
+      "炎上状态赋予",
+      "HP和物防极低、速度较慢"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "witch",
+    "displayName": "女巫 / 女术士 (Witch / Sorceress)",
+    "unitClasses": ["mage", "infantry"],
+    "mainRoles": [
+      "魔法输出+辅助复合型",
+      "冻结控制",
+      "先手控制",
+      "魔防较高"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "white_knight",
+    "displayName": "白骑士 / 圣骑士 (White Knight / Saint Knight)",
+    "unitClasses": ["cavalry"],
+    "mainRoles": [
+      "魔法攻击对策核心（魔法屏障/列屏障）",
+      "范围回复（列治愈）"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "griffin_knight",
+    "displayName": "狮鹫骑士 / 狮鹫统治者 (Griffin Knight / Griffin Lord)",
+    "unitClasses": ["flying"],
+    "mainRoles": [
+      "对回避型、骑马型特效攻击",
+      "可无视前后列限制",
+      "回避较高"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["cavalry"]
+  },
+  {
+    "characterId": "shaman",
+    "displayName": "萨满 / 德鲁伊 (Shaman / Druid)",
+    "unitClasses": ["mage", "infantry"],
+    "mainRoles": [
+      "减益(debuff)专家",
+      "攻防两面强力援护",
+      "提高友方行动效率的辅助角色",
+      "术师系中较高的生命力，魔防极高"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  },
+  {
+    "characterId": "elf_sibyl",
+    "displayName": "精灵女先知 (Elf Sibyl)",
+    "unitClasses": ["mage", "infantry"],
+    "mainRoles": [
+      "物魔混合全体攻击+回复",
+      "小精灵系统持有者",
+      "攻击/治愈双向辅助"
+    ],
+    "characteristics": [],
+    "referencedCharacterIds": [],
+    "referencedClassIds": []
+  }
+]
