@@ -51,7 +51,7 @@ namespace BattleKing.Ai
 				TargetType.Self => false,
 				TargetType.SingleAlly => false,
 				TargetType.AllAllies => false,
-				_ => true
+				_ => skill.Type != SkillType.Heal
 			};
 
 			var pool = targetIsEnemy

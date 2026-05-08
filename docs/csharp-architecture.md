@@ -473,6 +473,9 @@ Path A — SkillEffectExecutor (active skill structured effects):
   from data instead of being silent placeholders.
   SkillEffectExecutionState stores per-skill-use data such as counters consumed
   once but applied to every target calculation in that skill use.
+  AddBuff/AddDebuff parameters support ratio-based modifiers (`ratio`) and
+  flat stat modifiers (`amount`) for rules such as "会心+50". Heal-type active
+  skills execute structured effects and then skip the damage pipeline.
 
 Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (阶段感知):
   ModifyDamageCalc / CounterAttack / TemporalMark / CoverAlly /
@@ -619,6 +622,7 @@ namespace BattleKing.Ai
         //   Self 目标不依赖敌方候选池，直接返回 caster。
         //   Row / Column / FrontAndBack 先选中 anchor，再只在 anchor 所属阵营扩展形状，
         //   禁止从 BattleContext.AllUnits 二次捞目标导致误伤友方。
+        //   Heal 技能默认从友方候选池选目标，Row 治疗不会误选敌方。
     }
 }
 ```
@@ -668,6 +672,7 @@ namespace BattleKing.Equipment
         public string SkillId { get; set; }
         public string TargetStat { get; set; }
         public float Ratio { get; set; }         // +0.2 = +20%
+        public int FlatAmount { get; set; }      // +50 = 属性点数加成，如会心+50
         public bool IsOneTime { get; set; }
         public bool IsPureBuffOrDebuff { get; set; }
         public int RemainingTurns { get; set; }  // -1 = 战斗结束前有效

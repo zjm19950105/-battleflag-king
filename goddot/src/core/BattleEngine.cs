@@ -263,6 +263,12 @@ namespace BattleKing.Core
             if (actionEffectLogs.Count > 0)
                 Log($"  effects: {string.Join(", ", actionEffectLogs)}");
 
+            if (skill.Type == SkillType.Heal)
+            {
+                _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
+                return;
+            }
+
             foreach (var target in targets)
             {
                 if (!target.IsAlive)

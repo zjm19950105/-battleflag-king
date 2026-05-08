@@ -47,6 +47,7 @@
 | 下午 | Codex | **主动技能 effects 全管线竣工**: 审计确认项目无真实 EffectType enum、当前以字符串 effectType 驱动；补齐 SkillEffectExecutor 的 ApDamage/PpDamage、GrantSkill、RemoveBuff/CleanseDebuff、HealRatio、AddDebuff、TemporalMark、CoverAlly、Counter/Pursuit/Preemptive handler，并补充 ModifyDamageCalc 参数覆盖。新增/扩展测试后 `dotnet test` 75/75 通过，`goddot` 主项目 `dotnet build` 0 警告 0 错误 | `SkillEffectExecutor.cs`, `BattleUnit.cs`, `SkillEffectExecutorTest.cs`, `docs/csharp-architecture.md` |
 | 下午 | Claude Code | **C1 默认策略迁移**: Main.cs ApplyDefaultStrategies 180行 switch → 16行 JSON 查找；strategy_presets.json 新增18个角色默认策略；新增 PresetStrategyData.SkillId 字段；DataContractTest 期望值 3→21 | `Main.cs`, `strategy_presets.json`, `StrategyPresetData.cs`, `DataContractTest.cs` |
 | 下午 | Claude Code | **C2 ConditionMeta 补全 + C3 hitChance 公式修正**: ConditionMeta.Status 新增非毒/非炎上/非冻结/非气绝/非黑暗 5个反向值；ConditionEvaluator 新增"非"前缀取反逻辑；BattleLogHelper 公式从 (Hit-Eva)×skillHit% 改为 skillHit+Hit-Eva + 飞行近战半减 | `ConditionMeta.cs`, `ConditionEvaluator.cs`, `BattleLogHelper.cs` |
+| 下午 | Codex | **主动技能 JSON Effects 示范贯通**: 为 `act_sharp_slash`/`act_smash`/`act_row_heal` 写入完整 Effects 模板，覆盖 ModifyDamageCalc+AddBuff、AddDebuff、HealRatio；AddBuff 支持 `amount` 平铺属性点数与 `oneTime`；Heal/Assist Row 默认选友方，Heal 技能执行 effects 后跳过伤害管线。新增 3 条 BattleEngine 集成测试验证 Strategy→SkillEffectExecutor→BattleEngine 端到端结果。 | `active_skills.json`, `SkillEffectExecutor.cs`, `BattleUnit.cs`, `Buff.cs`, `BattleEngine.cs`, `TargetSelector.cs`, `SkillEffectExecutorTest.cs`, `docs/csharp-architecture.md` |
 
 ---
 
@@ -62,7 +63,7 @@
 | 4 | hitChance 公式一致性修正 | Claude Code | ✅ 已完成 | `BattleLogHelper.cs` 公式改为 `skillHit+Hit-Eva` + 飞行近战半减 |
 | 5 | 默认策略迁移到 JSON | Claude Code | ✅ 已完成 | `Main.cs:462-640` 180行 switch → 16行 JSON 查找；`strategy_presets.json` 3→21 条 preset |
 | 6 | ConditionMeta 补反向状态 + Evaluator 取反 | Claude Code | ✅ 已完成 | 新增 非毒/非炎上/非冻结/非气绝/非黑暗 5值；Evaluator 新增"非"前缀取反 |
-| 7 | **主动技能 JSON Effects 数组示范贯通**（选2-3个代表性技能，写入完整 Effects 数组，建立集成测试验证全管线：Main→Strategy→SkillEffectExecutor→BattleEngine→正确结果） | Codex | ⬜ 待办 | Handler 已就绪，JSON 仍只有 4 种 effectType。需示范端到端后，Claude Code 批量铺量其余 52 个技能 |
+| 7 | **主动技能 JSON Effects 数组示范贯通**（选2-3个代表性技能，写入完整 Effects 数组，建立集成测试验证全管线：Main→Strategy→SkillEffectExecutor→BattleEngine→正确结果） | Codex | ✅ 已完成 | 三个模板已落地：锐利斩击、粉碎、列治愈；Claude Code 可基于模板批量铺量其余主动技能 |
 | 8 | 职业定位描述数据结构化 + ID 引用规则 | Claude Code | ⬜ 待办 | 方案已有，需新建 CharacterRoleDescriptionData 模型 + JSON + 显示层解析 |
 | 9 | 6v6 模式入口 + 流程（当前 UI 6 格但入口仍是 1v1/3v3） | TBD | ⬜ 待办 | `Main.cs:232` 无 6v6 流程 |
 | 10 | 主动/被动技能 JSON Effects 批量填充（基于 Codex 示范模板 + 参考文档） | Claude Code | ⬜ 待办 | 依赖 #7 完成 |

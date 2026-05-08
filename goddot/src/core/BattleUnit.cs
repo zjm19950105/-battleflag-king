@@ -98,7 +98,8 @@ namespace BattleKing.Core
             int baseValue = Data.BaseStats.GetValueOrDefault(statName, 0);
             int equipValue = Equipment.GetTotalStat(statName);
             float buffRatio = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
-            return (int)((baseValue + equipValue) * (1 + buffRatio));
+            int flatBuff = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.FlatAmount);
+            return (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
         }
 
         public int GetCurrentAttackPower(SkillType damageType)

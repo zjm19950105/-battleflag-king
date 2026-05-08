@@ -321,6 +321,106 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void BattleEngine_锐利斩击_JSONEffects贯通必中与会心加成()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_sharp_slash", hp: 1000, str: 100, def: 0, spd: 100, hit: 0, crit: 50), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: 1000, str: 10, def: 50, spd: 1, eva: 1000), repository, false)
+            {
+                Position = 1
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_sharp_slash" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(925, defender.CurrentHp);
+            ClassicAssert.IsTrue(logs.Any(l => l.Contains("attacker.Crit 50->100")));
+            ClassicAssert.IsFalse(attacker.Buffs.Any(b => b.SkillId == "act_sharp_slash"));
+        }
+
+        [Test]
+        public void BattleEngine_粉碎_JSONEffects贯通物防Debuff()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_smash", hp: 1000, str: 100, def: 0, spd: 100, hit: 0), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: 1000, str: 10, def: 100, spd: 1), repository, false)
+            {
+                Position = 1
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_smash" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(80, defender.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(980, defender.CurrentHp);
+        }
+
+        [Test]
+        public void BattleEngine_列治愈_JSONEffects贯通友方RowHealRatio()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var caster = new BattleUnit(CreateCharacter("caster", "act_row_heal", hp: 200, str: 10, def: 0, spd: 100), repository, true)
+            {
+                Position = 4,
+                CurrentLevel = 20
+            };
+            var frontAlly = new BattleUnit(CreateCharacter("frontAlly", null, hp: 200, str: 10, def: 0, spd: 1), repository, true)
+            {
+                Position = 1
+            };
+            frontAlly.CurrentHp = 80;
+            var sameRowAlly = new BattleUnit(CreateCharacter("sameRowAlly", null, hp: 200, str: 10, def: 0, spd: 1), repository, true)
+            {
+                Position = 2
+            };
+            sameRowAlly.CurrentHp = 130;
+            var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 200, str: 10, def: 0, spd: 1), repository, false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_row_heal" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster, frontAlly, sameRowAlly },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(180, frontAlly.CurrentHp);
+            ClassicAssert.AreEqual(200, sameRowAlly.CurrentHp);
+            ClassicAssert.AreEqual(200, enemy.CurrentHp);
+        }
+
+        [Test]
         public void PassiveSkillProcessor_SharedExecutor_ExecutesBuffAndHealEffects()
         {
             var repository = LoadRepositoryWithPassive(new PassiveSkillData
@@ -418,7 +518,17 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(0.5f, calc.IgnoreDefenseRatio);
         }
 
-        private static CharacterData CreateCharacter(string id, string skillId, int hp, int str, int def, int spd)
+        private static CharacterData CreateCharacter(
+            string id,
+            string skillId,
+            int hp,
+            int str,
+            int def,
+            int spd,
+            int hit = 1000,
+            int eva = 0,
+            int crit = 0,
+            int block = 0)
         {
             return new CharacterData
             {
@@ -433,10 +543,10 @@ namespace BattleKing.Tests
                     { "Def", def },
                     { "Mag", 0 },
                     { "MDef", 0 },
-                    { "Hit", 1000 },
-                    { "Eva", 0 },
-                    { "Crit", 0 },
-                    { "Block", 0 },
+                    { "Hit", hit },
+                    { "Eva", eva },
+                    { "Crit", crit },
+                    { "Block", block },
                     { "Spd", spd },
                     { "AP", 3 },
                     { "PP", 0 }

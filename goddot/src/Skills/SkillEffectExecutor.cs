@@ -242,10 +242,15 @@ namespace BattleKing.Skills
             bool forceDebuff = false)
         {
             string stat = GetString(parameters, "stat", "Str");
-            float ratio = GetFloat(parameters, "ratio", 0.2f);
+            int flatAmount = GetInt(parameters, "amount", 0);
+            float ratio = GetFloat(parameters, "ratio", parameters.ContainsKey("amount") ? 0f : 0.2f);
             if (forceDebuff)
+            {
                 ratio = -Math.Abs(ratio);
+                flatAmount = -Math.Abs(flatAmount);
+            }
             int turns = GetInt(parameters, "turns", 1);
+            bool isOneTime = GetBool(parameters, "oneTime", false);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
             {
                 int before = target.GetCurrentStat(stat);
@@ -254,7 +259,9 @@ namespace BattleKing.Skills
                     SkillId = sourceSkillId,
                     TargetStat = stat,
                     Ratio = ratio,
+                    FlatAmount = flatAmount,
                     RemainingTurns = turns,
+                    IsOneTime = isOneTime,
                     IsPureBuffOrDebuff = true
                 });
                 logs.Add($"{target.Data.Name}.{stat} {before}->{target.GetCurrentStat(stat)}");

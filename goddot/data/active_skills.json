@@ -24,8 +24,9 @@
         "effectType": "AddBuff",
         "parameters": {
           "stat": "Crit",
-          "ratio": 0.5,
-          "turns": -1,
+          "amount": 50,
+          "turns": 1,
+          "oneTime": true,
           "target": "Self"
         }
       }
@@ -331,7 +332,17 @@
     "tags": [
       "DefDown"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Target",
+          "stat": "Def",
+          "ratio": 0.2,
+          "turns": -1
+        }
+      }
+    ],
     "learnCondition": "近卫/维京 Lv1",
     "unlockLevel": 1
   },
@@ -858,7 +869,15 @@
       "Heal",
       "Row"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "AllTargets",
+          "ratio": 0.5
+        }
+      }
+    ],
     "learnCondition": "白骑士/圣骑士 Lv10",
     "unlockLevel": 10
   },
