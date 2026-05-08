@@ -42,6 +42,8 @@ namespace BattleKing.Core
         public List<StatusAilment> Ailments { get; private set; } = new List<StatusAilment>();
         public List<Strategy> Strategies { get; set; } = new List<Strategy>();
         public List<string> EquippedPassiveSkillIds { get; set; } = new List<string>();
+        public List<string> TemporaryActiveSkillIds { get; private set; } = new List<string>();
+        public List<string> TemporaryPassiveSkillIds { get; private set; } = new List<string>();
 
         /// <summary>Per-passive trigger conditions (skillId → Condition). Checked by PassiveSkillProcessor before triggering.</summary>
         public Dictionary<string, Condition> PassiveConditions { get; set; } = new Dictionary<string, Condition>();
@@ -141,6 +143,7 @@ namespace BattleKing.Core
             }).ToList();
 
             ids.AddRange(Equipment.GetGrantedActiveSkillIds());
+            ids.AddRange(TemporaryActiveSkillIds);
             return ids.Distinct().ToList();
         }
 
@@ -157,7 +160,18 @@ namespace BattleKing.Core
             }).ToList();
 
             ids.AddRange(Equipment.GetGrantedPassiveSkillIds());
+            ids.AddRange(TemporaryPassiveSkillIds);
             return ids.Distinct().ToList();
+        }
+
+        public void GrantTemporarySkill(string skillId, bool isPassive)
+        {
+            if (string.IsNullOrWhiteSpace(skillId))
+                return;
+
+            var targetList = isPassive ? TemporaryPassiveSkillIds : TemporaryActiveSkillIds;
+            if (!targetList.Contains(skillId))
+                targetList.Add(skillId);
         }
 
         public bool CanUseActiveSkill(ActiveSkill skill) => CurrentAp >= skill.Data.ApCost;

@@ -1,6 +1,7 @@
 using BattleKing.Ai;
 using BattleKing.Core;
 using BattleKing.Data;
+using BattleKing.Equipment;
 using BattleKing.Events;
 using BattleKing.Pipeline;
 using BattleKing.Skills;
@@ -33,8 +34,11 @@ namespace BattleKing.Tests
                     Parameters = new()
                     {
                         { "ForceHit", true },
+                        { "ForceBlock", true },
                         { "HitCount", 9 },
                         { "CannotBeBlocked", true },
+                        { "DamageMultiplier", 1.5 },
+                        { "NullifyPhysicalDamage", true },
                         { "IgnoreDefenseRatio", 0.5 }
                     }
                 }
@@ -46,9 +50,12 @@ namespace BattleKing.Tests
                 skill.Data.Id, calc, new SkillEffectExecutionState());
 
             ClassicAssert.IsTrue(calc.ForceHit);
+            ClassicAssert.AreEqual(true, calc.ForceBlock);
             ClassicAssert.IsTrue(calc.CannotBeBlocked);
+            ClassicAssert.IsTrue(calc.NullifyPhysicalDamage);
             ClassicAssert.AreEqual(9, calc.HitCount);
             ClassicAssert.AreEqual(0.5f, calc.IgnoreDefenseRatio);
+            ClassicAssert.AreEqual(1.5f, calc.DamageMultiplier);
         }
 
         [Test]
@@ -108,6 +115,181 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(0, caster.GetCounter("Sprite"));
             ClassicAssert.AreEqual(60, firstCalc.CounterPowerBonus);
             ClassicAssert.AreEqual(60, secondCalc.CounterPowerBonus);
+        }
+
+        [Test]
+        public void ResourceAndHealEffects_ApplyApPpDamageAndHealRatio()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var target = TestDataFactory.CreateUnit(hp: 200, ap: 3, pp: 2, isPlayer: false);
+            target.CurrentHp = 80;
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "ApDamage",
+                    Parameters = new() { { "target", "Target" }, { "amount", 2 } }
+                },
+                new SkillEffectData
+                {
+                    EffectType = "PpDamage",
+                    Parameters = new() { { "target", "Target" }, { "amount", 1 } }
+                },
+                new SkillEffectData
+                {
+                    EffectType = "HealRatio",
+                    Parameters = new() { { "target", "Target" }, { "ratio", 0.25 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(1, target.CurrentAp);
+            ClassicAssert.AreEqual(1, target.CurrentPp);
+            ClassicAssert.AreEqual(130, target.CurrentHp);
+        }
+
+        [Test]
+        public void GrantSkill_AddsTemporarySkillToAvailablePool()
+        {
+            var executor = new SkillEffectExecutor();
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var context = new BattleContext(repository);
+            var caster = new BattleUnit(CreateCharacter("caster", null, hp: 100, str: 10, def: 10, spd: 10), repository, true);
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "GrantSkill",
+                    Parameters = new()
+                    {
+                        { "target", "Self" },
+                        { "skillId", "act_meteor_slash" },
+                        { "skillType", "Active" }
+                    }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, Array.Empty<BattleUnit>(), skill.Data.Effects, skill.Data.Id);
+
+            CollectionAssert.Contains(caster.GetAvailableActiveSkillIds(), "act_meteor_slash");
+        }
+
+        [Test]
+        public void RemoveBuff_CanDispelBuffAndCleanseDebuff()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var target = TestDataFactory.CreateUnit(isPlayer: false);
+            target.Buffs.Add(new Buff { SkillId = "buff", TargetStat = "Str", Ratio = 0.2f, RemainingTurns = -1 });
+            target.Buffs.Add(new Buff { SkillId = "debuff", TargetStat = "Def", Ratio = -0.3f, RemainingTurns = -1 });
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "RemoveBuff",
+                    Parameters = new() { { "target", "Target" }, { "kind", "Buff" } }
+                },
+                new SkillEffectData
+                {
+                    EffectType = "CleanseDebuff",
+                    Parameters = new() { { "target", "Target" } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(0, target.Buffs.Count);
+        }
+
+        [Test]
+        public void AddDebuffAndModifyCounter_ApplyToSelectedTarget()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var target = TestDataFactory.CreateUnit(def: 100, isPlayer: false);
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "AddDebuff",
+                    Parameters = new() { { "target", "Target" }, { "stat", "Def" }, { "ratio", 0.3 }, { "turns", -1 } }
+                },
+                new SkillEffectData
+                {
+                    EffectType = "ModifyCounter",
+                    Parameters = new() { { "target", "Target" }, { "key", "Rage" }, { "delta", 2 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(70, target.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(2, target.GetCounter("Rage"));
+            ClassicAssert.AreEqual(0, caster.GetCounter("Rage"));
+        }
+
+        [Test]
+        public void TemporalAndCoverEffects_AddMarkAndRedirectCalculation()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var defender = TestDataFactory.CreateUnit(isPlayer: false);
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "TemporalMark",
+                    Parameters = new()
+                    {
+                        { "target", "Self" },
+                        { "key", "DeathResist" },
+                        { "count", 1 }
+                    }
+                },
+                new SkillEffectData
+                {
+                    EffectType = "CoverAlly",
+                    Parameters = new()
+                }
+            });
+            var calc = TestDataFactory.CreateCalc(caster, defender, skill);
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { defender }, skill.Data.Effects, skill.Data.Id);
+            executor.ExecuteCalculationEffects(context, caster, new List<BattleUnit> { defender }, skill.Data.Effects, skill.Data.Id, calc, new SkillEffectExecutionState());
+
+            ClassicAssert.IsTrue(caster.TemporalStates.Any(s => s.Key == "DeathResist"));
+            ClassicAssert.AreSame(caster, calc.CoverTarget);
+        }
+
+        [Test]
+        public void PendingActionEffects_QueueCounterPursuitAndPreemptiveActions()
+        {
+            var queued = new List<PendingAction>();
+            var executor = new SkillEffectExecutor(queued.Add);
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var target = TestDataFactory.CreateUnit(isPlayer: false);
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData { EffectType = "CounterAttack", Parameters = new() { { "power", 70 } } },
+                new SkillEffectData { EffectType = "PursuitAttack", Parameters = new() { { "power", 80 } } },
+                new SkillEffectData { EffectType = "PreemptiveAttack", Parameters = new() { { "power", 90 } } }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(3, queued.Count);
+            ClassicAssert.AreEqual(PendingActionType.Counter, queued[0].Type);
+            ClassicAssert.AreEqual(PendingActionType.Pursuit, queued[1].Type);
+            ClassicAssert.AreEqual(PendingActionType.Preemptive, queued[2].Type);
+            ClassicAssert.AreEqual(90, queued[2].Power);
         }
 
         [Test]

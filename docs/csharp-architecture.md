@@ -337,6 +337,8 @@ namespace BattleKing.Core
         public List<StatusAilment> Ailments { get; private set; } = new();
         public List<Strategy> Strategies { get; set; } = new();         // 8条策略
         public List<string> EquippedPassiveSkillIds { get; set; } = new();
+        public List<string> TemporaryActiveSkillIds { get; private set; } = new();
+        public List<string> TemporaryPassiveSkillIds { get; private set; } = new();
 
         // 被动条件: skillId → 发动条件
         public Dictionary<string, Condition> PassiveConditions { get; set; } = new();
@@ -358,8 +360,9 @@ namespace BattleKing.Core
         public int GetCurrentStat(string statName) { /* 基础 + 装备 + buff */ }
 
         // 可用技能池（含装备赋予 + 等级过滤）
-        public List<string> GetAvailableActiveSkillIds() { /* 基础 + CC + 装备赋予，按UnlockLevel过滤 */ }
+        public List<string> GetAvailableActiveSkillIds() { /* 基础 + CC + 装备赋予 + 临时赋予，按UnlockLevel过滤 */ }
         public List<string> GetAvailablePassiveSkillIds() { /* 同上 */ }
+        public void GrantTemporarySkill(string skillId, bool isPassive) { /* GrantSkill effect 写入战斗期技能池 */ }
         public List<PassiveSkillData> GetEquippedPassiveSkills() { /* 从EquippedPassiveSkillIds解析 */ }
 
         public void TakeDamage(int damage) { CurrentHp = Math.Max(0, CurrentHp - damage); }
@@ -450,8 +453,10 @@ namespace BattleKing.Skills
 新角色和新技能默认只能改 JSON，不能为每个角色或每个技能新增 C# 分支。
 
 技能实现必须优先组合已有 `effectType` 原子，例如 `ModifyDamageCalc`、`AddBuff`、
-`RecoverAp`、`RecoverPp`、`RecoverHp`、`StatusAilment`、`ModifyCounter`、
-`ConsumeCounter`。只有出现已有原子无法表达的全新规则语义时，才允许新增
+`AddDebuff`、`RemoveBuff`、`RecoverAp`、`RecoverPp`、`RecoverHp`、`HealRatio`、
+`ApDamage`、`PpDamage`、`StatusAilment`、`TemporalMark`、`GrantSkill`、
+`ModifyCounter`、`ConsumeCounter`、`CoverAlly`、`CounterAttack`、`PursuitAttack`、
+`PreemptiveAttack`。只有出现已有原子无法表达的全新规则语义时，才允许新增
 `effectType`，并且同一批次必须补测试和更新本文档。
 
 `tags` 只允许作为展示、分类、兼容旧数据或迁移标记；新战斗逻辑不允许只靠 tag
@@ -462,8 +467,10 @@ namespace BattleKing.Skills
 Path A — SkillEffectExecutor (active skill structured effects):
   BattleEngine.ExecuteSkillAgainstTargets() calls SkillEffectExecutor before
   DamageCalculator.Calculate(calc). Active JSON effects such as ModifyDamageCalc,
-  AddBuff, RecoverAp, RecoverPp, RecoverHp, StatusAilment, ModifyCounter and
-  ConsumeCounter are executed from data instead of being silent placeholders.
+  AddBuff/AddDebuff, RemoveBuff/CleanseDebuff, RecoverAp/RecoverPp/RecoverHp,
+  HealRatio, ApDamage/PpDamage, StatusAilment, TemporalMark, GrantSkill,
+  ModifyCounter, ConsumeCounter, CoverAlly and queued-action effects are executed
+  from data instead of being silent placeholders.
   SkillEffectExecutionState stores per-skill-use data such as counters consumed
   once but applied to every target calculation in that skill use.
 
@@ -472,10 +479,11 @@ Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (阶段感知):
   ModifyCounter / ConsumeCounter / PreemptiveAttack / PursuitAttack /
   RecoverAp / RecoverPp / RecoverHp / AddBuff / AddDebuff
   有完整战斗阶段上下文(DamageCalculation/PendingActionQueue/TemporalState)。
-  RecoverAp / RecoverPp / RecoverHp / AddBuff / StatusAilment /
-  ModifyCounter / ConsumeCounter / ModifyDamageCalc 已委派给 SkillEffectExecutor；
-  CoverAlly / TemporalMark / CounterAttack / PursuitAttack / PreemptiveAttack
-  仍保留在 PassiveSkillProcessor 中，因为它们需要行动队列或事件阶段上下文。
+  RecoverAp / RecoverPp / RecoverHp / AddBuff / AddDebuff / StatusAilment /
+  TemporalMark / ModifyCounter / ConsumeCounter / ModifyDamageCalc 已委派给
+  SkillEffectExecutor；CoverAlly / CounterAttack / PursuitAttack /
+  PreemptiveAttack 在 SkillEffectExecutor 也有 handler，但被动路径仍可保留在
+  PassiveSkillProcessor 中，因为它们需要行动队列或事件阶段上下文。
   这些类型在SkillEffectFactory中创建PassiveOnlyEffect — Apply()是空操作。
 ```
 
