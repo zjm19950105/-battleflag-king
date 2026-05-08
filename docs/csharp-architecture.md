@@ -35,6 +35,8 @@ src/
     PassiveSkill.cs
     ISkillEffect.cs
     SkillEffectFactory.cs
+    SkillEffectExecutor.cs
+    SkillEffectExecutionState.cs
     PassiveSkillProcessor.cs
     PendingAction.cs
     PendingActionType.cs
@@ -444,9 +446,13 @@ namespace BattleKing.Skills
 ## 技能系统 — 双路径架构
 
 ```
-Path A — ISkillEffect (通用):
-  DamageEffect / BuffEffect / HealEffect / StatusAilmentEffect
-  用于主动技能执行: ISkillEffect.Apply(ctx, caster, targets, calc)
+Path A — SkillEffectExecutor (active skill structured effects):
+  BattleEngine.ExecuteSkillAgainstTargets() calls SkillEffectExecutor before
+  DamageCalculator.Calculate(calc). Active JSON effects such as ModifyDamageCalc,
+  AddBuff, RecoverAp, RecoverPp, RecoverHp, StatusAilment, ModifyCounter and
+  ConsumeCounter are executed from data instead of being silent placeholders.
+  SkillEffectExecutionState stores per-skill-use data such as counters consumed
+  once but applied to every target calculation in that skill use.
 
 Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (阶段感知):
   ModifyDamageCalc / CounterAttack / TemporalMark / CoverAlly /

@@ -14,6 +14,7 @@ namespace BattleKing.Core
         private BattleContext _ctx;
         private StrategyEvaluator _strategyEvaluator;
         private DamageCalculator _damageCalculator;
+        private SkillEffectExecutor _skillEffectExecutor;
         private EventBus _eventBus = new EventBus();
 
         public Action<string> OnLog { get; set; }
@@ -32,6 +33,7 @@ namespace BattleKing.Core
             _ctx = ctx;
             _strategyEvaluator = new StrategyEvaluator(ctx);
             _damageCalculator = new DamageCalculator();
+            _skillEffectExecutor = new SkillEffectExecutor();
         }
 
         private void Log(string message)
@@ -256,6 +258,11 @@ namespace BattleKing.Core
 
             Log($"--- {unit.Data.Name} 发动 {skill.Data.Name} (AP{skill.ApCost} 威力{skill.Power}) [{DumpUnitBrief(unit)}] ---");
 
+            var effectState = new SkillEffectExecutionState();
+            var actionEffectLogs = _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, skill.Data.Effects, skill.Data.Id);
+            if (actionEffectLogs.Count > 0)
+                Log($"  effects: {string.Join(", ", actionEffectLogs)}");
+
             foreach (var target in targets)
             {
                 if (!target.IsAlive)
@@ -269,6 +276,11 @@ namespace BattleKing.Core
                     Skill = skill,
                     HitCount = 1  // Default; multi-hit skills override this via effects
                 };
+
+                var calculationEffectLogs = _skillEffectExecutor.ExecuteCalculationEffects(
+                    _ctx, unit, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id, calc, effectState);
+                if (calculationEffectLogs.Count > 0)
+                    Log($"  calc effects: {string.Join(", ", calculationEffectLogs)}");
 
                 _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                 _eventBus.Publish(new BeforeHitEvent
