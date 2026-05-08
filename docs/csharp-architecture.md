@@ -445,6 +445,19 @@ namespace BattleKing.Skills
 
 ## 技能系统 — 双路径架构
 
+### Effect 扩展原则（必须遵守）
+
+新角色和新技能默认只能改 JSON，不能为每个角色或每个技能新增 C# 分支。
+
+技能实现必须优先组合已有 `effectType` 原子，例如 `ModifyDamageCalc`、`AddBuff`、
+`RecoverAp`、`RecoverPp`、`RecoverHp`、`StatusAilment`、`ModifyCounter`、
+`ConsumeCounter`。只有出现已有原子无法表达的全新规则语义时，才允许新增
+`effectType`，并且同一批次必须补测试和更新本文档。
+
+`tags` 只允许作为展示、分类、兼容旧数据或迁移标记；新战斗逻辑不允许只靠 tag
+驱动。需要生效的规则必须落到结构化 `effects` 中，由 `SkillEffectExecutor` 或
+明确的阶段处理器执行。
+
 ```
 Path A — SkillEffectExecutor (active skill structured effects):
   BattleEngine.ExecuteSkillAgainstTargets() calls SkillEffectExecutor before
