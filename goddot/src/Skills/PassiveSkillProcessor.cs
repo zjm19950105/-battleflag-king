@@ -16,6 +16,7 @@ namespace BattleKing.Skills
         private GameDataRepository _gameData;
         private Action<string> _log;
         private Action<PendingAction> _enqueueAction;
+        private SkillEffectExecutor _skillEffectExecutor = new();
 
         private BattleContext _ctx;
         // Per-side simultaneous limit: key=true=player, false=enemy
@@ -226,6 +227,17 @@ namespace BattleKing.Skills
         private void ExecuteStructuredEffect(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
             DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects)
         {
+            if (CanExecuteThroughSharedExecutor(effect.EffectType))
+            {
+                var targets = SelectExecutorFallbackTargets(unit, effect, attacker, defender);
+                var state = new SkillEffectExecutionState();
+                var logs = IsCalculationEffect(effect.EffectType)
+                    ? _skillEffectExecutor.ExecuteCalculationEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id, calc, state)
+                    : _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id);
+                effects.AddRange(logs);
+                return;
+            }
+
             var p = effect.Parameters ?? new Dictionary<string, object>();
 
             switch (effect.EffectType)
@@ -515,6 +527,33 @@ namespace BattleKing.Skills
             {
                 effects.Add("回复友方HP(待结构化)");
             }
+        }
+
+        private static bool CanExecuteThroughSharedExecutor(string effectType)
+        {
+            return effectType == "RecoverAp"
+                || effectType == "RecoverPp"
+                || effectType == "RecoverHp"
+                || effectType == "AddBuff"
+                || effectType == "ModifyCounter"
+                || effectType == "ConsumeCounter"
+                || effectType == "ModifyDamageCalc"
+                || effectType == "StatusAilment";
+        }
+
+        private static bool IsCalculationEffect(string effectType)
+        {
+            return effectType == "ModifyDamageCalc" || effectType == "ConsumeCounter";
+        }
+
+        private List<BattleUnit> SelectExecutorFallbackTargets(
+            BattleUnit owner,
+            SkillEffectData effect,
+            BattleUnit attacker,
+            BattleUnit defender)
+        {
+            var targetType = GetTargetType(effect.Parameters ?? new Dictionary<string, object>(), "target", "Self");
+            return SelectPassiveTargets(owner, targetType, attacker, defender);
         }
 
         // === Module 4: Target selection helpers ===

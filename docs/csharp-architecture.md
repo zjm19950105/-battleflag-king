@@ -458,8 +458,12 @@ Path B — PassiveSkillProcessor.ExecuteStructuredEffect() (阶段感知):
   ModifyDamageCalc / CounterAttack / TemporalMark / CoverAlly /
   ModifyCounter / ConsumeCounter / PreemptiveAttack / PursuitAttack /
   RecoverAp / RecoverPp / RecoverHp / AddBuff / AddDebuff
-  有完整战斗阶段上下文(DamageCalculation/PendingActionQueue/TemporalState)
-  这些类型在SkillEffectFactory中创建PassiveOnlyEffect — Apply()是空操作
+  有完整战斗阶段上下文(DamageCalculation/PendingActionQueue/TemporalState)。
+  RecoverAp / RecoverPp / RecoverHp / AddBuff / StatusAilment /
+  ModifyCounter / ConsumeCounter / ModifyDamageCalc 已委派给 SkillEffectExecutor；
+  CoverAlly / TemporalMark / CounterAttack / PursuitAttack / PreemptiveAttack
+  仍保留在 PassiveSkillProcessor 中，因为它们需要行动队列或事件阶段上下文。
+  这些类型在SkillEffectFactory中创建PassiveOnlyEffect — Apply()是空操作。
 ```
 
 ```csharp

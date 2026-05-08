@@ -1,6 +1,7 @@
 using BattleKing.Ai;
 using BattleKing.Core;
 using BattleKing.Data;
+using BattleKing.Events;
 using BattleKing.Pipeline;
 using BattleKing.Skills;
 using NUnit.Framework;
@@ -137,6 +138,104 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(910, defender.CurrentHp);
         }
 
+        [Test]
+        public void PassiveSkillProcessor_SharedExecutor_ExecutesBuffAndHealEffects()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_shared_buff_heal",
+                Name = "Shared Buff Heal",
+                PpCost = 0,
+                TriggerTiming = PassiveTriggerTiming.BattleStart,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "AddBuff",
+                        Parameters = new()
+                        {
+                            { "target", "Self" },
+                            { "stat", "Str" },
+                            { "ratio", 0.2 },
+                            { "turns", -1 }
+                        }
+                    },
+                    new()
+                    {
+                        EffectType = "RecoverHp",
+                        Parameters = new()
+                        {
+                            { "target", "Self" },
+                            { "amount", 25 }
+                        }
+                    }
+                }
+            });
+            var unit = new BattleUnit(CreateCharacter("unit", null, hp: 100, str: 50, def: 10, spd: 10), repository, true);
+            unit.CurrentHp = 50;
+            unit.EquippedPassiveSkillIds.Add("pas_shared_buff_heal");
+            var context = new BattleContext(repository) { PlayerUnits = new List<BattleUnit> { unit } };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+
+            ClassicAssert.AreEqual(60, unit.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(75, unit.CurrentHp);
+        }
+
+        [Test]
+        public void PassiveSkillProcessor_SharedExecutor_ModifiesBeforeHitCalculation()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_shared_calc",
+                Name = "Shared Calc",
+                PpCost = 0,
+                TriggerTiming = PassiveTriggerTiming.SelfBeforeHit,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "ModifyDamageCalc",
+                        Parameters = new()
+                        {
+                            { "ForceEvasion", true },
+                            { "CannotBeBlocked", true },
+                            { "IgnoreDefenseRatio", 0.5 }
+                        }
+                    }
+                }
+            });
+            var attacker = new BattleUnit(CreateCharacter("attacker", null, hp: 100, str: 50, def: 10, spd: 20), repository, true);
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: 100, str: 30, def: 10, spd: 10), repository, false);
+            defender.EquippedPassiveSkillIds.Add("pas_shared_calc");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+            var skill = TestDataFactory.CreateSkill();
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                Context = context,
+                Calc = calc
+            });
+
+            ClassicAssert.IsTrue(calc.ForceEvasion);
+            ClassicAssert.IsTrue(calc.CannotBeBlocked);
+            ClassicAssert.AreEqual(0.5f, calc.IgnoreDefenseRatio);
+        }
+
         private static CharacterData CreateCharacter(string id, string skillId, int hp, int str, int def, int spd)
         {
             return new CharacterData
@@ -161,6 +260,14 @@ namespace BattleKing.Tests
                     { "PP", 0 }
                 }
             };
+        }
+
+        private static GameDataRepository LoadRepositoryWithPassive(PassiveSkillData passive)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.PassiveSkills[passive.Id] = passive;
+            return repository;
         }
     }
 }

@@ -307,12 +307,22 @@ namespace BattleKing.Skills
                 "Caster" => new List<BattleUnit> { caster },
                 "Target" => calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
                 "Defender" => calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
-                "Attacker" => calculation?.Attacker != null ? new List<BattleUnit> { calculation.Attacker } : new List<BattleUnit> { caster },
+                "Attacker" => calculation?.Attacker != null ? new List<BattleUnit> { calculation.Attacker } : targets.Where(t => t != null).ToList(),
                 "AllTargets" => targets.Where(t => t != null).ToList(),
                 "AllAllies" => context.GetAliveUnits(caster.IsPlayer),
                 "AllEnemies" => context.GetAliveUnits(!caster.IsPlayer),
+                "LowestHpAlly" => context.GetAliveUnits(caster.IsPlayer).OrderBy(u => u.CurrentHp).Take(1).ToList(),
+                "HighestHpAlly" => context.GetAliveUnits(caster.IsPlayer).OrderByDescending(u => u.CurrentHp).Take(1).ToList(),
+                "RandomAlly" => SelectRandomUnit(context.GetAliveUnits(caster.IsPlayer)),
                 _ => targets.Where(t => t != null).ToList()
             };
+        }
+
+        private static List<BattleUnit> SelectRandomUnit(List<BattleUnit> units)
+        {
+            return units.Count == 0
+                ? new List<BattleUnit>()
+                : new List<BattleUnit> { units[Random.Shared.Next(units.Count)] };
         }
 
         private static bool TryGetInt(Dictionary<string, object> parameters, string key, out int value)
