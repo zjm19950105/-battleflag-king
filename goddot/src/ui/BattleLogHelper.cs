@@ -11,71 +11,83 @@ namespace BattleKing.Ui
     /// <summary>Formats multi-line battle log output.</summary>
     public static class BattleLogHelper
     {
+        public static string FormatUnitName(BattleUnit unit)
+        {
+            if (unit == null)
+                return "";
+
+            return unit.IsPlayer
+                ? "{{P:" + unit.Data.Name + "}}"
+                : "{{E:" + unit.Data.Name + "}}";
+        }
+
         public static List<string> FormatAttack(BattleUnit attacker, BattleUnit defender, ActiveSkill skill,
             DamageCalculation calc, DamageResult result, bool killed, List<StatusAilment> appliedAilments)
         {
             var lines = new List<string>();
+            var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? defender;
 
-            // Line 1: attacker → defender [skill] — effect description
-            lines.Add("  " + attacker.Data.Name + " → " + defender.Data.Name + " [" + skill.Data.Name + "] — " + skill.Data.EffectDescription);
+            lines.Add("  " + FormatUnitName(attacker) + " -> " + FormatUnitName(defender) + " [" + skill.Data.Name + "] - " + skill.Data.EffectDescription);
+            if (damageReceiver != defender)
+                lines.Add("  Cover: " + FormatUnitName(defender) + " -> " + FormatUnitName(damageReceiver));
 
-            // Line 2: hit/evade/crit/block rates
             int atkHit = attacker.GetCurrentStat("Hit");
             int defEva = defender.GetCurrentStat("Eva");
             int skillHit = skill.Data.HitRate ?? 100;
-            int hitChance = skillHit + atkHit - defEva;
-            string hitFormula = skillHit + "+" + atkHit + "-" + defEva;
+            int rawHitChance = skillHit + atkHit - defEva;
+            int modifiedHitChance = rawHitChance;
+            string hitFormula = $"技能{skillHit} + {FormatUnitName(attacker)}命中{atkHit} - {FormatUnitName(defender)}回避{defEva}";
             bool defIsFlying = defender.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true;
             bool atkIsGrounded = attacker.GetEffectiveClasses()?.Contains(UnitClass.Flying) != true;
             if (defIsFlying && atkIsGrounded && skill.AttackType == AttackType.Melee)
             {
-                hitChance /= 2;
-                hitFormula += "/2(飞行半减)";
+                modifiedHitChance /= 2;
+                hitFormula = "(" + hitFormula + ") / 2(飞行防御)";
             }
-            hitChance = Math.Clamp(hitChance, 0, 100);
-            lines.Add("  命中:" + hitFormula + "=" + hitChance + "% | 闪避:" + defEva + "% | 格挡:" + defender.GetCurrentBlockRate() + "% | 会心:" + attacker.GetCurrentCritRate() + "%");
+            int hitChance = Math.Clamp(modifiedHitChance, 0, 100);
+            string clampNote = modifiedHitChance != hitChance ? $"，显示上限/下限后 {hitChance}%" : $"，最终 {hitChance}%";
+            lines.Add("  命中率: " + hitFormula + " = " + modifiedHitChance + "%" + clampNote);
+            lines.Add("  判定数据: " + FormatUnitName(defender) + "回避 " + defEva + "% | " + FormatUnitName(damageReceiver) + "格挡 " + damageReceiver.GetCurrentBlockRate() + "% | " + FormatUnitName(attacker) + "暴击 " + attacker.GetCurrentCritRate() + "%");
+            if (calc.HitCount > 1)
+                lines.Add("  段数: " + calc.HitCount + " hit | 命中 " + calc.LandedHits + " | 未命中 " + calc.MissedHits + " | 回避 " + calc.EvadedHits + " | 无效 " + calc.NullifiedHits);
 
-            // Hit result
             if (!result.IsHit)
             {
-                lines.Add("  ▶ MISS");
+                lines.Add(result.IsEvaded ? "  * EVADE" : "  * MISS");
                 return lines;
             }
             if (result.IsEvaded)
-            {
-                lines.Add("  ▶ EVADE");
-                return lines;
-            }
+                lines.Add("  * EVADE: 已回避 " + calc.EvadedHits + " hit，其余命中段继续结算");
+            if (calc.NullifiedHits > 0)
+                lines.Add("  * NULLIFY: 已无效 " + calc.NullifiedHits + " hit");
 
-            // Line 3-4: ATK/DEF breakdown + damage formula
             string flags = "";
-            if (result.IsCritical) flags += "CRIT(×" + calc.CritMultiplier.ToString("F1") + ") ";
+            if (result.IsCritical) flags += "CRIT(x" + calc.CritMultiplier.ToString("F1") + ") ";
             if (result.IsBlocked) flags += "BLOCK(-" + (calc.BlockReduction * 100).ToString("F0") + "%) ";
 
             int diff = Math.Max(1, calc.FinalAttackPower - calc.FinalDefense);
             float powerRatio = skill.Power / 100f;
             float classMult = calc.ClassTraitMultiplier;
 
-            lines.Add("  物攻:" + calc.FinalAttackPower + " | 物防:" + calc.FinalDefense + " | 差值=" + diff);
+            lines.Add("  Atk:" + calc.FinalAttackPower + " | Def:" + calc.FinalDefense + " | Diff:" + diff);
             if (calc.MagicalDamage > 0)
-                lines.Add("  魔伤:" + calc.MagicalDamage);
+                lines.Add("  MagicDamage:" + calc.MagicalDamage);
 
-            string formula = "  伤害:(" + calc.FinalAttackPower + "-" + calc.FinalDefense + "=" + diff + ")";
-            if (Math.Abs(powerRatio - 1f) > 0.01f) formula += " × " + powerRatio.ToString("F1");
-            if (Math.Abs(classMult - 1f) > 0.01f) formula += " × " + classMult.ToString("F1");
+            string formula = "  Damage:(" + calc.FinalAttackPower + "-" + calc.FinalDefense + "=" + diff + ")";
+            if (Math.Abs(powerRatio - 1f) > 0.01f) formula += " x " + powerRatio.ToString("F1");
+            if (Math.Abs(classMult - 1f) > 0.01f) formula += " x " + classMult.ToString("F1");
             if (calc.MagicalDamage > 0) formula += " + " + calc.MagicalDamage;
             formula += " = " + result.TotalDamage;
             if (flags.Length > 0) formula += " [" + flags.Trim() + "]";
             lines.Add(formula);
 
-            // Result
-            int hpBefore = defender.CurrentHp + result.TotalDamage;
-            if (hpBefore > defender.Data.BaseStats.GetValueOrDefault("HP", 0))
-                hpBefore = defender.Data.BaseStats.GetValueOrDefault("HP", 0);
-            int hpAfter = defender.CurrentHp;
-            string killStr = killed ? " [击倒!]" : "";
-            string ailStr = appliedAilments.Count > 0 ? " | 异常:" + string.Join(",", appliedAilments) : "";
-            lines.Add("  ▶ " + defender.Data.Name + " HP:" + hpBefore + "→" + hpAfter + "(-" + result.TotalDamage + ")" + killStr + ailStr);
+            int hpBefore = damageReceiver.CurrentHp + result.TotalDamage;
+            if (hpBefore > damageReceiver.Data.BaseStats.GetValueOrDefault("HP", 0))
+                hpBefore = damageReceiver.Data.BaseStats.GetValueOrDefault("HP", 0);
+            int hpAfter = damageReceiver.CurrentHp;
+            string killStr = killed ? " [Knockdown]" : "";
+            string ailStr = appliedAilments.Count > 0 ? " | Ailments:" + string.Join(",", appliedAilments) : "";
+            lines.Add("  * " + FormatUnitName(damageReceiver) + " HP:" + hpBefore + "->" + hpAfter + "(-" + result.TotalDamage + ")" + killStr + ailStr);
 
             return lines;
         }

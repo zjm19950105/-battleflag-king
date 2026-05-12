@@ -18,19 +18,18 @@ namespace BattleKing.Ai
 
 		public List<BattleUnit> SelectTargets(BattleUnit caster, Strategy strategy, ActiveSkillData skill)
 		{
-			if (skill.TargetType == TargetType.Self)
-				return new List<BattleUnit> { caster };
+			var defaultTargets = skill.TargetType == TargetType.Self
+				? new List<BattleUnit> { caster }
+				: GetDefaultTargetList(caster, skill);
 
-			var candidates = GetDefaultTargetList(caster, skill);
-			candidates = ApplyCondition(candidates, strategy.Condition1, strategy.Mode1, caster);
-			candidates = ApplyCondition(candidates, strategy.Condition2, strategy.Mode2, caster);
-			candidates = ApplyPositionPriority(candidates, strategy);
+			var candidates = ApplyStrategyConditions(defaultTargets, strategy, caster, skill);
 
-			if (candidates.Count == 0)
+			if (candidates == null || candidates.Count == 0)
 				return null;
 
 			return skill.TargetType switch
 			{
+				TargetType.Self => new List<BattleUnit> { candidates.First() },
 				TargetType.SingleEnemy => new List<BattleUnit> { candidates.First() },
 				TargetType.SingleAlly => new List<BattleUnit> { candidates.First() },
 				TargetType.TwoEnemies => candidates.Take(2).ToList(),
@@ -90,7 +89,6 @@ namespace BattleKing.Ai
 			var targets = new List<BattleUnit> { first };
 			var sidePool = _ctx.GetAliveUnits(first.IsPlayer);
 
-			// Find the unit in the opposite row, same column
 			int col = (first.Position - 1) % 3;
 			bool firstIsFront = first.IsFrontRow;
 			int oppositePos = firstIsFront ? (col + 1 + 3) : (col + 1);
@@ -125,71 +123,219 @@ namespace BattleKing.Ai
 				.ToList();
 		}
 
-		private List<BattleUnit> ApplyCondition(List<BattleUnit> list, Condition condition, ConditionMode mode, BattleUnit caster)
+		private List<BattleUnit> ApplyStrategyConditions(
+			List<BattleUnit> defaultCandidates,
+			Strategy strategy,
+			BattleUnit caster,
+			ActiveSkillData skill)
 		{
-			if (condition == null || list.Count == 0) return list;
+			if (defaultCandidates.Count == 0)
+				return defaultCandidates;
 
-			if (mode == ConditionMode.Only)
+			var slots = GetConditionSlots(strategy)
+				.Where(slot => slot.Condition != null)
+				.ToList();
+			if (slots.Count == 0)
+				return defaultCandidates;
+
+			var requiredCandidates = defaultCandidates;
+			foreach (var slot in slots.Where(slot => slot.Mode == ConditionMode.Only))
 			{
-				// "仅+最低" = keep only units with minimum value
-				if (condition.Operator == "lowest")
-				{
-					return condition.Category switch
-					{
-						ConditionCategory.Hp => list.Where(u => u.CurrentHp == list.Min(x => x.CurrentHp)).ToList(),
-						ConditionCategory.ApPp => list.Where(u => u.CurrentAp == list.Min(x => x.CurrentAp)).ToList(),
-						_ => list.Where(u => _conditionEvaluator.Evaluate(condition, caster, u)).ToList()
-					};
-				}
-				if (condition.Operator == "highest")
-				{
-					return condition.Category switch
-					{
-						ConditionCategory.Hp => list.Where(u => u.CurrentHp == list.Max(x => x.CurrentHp)).ToList(),
-						ConditionCategory.ApPp => list.Where(u => u.CurrentAp == list.Max(x => x.CurrentAp)).ToList(),
-						_ => list.Where(u => _conditionEvaluator.Evaluate(condition, caster, u)).ToList()
-					};
-				}
-				return list.Where(u => _conditionEvaluator.Evaluate(condition, caster, u)).ToList();
+				requiredCandidates = GetMatchingTargets(requiredCandidates, slot.Condition, caster, skill);
+				if (requiredCandidates.Count == 0)
+					return null;
 			}
-			else
+
+			var prioritySlots = slots
+				.Where(slot => slot.Mode == ConditionMode.Priority)
+				.ToList();
+			if (prioritySlots.Count == 0)
+				return requiredCandidates;
+
+			return ApplyPriorityConditions(requiredCandidates, prioritySlots, caster, skill);
+		}
+
+		private List<BattleUnit> ApplyPriorityConditions(
+			List<BattleUnit> candidates,
+			List<ConditionSlot> prioritySlots,
+			BattleUnit caster,
+			ActiveSkillData skill)
+		{
+			if (prioritySlots.Count == 1)
 			{
-				if (condition.Operator == "lowest")
-				{
-					return condition.Category switch
-					{
-						ConditionCategory.Hp => list.OrderBy(u => u.CurrentHp).ThenBy(u => u.Position).ToList(),
-						ConditionCategory.ApPp => list.OrderBy(u => u.CurrentAp).ThenBy(u => u.Position).ToList(),
-						ConditionCategory.AttributeRank => SortByAttributeRank(list, condition, true),
-						_ => list.OrderByDescending(u => _conditionEvaluator.Evaluate(condition, caster, u)).ThenBy(u => u.Position).ToList()
-					};
-				}
-				if (condition.Operator == "highest")
-				{
-					return condition.Category switch
-					{
-						ConditionCategory.Hp => list.OrderByDescending(u => u.CurrentHp).ThenBy(u => u.Position).ToList(),
-						ConditionCategory.ApPp => list.OrderByDescending(u => u.CurrentAp).ThenBy(u => u.Position).ToList(),
-						ConditionCategory.AttributeRank => SortByAttributeRank(list, condition, false),
-						_ => list.OrderByDescending(u => _conditionEvaluator.Evaluate(condition, caster, u)).ThenBy(u => u.Position).ToList()
-					};
-				}
-				return list.OrderByDescending(u => _conditionEvaluator.Evaluate(condition, caster, u)).ThenBy(u => u.Position).ToList();
+				var preferred = GetMatchingTargets(candidates, prioritySlots[0].Condition, caster, skill);
+				return preferred.Count == 0
+					? candidates
+					: OrderByGroups(candidates, preferred);
 			}
+
+			var first = prioritySlots.FirstOrDefault(slot => slot.SlotIndex == 1) ?? prioritySlots[0];
+			var second = prioritySlots.FirstOrDefault(slot => slot.SlotIndex == 2) ?? prioritySlots[^1];
+			var firstMatches = GetMatchingTargets(candidates, first.Condition, caster, skill);
+			var secondMatches = GetMatchingTargets(candidates, second.Condition, caster, skill);
+			var intersection = firstMatches.Where(secondMatches.Contains).ToList();
+			if (intersection.Count > 0)
+				return OrderByGroups(candidates, intersection, secondMatches, firstMatches);
+
+			var positionPriority = prioritySlots.FirstOrDefault(slot => IsFrontOrBackPositionPriority(slot.Condition));
+			if (positionPriority != null)
+			{
+				var positionMatches = GetMatchingTargets(candidates, positionPriority.Condition, caster, skill);
+				if (positionMatches.Count > 0)
+				{
+					var otherMatches = positionPriority.SlotIndex == first.SlotIndex ? secondMatches : firstMatches;
+					return OrderByGroups(candidates, positionMatches, otherMatches);
+				}
+			}
+
+			if (secondMatches.Count > 0)
+				return OrderByGroups(candidates, secondMatches, firstMatches);
+			if (firstMatches.Count > 0)
+				return OrderByGroups(candidates, firstMatches);
+			return candidates;
 		}
 
-		private static List<BattleUnit> SortByAttributeRank(List<BattleUnit> list, Condition condition, bool ascending)
+		private List<BattleUnit> GetMatchingTargets(
+			List<BattleUnit> candidates,
+			Condition condition,
+			BattleUnit caster,
+			ActiveSkillData skill)
 		{
-			string statName = condition.Value?.ToString() ?? "";
-			if (ascending)
-				return list.OrderBy(u => BattleContext.GetStatValue(u, statName)).ThenBy(u => u.Position).ToList();
-			else
-				return list.OrderByDescending(u => BattleContext.GetStatValue(u, statName)).ThenBy(u => u.Position).ToList();
+			if (condition == null || candidates.Count == 0)
+				return candidates;
+
+			if (condition.Operator == "lowest")
+			{
+				int min = candidates.Min(u => GetRankValue(u, condition));
+				return candidates.Where(u => GetRankValue(u, condition) == min).ToList();
+			}
+
+			if (condition.Operator == "highest")
+			{
+				int max = candidates.Max(u => GetRankValue(u, condition));
+				return candidates.Where(u => GetRankValue(u, condition) == max).ToList();
+			}
+
+			return candidates.Where(u => _conditionEvaluator.Evaluate(condition, caster, u, skill)).ToList();
 		}
 
-		private List<BattleUnit> ApplyPositionPriority(List<BattleUnit> list, Strategy strategy)
+		private int GetRankValue(BattleUnit unit, Condition condition)
 		{
-			return list;
+			return condition.Category switch
+			{
+				ConditionCategory.Position => GetPositionRankValue(unit, condition),
+				ConditionCategory.Hp => GetHpRankValue(unit, condition),
+				ConditionCategory.ApPp => GetApPpValue(unit, condition),
+				ConditionCategory.SelfApPp => GetApPpValue(unit, condition),
+				ConditionCategory.AttributeRank => GetAttributeRankValue(unit, condition.Value?.ToString() ?? ""),
+				_ => 0
+			};
 		}
+
+		private int GetPositionRankValue(BattleUnit unit, Condition condition)
+		{
+			if (unit == null)
+				return 0;
+
+			string value = condition.Value?.ToString() ?? "";
+			if (value == "column_unit_count")
+			{
+				int column = (unit.Position - 1) % 3;
+				return _ctx.GetAliveUnits(unit.IsPlayer)
+					.Count(u => (u.Position - 1) % 3 == column);
+			}
+
+			return 0;
+		}
+
+		private static int GetHpRankValue(BattleUnit unit, Condition condition)
+		{
+			if (unit == null)
+				return 0;
+
+			string value = condition.Value?.ToString() ?? "";
+			if (value == "ratio")
+			{
+				int maxHp = unit.Data?.BaseStats?.GetValueOrDefault("HP", 1) ?? 1;
+				if (maxHp <= 0) maxHp = 1;
+				return (int)((float)unit.CurrentHp / maxHp * 100000);
+			}
+
+			return unit.CurrentHp;
+		}
+
+		private static int GetAttributeRankValue(BattleUnit unit, string statName)
+		{
+			if (unit == null) return 0;
+
+			// HP priority intentionally follows current HP. MaxHp is separate for
+			// the original-style "highest/lowest ability" catalog.
+			if (string.Equals(statName, "HP", System.StringComparison.OrdinalIgnoreCase))
+				return unit.CurrentHp;
+			if (string.Equals(statName, "MaxHp", System.StringComparison.OrdinalIgnoreCase))
+				return unit.GetCurrentStat("HP");
+			if (string.Equals(statName, "MaxAp", System.StringComparison.OrdinalIgnoreCase))
+				return unit.MaxAp;
+			if (string.Equals(statName, "MaxPp", System.StringComparison.OrdinalIgnoreCase))
+				return unit.MaxPp;
+
+			return unit.GetCurrentStat(statName);
+		}
+
+		private static int GetApPpValue(BattleUnit unit, Condition condition)
+		{
+			if (unit == null) return 0;
+			string resource = condition.Value?.ToString() ?? "AP";
+			if (resource.Contains(":"))
+				resource = resource.Split(':')[0];
+
+			return resource.Equals("PP", System.StringComparison.OrdinalIgnoreCase)
+				? unit.CurrentPp
+				: unit.CurrentAp;
+		}
+
+		private static List<BattleUnit> OrderByGroups(List<BattleUnit> candidates, params List<BattleUnit>[] groups)
+		{
+			var ordered = new List<BattleUnit>();
+			var seen = new HashSet<BattleUnit>();
+			foreach (var group in groups)
+			{
+				if (group == null || group.Count == 0)
+					continue;
+
+				foreach (var candidate in candidates)
+				{
+					if (group.Contains(candidate) && seen.Add(candidate))
+						ordered.Add(candidate);
+				}
+			}
+
+			foreach (var candidate in candidates)
+			{
+				if (seen.Add(candidate))
+					ordered.Add(candidate);
+			}
+
+			return ordered;
+		}
+
+		private static bool IsFrontOrBackPositionPriority(Condition condition)
+		{
+			string value = condition?.Value?.ToString() ?? "";
+			return condition?.Category == ConditionCategory.Position
+				&& condition.Operator == "equals"
+				&& (value == "front" || value == "back");
+		}
+
+		private static IEnumerable<ConditionSlot> GetConditionSlots(Strategy strategy)
+		{
+			if (strategy == null)
+				yield break;
+
+			yield return new ConditionSlot(strategy.Condition1, strategy.Mode1, 1);
+			yield return new ConditionSlot(strategy.Condition2, strategy.Mode2, 2);
+		}
+
+		private sealed record ConditionSlot(Condition Condition, ConditionMode Mode, int SlotIndex);
 	}
 }

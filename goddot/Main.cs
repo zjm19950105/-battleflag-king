@@ -1,74 +1,178 @@
-using Godot;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using BattleKing.Core;
-using BattleKing.Data;
-using BattleKing.Ai;
-using BattleKing.Equipment;
-using BattleKing.Ui;
+using Godot; // 引入 Godot 引擎的类，比如 Node2D、Label、按钮、布局容器等。
+using System; // 引入 C# 基础库，比如 Random、Action、基础类型等。
+using System.Collections.Generic; // 引入 List、Dictionary 这类集合工具。
+using System.Linq; // 引入 ToList、Where、Select 等方便处理集合的方法。
+using BattleKing.Core; // 引入本项目的战斗核心代码，比如 BattleEngine、BattleUnit、BattleContext。
+using BattleKing.Data; // 引入本项目的数据读取和数据模型，比如 GameDataRepository、CharacterData。
+using BattleKing.Ui; // 引入本项目拆出去的 UI 视图和流程控制类。
 
-public enum GamePhase
+public partial class Main : Node2D // 定义 Godot 主场景脚本类；继承 Node2D 表示它是一个 2D 节点。
 {
-	ModeSelect,
-	PlayerFormation,
-	EnemyChoice,
-	EnemyDragFormation,
-	EquipmentSetup,
-	PassiveSetup,
-	StrategySetup,
-	Battle,
-	Result
-}
-
-public partial class Main : Node2D
-{
-	private TextEdit _logLabel;
+	private RichTextLabel _logLabel; // 战斗日志显示框，可以显示带格式的富文本。
 	
-	private HSplitContainer _splitter;
-	private VBoxContainer _leftPanel;
-	private VBoxContainer _rightPanel;
-	private Label _statusLabel;
-	private HBoxContainer _buttonBar;
-	private float _fontScale = 1.0f;
-	private static readonly int BASE_FONT = 28;
+	private HSplitContainer _splitter; // 左右分栏容器，用来把界面分成左侧和右侧。
+	private VBoxContainer _leftPanel; // 左侧竖向面板，通常放主操作内容。
+	private VBoxContainer _rightPanel; // 右侧竖向面板，通常放状态、日志或辅助内容。
+	private Label _statusLabel; // 顶部或界面上的状态文字，比如当前阶段提示。
+	private HBoxContainer _buttonBar; // 横向按钮栏，用来放下一步、返回等按钮。
+	private ScrollContainer _buttonBarScroll; // 底部按钮栏外层滚动容器。
+	private float _fontScale = 1.15f; // 字体缩放倍率，1.15 表示比基础字体稍大一点。
+	private static readonly int BASE_FONT = 32; // 基础字体大小；readonly 表示运行时不再修改。
+	private static readonly Vector2I DefaultWindowSize = new(1280, 720);
+	private static readonly Vector2I MinimumWindowSize = new(960, 540);
+	private static readonly Vector2I[] ResolutionPresets = // 预设分辨率数组，每个 Vector2I 是宽和高。
+	{
+		new(1280, 720), // 预设分辨率：1280 x 720。
+		new(1600, 900), // 预设分辨率：1600 x 900。
+		new(1920, 1080), // 预设分辨率：1920 x 1080。
+		new(2048, 1152), // 预设分辨率：2048 x 1152。
+		new(2560, 1440), // 预设分辨率：2560 x 1440。
+		new(2560, 1600), // 预设分辨率：2560 x 1600。
+		new(3440, 1440) // 预设分辨率：3440 x 1440。
+	};
 
-	private GamePhase _phase;
-	private GameDataRepository _gameData;
-	private System.Random _rnd = new();
-	private List<CharacterData> _allChars;
+	private BattleUiFlowController _flow; // UI 流程控制器，负责在主菜单、布阵、战斗等阶段之间切换。
+	private FormationSetupView _formationSetupView; // 布阵界面，负责选择玩家和敌人的上场角色。
+	private EquipmentSetupView _equipmentSetupView; // 装备设置界面，负责给角色选择装备。
+	private PassiveSetupView _passiveSetupView; // 被动技能设置界面，负责给角色选择被动。
+	private StrategySetupView _strategySetupView; // 策略设置界面，负责配置 AI 条件和行动。
+	private BattleView _battleView; // 战斗显示界面，负责展示战斗过程、按钮和日志。
+	private TestSandboxView _testSandboxView; // 测试场景界面，用来快速拖阵容、调装备策略、跑战斗日志。
+	private GameDataRepository _gameData; // 游戏数据仓库，负责从 JSON 读取角色、技能、装备等数据。
+	private BattleSetupService _battleSetup; // 战斗创建服务，负责把选择结果组装成真正的战斗单位。
+	private System.Random _rnd = new(); // 随机数工具，用于随机敌人、随机配置等。
+	private List<CharacterData> _allChars; // 所有角色数据列表，通常从 _gameData 里读取出来。
 
-	private string[] _playerSlots = new string[6];
-	private string[] _enemySlots = new string[6];
-	private bool _enemyUseDrag;
-	private int _minSlots = 3;
-	private int _selectedDay = 1;
-	private bool _selectedCc = false;
+	private string[] _playerSlots = new string[6]; // 玩家 6 个站位槽，字符串一般存角色 ID。
+	private string[] _enemySlots = new string[6]; // 敌人 6 个站位槽，字符串一般存角色 ID。
+	private bool _enemyUseDrag; // 敌人是否也使用拖拽方式布阵。
+	private int _minSlots = 3; // 最少上场人数，当前默认至少 3 人。
+	private int _selectedDay = 1; // 当前选择的天数或关卡日，默认第 1 天。
+	private bool _selectedCc = false; // 是否启用 CC 相关规则，默认关闭。
+	private bool _fullscreenEnabled = false; // 是否启用全屏，默认关闭，避免小屏幕启动时按钮跑出屏幕。
+	private Vector2I _manualResolution = DefaultWindowSize; // 手动窗口分辨率，默认 1280 x 720。
+	private string _displayNotice = ""; // 最近一次显示设置应用后的提示。
 
-	private BattleContext _ctx;
-	private BattleEngine _engine;
-	private BattleKing.Skills.PassiveSkillProcessor _passiveProc;
-	private List<BattleUnit> _playerUnits;
-	private List<BattleUnit> _enemyUnits;
-	private List<(string, int, string)> _enemyConfig;
-	private int _equipSetupIdx;
-	private int _passiveSetupIdx;
-	private int _strategySetupIdx;
-	private bool _editingEnemyStrategies;
-	private BattleResult _battleResult;
-	private Node _logOriginalParent;
+	private BattleContext _ctx; // 一场战斗的上下文，保存双方单位、回合状态、事件等。
+	private BattleEngine _engine; // 战斗引擎，负责推进战斗状态机和执行行动。
+	private List<BattleUnit> _playerUnits; // 玩家实际参战单位列表。
+	private List<BattleUnit> _enemyUnits; // 敌人实际参战单位列表。
+	private List<(string, int, string)> _enemyConfig; // 敌人配置列表；元组里通常放角色 ID、等级或站位、附加配置。
+	private int _equipSetupIdx; // 当前正在设置装备的角色下标。
+	private int _passiveSetupIdx; // 当前正在设置被动技能的角色下标。
+	private int _strategySetupIdx; // 当前正在设置策略的角色下标。
+	private bool _editingEnemyStrategies; // 当前是否在编辑敌方策略，而不是玩家策略。
+	private BattleResult _battleResult; // 战斗结束后的结果，比如胜利、失败或平局。
 
 	// ── GODOT ────────────────────────────────────────────────
 
 	public override void _Ready()
 	{
 		GD.Print("Hello Battle King");
+		InitializeDisplaySettings();
 		_gameData = new GameDataRepository();
 		_gameData.LoadAll(ProjectSettings.GlobalizePath("res://data"));
+		_battleSetup = new BattleSetupService(_gameData);
 		_allChars = _gameData.Characters.Values.ToList();
 		SetupUi();
+		_flow = new BattleUiFlowController(_leftPanel, _rightPanel, _buttonBar, _logLabel, Btn, RenderPhase);
+		_formationSetupView = new FormationSetupView(_leftPanel, _rightPanel, _buttonBar, _allChars, Btn);
+		_equipmentSetupView = new EquipmentSetupView(_leftPanel, _rightPanel, _buttonBar, Btn);
+		_passiveSetupView = new PassiveSetupView(_leftPanel, _rightPanel, _buttonBar, Btn);
+		_strategySetupView = new StrategySetupView(_leftPanel, _rightPanel, _buttonBar, Btn);
+		_battleView = new BattleView(_leftPanel, _logLabel, _buttonBar, Btn, _flow.MoveLogToRightPanel);
+		_testSandboxView = new TestSandboxView(_leftPanel, _rightPanel, _buttonBar, _logLabel, _allChars, _gameData, Btn, _flow.MoveLogToRightPanel, _flow.GoBack);
 		Log("数据加载完成 — 战旗之王 Phase 1.3");
-		Go(GamePhase.ModeSelect);
+		_flow.Go(GamePhase.MainMenu);
+	}
+
+	private void InitializeDisplaySettings()
+	{
+		DisplayServer.WindowSetMinSize(GetWindowMinimumForCurrentScreen());
+		ApplyDisplaySettings(fullscreen: false, DefaultWindowSize);
+	}
+
+	private static Vector2I GetCurrentScreenSize()
+	{
+		return DisplayServer.ScreenGetSize(DisplayServer.WindowGetCurrentScreen());
+	}
+
+	private static Rect2I GetCurrentScreenUsableRect()
+	{
+		var screen = DisplayServer.WindowGetCurrentScreen();
+		var rect = DisplayServer.ScreenGetUsableRect(screen);
+		return rect.Size.X > 0 && rect.Size.Y > 0
+			? rect
+			: new Rect2I(Vector2I.Zero, DisplayServer.ScreenGetSize(screen));
+	}
+
+	private static Vector2I ClampWindowResolution(Vector2I requested, out string notice)
+	{
+		var usable = GetCurrentScreenUsableRect();
+		var max = new Vector2I(Math.Max(1, usable.Size.X), Math.Max(1, usable.Size.Y));
+		var min = GetWindowMinimumForCurrentScreen();
+		var clamped = new Vector2I(
+			Math.Clamp(requested.X, min.X, max.X),
+			Math.Clamp(requested.Y, min.Y, max.Y));
+
+		notice = clamped == requested
+			? ""
+			: $"请求的窗口分辨率 {requested.X} x {requested.Y} 已调整为 {clamped.X} x {clamped.Y}，确保窗口留在当前显示器内。";
+		return clamped;
+	}
+
+	private static Vector2I GetWindowMinimumForCurrentScreen()
+	{
+		var usable = GetCurrentScreenUsableRect();
+		return new Vector2I(
+			Math.Min(MinimumWindowSize.X, Math.Max(1, usable.Size.X)),
+			Math.Min(MinimumWindowSize.Y, Math.Max(1, usable.Size.Y)));
+	}
+
+	private static void CenterWindow(Vector2I resolution)
+	{
+		var usable = GetCurrentScreenUsableRect();
+		var position = new Vector2I(
+			usable.Position.X + Math.Max(0, (usable.Size.X - resolution.X) / 2),
+			usable.Position.Y + Math.Max(0, (usable.Size.Y - resolution.Y) / 2));
+		DisplayServer.WindowSetPosition(position);
+	}
+
+	private void ApplyDisplaySettings(bool fullscreen, Vector2I resolution)
+	{
+		_fullscreenEnabled = fullscreen;
+		DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+
+		if (fullscreen)
+		{
+			var screen = GetCurrentScreenSize();
+			DisplayServer.WindowSetSize(screen);
+			DisplayServer.WindowSetPosition(GetCurrentScreenUsableRect().Position);
+			DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
+			_displayNotice = "";
+			ApplyResponsiveLayout();
+			return;
+		}
+
+		DisplayServer.WindowSetMinSize(GetWindowMinimumForCurrentScreen());
+		var clamped = ClampWindowResolution(resolution, out var notice);
+		_manualResolution = clamped;
+		DisplayServer.WindowSetSize(clamped);
+		CenterWindow(clamped);
+		_displayNotice = notice;
+		ApplyResponsiveLayout();
+	}
+
+	private void ApplyResponsiveLayout()
+	{
+		if (_splitter == null)
+			return;
+
+		var width = GetViewportRect().Size.X;
+		_leftPanel.CustomMinimumSize = width <= 1400 ? new Vector2(420, 0) : new Vector2(520, 0);
+#pragma warning disable CS0618
+		_splitter.SplitOffset = width <= 1400 ? 680 : 760;
+#pragma warning restore CS0618
 	}
 
 	// ── LAYOUT: status → formation-area → button-bar → log ──
@@ -90,13 +194,13 @@ public partial class Main : Node2D
 		_splitter = new HSplitContainer();
 		_splitter.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
 #pragma warning disable CS0618
-			_splitter.SplitOffset = 400;
+			_splitter.SplitOffset = 680;
 #pragma warning restore CS0618
 			_splitter.DraggerVisibility = Godot.SplitContainer.DraggerVisibilityEnum.Visible;
 		root.AddChild(_splitter);
 
 		_leftPanel = new VBoxContainer();
-		_leftPanel.CustomMinimumSize = new Vector2(300, 0);
+		_leftPanel.CustomMinimumSize = new Vector2(420, 0);
 		_splitter.AddChild(_leftPanel);
 		
 		_rightPanel = new VBoxContainer();
@@ -104,48 +208,55 @@ public partial class Main : Node2D
 		_splitter.AddChild(_rightPanel);
 
 		// 3) Button bar (prominent)
+		_buttonBarScroll = new ScrollContainer
+		{
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(0, 64)
+		};
+		root.AddChild(_buttonBarScroll);
 		_buttonBar = new HBoxContainer();
 		_buttonBar.AddThemeConstantOverride("separation", 8);
-		root.AddChild(_buttonBar);
+		_buttonBarScroll.AddChild(_buttonBar);
 
-		// 4) Log: TextEdit (read-only) — larger font, fills available space
-		_logLabel = new TextEdit();
-		_logLabel.Editable = false;
-		_logLabel.WrapMode = TextEdit.LineWrappingMode.Boundary;
+		// 4) Log: RichTextLabel — larger font, fills available space
+		_logLabel = new RichTextLabel();
+		_logLabel.BbcodeEnabled = false;
+		_logLabel.SelectionEnabled = true;
+		_logLabel.ContextMenuEnabled = true;
+		_logLabel.ScrollFollowing = true;
+		_logLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_logLabel.AddThemeColorOverride("background_color", new Color(0.05f, 0.05f, 0.08f));
-		_logLabel.AddThemeFontSizeOverride("font_size", 20);
+		_logLabel.AddThemeColorOverride("default_color", new Color(0.9f, 0.9f, 0.9f));
+		_logLabel.AddThemeFontSizeOverride("normal_font_size", 36);
 		root.AddChild(_logLabel);
+		ApplyResponsiveLayout();
 	}
 
 	// ── HELPERS ──────────────────────────────────────────────
 
-	private void Log(string msg) => _logLabel.InsertTextAtCaret(msg + "\n");
-	private void ClearLog() => _logLabel.Text = "";
-	private void ClearPanel(Control p) { foreach (var c in p.GetChildren()) c.QueueFree(); }
-	private void ClearAll() { ClearPanel(_leftPanel); ClearPanel(_rightPanel); ClearButtons(); }
-
-	private static string StarStr(int current, int max) => BattleStatusHelper.StarStr(current, max);
+	private void Log(string msg) => BattleLogTextRenderer.Append(_logLabel, msg);
+	private void ClearLog() => _logLabel.Clear();
 
 	private Button Btn(string text, Action onClick)
 	{
-		var b = new Button { Text = text };
+		var b = new Button
+		{
+			Text = text,
+			ClipText = true,
+			TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis
+		};
+		b.CustomMinimumSize = new Vector2(0, 56);
+		b.AddThemeFontSizeOverride("font_size", Math.Max(24, (int)(BASE_FONT * _fontScale)));
 		b.Pressed += () => onClick();
 		return b;
 	}
-	private void AddBtn(string text, Action onClick) => _buttonBar.AddChild(Btn(text, onClick));
-	private void AddBackBtn() {
-		var backTo = _phaseHistory.Count > 0 ? _phaseHistory.Peek() : GamePhase.ModeSelect;
-		_buttonBar.AddChild(Btn("← 上一步", () => GoBack()));
-	}
-	private void ClearButtons() { foreach (var c in _buttonBar.GetChildren()) c.QueueFree(); }
 
 	private void ReapplyFontScale()
 	{
 		int size = Math.Max(10, (int)(BASE_FONT * _fontScale));
 		_statusLabel.AddThemeFontSizeOverride("font_size", size + 4);
-		_logLabel.AddThemeFontSizeOverride("font_size", size + 2);
+		_logLabel.AddThemeFontSizeOverride("normal_font_size", size + 2);
 		if (GetTree() != null)
 			ApplyFontSizeRecursive(GetTree().Root, size);
 	}
@@ -164,30 +275,20 @@ public partial class Main : Node2D
 
 	// ── STATE MACHINE ────────────────────────────────────────
 
-	private Stack<GamePhase> _phaseHistory = new();
-	private bool _suppressHistory;
-
-	private void Go(GamePhase p)
+	private void RenderPhase(GamePhase p)
 	{
-		if (!_suppressHistory && _phase != p)
-			_phaseHistory.Push(_phase);
-		_suppressHistory = false;
-		_phase = p;
-		// Before clearing: reparent log if it was moved to right panel
-		if (_logOriginalParent != null)
-		{
-			if (_rightPanel != null && _logLabel.GetParent() == _rightPanel)
-				_rightPanel.RemoveChild(_logLabel);
-			_logOriginalParent.AddChild(_logLabel);
-			_logOriginalParent = null;
-		}
-		ClearAll();
+		if (_buttonBarScroll != null)
+			_buttonBarScroll.CustomMinimumSize = p == GamePhase.TestSandbox ? new Vector2(0, 34) : new Vector2(0, 64);
+
 		switch (p)
 		{
+			case GamePhase.MainMenu:          Phase_MainMenu(); break;
+			case GamePhase.DisplaySettings:   Phase_DisplaySettings(); break;
 			case GamePhase.ModeSelect:        Phase_ModeSelect(); break;
 			case GamePhase.PlayerFormation:   Phase_PlayerFormation(); break;
 			case GamePhase.PassiveSetup:       Phase_PassiveSetup(); break;
 			case GamePhase.StrategySetup:      Phase_StrategySetup(); break;
+			case GamePhase.TestSandbox:        Phase_TestSandbox(); break;
 			case GamePhase.Battle:             Phase_Battle(); break;
 			case GamePhase.Result:             Phase_Result(); break;
 			case GamePhase.EnemyChoice:       Phase_EnemyChoice(); break;
@@ -195,18 +296,118 @@ public partial class Main : Node2D
 			case GamePhase.EquipmentSetup:     Phase_EquipmentSetup(); break;
 
 		}
-		// Back button for all phases except ModeSelect
-		if (p != GamePhase.ModeSelect) AddBackBtn();
+		if (p != GamePhase.TestSandbox)
+			ReapplyFontScale();
 	}
 
-	private void GoBack()
+	// ── START MENU ───────────────────────────────────────────
+
+	private void Phase_MainMenu()
 	{
-		if (_phaseHistory.Count > 0)
+		_statusLabel.Text = "战旗之王";
+		ClearLog();
+
+		var title = new Label { Text = "战旗之王\n" };
+		title.AddThemeFontSizeOverride("font_size", 56);
+		_leftPanel.AddChild(title);
+		_leftPanel.AddChild(new Label { Text = "战前编程策略 -> 自动战斗\n" });
+		_leftPanel.AddChild(Btn("开始游戏", () => _flow.Go(GamePhase.ModeSelect)));
+		_leftPanel.AddChild(Btn("测试场景", () => _flow.Go(GamePhase.TestSandbox)));
+		_leftPanel.AddChild(Btn("显示设置", () => _flow.Go(GamePhase.DisplaySettings)));
+		_leftPanel.AddChild(Btn("退出", () => GetTree().Quit()));
+
+		var screen = GetCurrentScreenSize();
+		_rightPanel.AddChild(new Label
 		{
-			_suppressHistory = true;
-			Go(_phaseHistory.Pop());
+			Text = $"当前显示器: {screen.X} x {screen.Y}\n当前模式: {(_fullscreenEnabled ? "全屏" : "窗口")}\n\n如果窗口没有铺满屏幕，请进入显示设置，勾选全屏。"
+		});
+	}
+
+	private void Phase_TestSandbox()
+	{
+		_statusLabel.Text = "测试场景";
+		_statusLabel.AddThemeFontSizeOverride("font_size", TestSandboxView.CurrentTitleFontSize);
+		_testSandboxView.Show();
+	}
+
+	private void Phase_DisplaySettings()
+	{
+		_statusLabel.Text = "显示设置";
+		ClearLog();
+
+		var screen = GetCurrentScreenSize();
+		var usable = GetCurrentScreenUsableRect();
+		var scroll = new ScrollContainer
+		{
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill
+		};
+		_leftPanel.AddChild(scroll);
+
+		var settingsPanel = new VBoxContainer
+		{
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+		};
+		scroll.AddChild(settingsPanel);
+
+		settingsPanel.AddChild(new Label
+		{
+			Text = $"当前显示器分辨率: {screen.X} x {screen.Y}\n可用窗口区域: {usable.Size.X} x {usable.Size.Y}\n当前窗口设置: {(_fullscreenEnabled ? "全屏" : $"{_manualResolution.X} x {_manualResolution.Y}")}\n"
+		});
+
+		var fullscreenCheck = new CheckBox
+		{
+			Text = "全屏（自动使用当前显示器分辨率）",
+			ButtonPressed = _fullscreenEnabled
+		};
+		fullscreenCheck.Toggled += on => {
+			if (on)
+				ApplyDisplaySettings(true, GetCurrentScreenSize());
+			else
+				ApplyDisplaySettings(false, _manualResolution);
+			_flow.Go(GamePhase.DisplaySettings);
+		};
+		settingsPanel.AddChild(fullscreenCheck);
+
+		settingsPanel.AddChild(new Label { Text = "\n常用窗口分辨率:" });
+		foreach (var preset in ResolutionPresets)
+		{
+			var captured = preset;
+			settingsPanel.AddChild(Btn($"{captured.X} x {captured.Y}", () => {
+				ApplyDisplaySettings(false, captured);
+				_flow.Go(GamePhase.DisplaySettings);
+			}));
 		}
-		else Go(GamePhase.ModeSelect);
+
+		settingsPanel.AddChild(new Label { Text = "\n手动输入窗口分辨率:" });
+		var row = new HBoxContainer();
+		var widthEdit = new LineEdit { Text = _manualResolution.X.ToString(), PlaceholderText = "宽度" };
+		var heightEdit = new LineEdit { Text = _manualResolution.Y.ToString(), PlaceholderText = "高度" };
+		widthEdit.CustomMinimumSize = new Vector2(180, 56);
+		heightEdit.CustomMinimumSize = new Vector2(180, 56);
+		row.AddChild(widthEdit);
+		row.AddChild(new Label { Text = " x " });
+		row.AddChild(heightEdit);
+		settingsPanel.AddChild(row);
+
+		settingsPanel.AddChild(Btn("应用手动分辨率", () => {
+			if (!int.TryParse(widthEdit.Text, out var width) || !int.TryParse(heightEdit.Text, out var height))
+			{
+				Log("请输入数字宽度和高度。");
+				return;
+			}
+
+			width = Math.Clamp(width, 800, 7680);
+			height = Math.Clamp(height, 450, 4320);
+			ApplyDisplaySettings(false, new Vector2I(width, height));
+			_flow.Go(GamePhase.DisplaySettings);
+		}));
+
+		_rightPanel.AddChild(new Label
+		{
+			Text = $"说明:\n- 勾选全屏会自动读取你的显示器分辨率。\n- 应用窗口分辨率会自动退出全屏。\n- 超出当前显示器可用区域的窗口分辨率会自动调整。\n{(string.IsNullOrWhiteSpace(_displayNotice) ? "" : "\n提示:\n" + _displayNotice + "\n")}"
+		});
+		_flow.AddBackButton();
 	}
 
 	// ── PHASE 0: MODE SELECT ──────────────────────────────
@@ -231,12 +432,13 @@ public partial class Main : Node2D
 		dayOpt.ItemSelected += (long idx) => { int d = (int)idx + 1; ccCheck.Disabled = (d < 5); if (d < 5) { ccCheck.ButtonPressed = false; _selectedCc = false; } };
 		_leftPanel.AddChild(Btn("[1v1 对战] — 双方各上场1人", () => {
 			_minSlots = 1;
-			Go(GamePhase.PlayerFormation);
+			_flow.Go(GamePhase.PlayerFormation);
 		}));
 		_leftPanel.AddChild(Btn("[3v3 对战] — 双方各上场3人", () => {
 			_minSlots = 3;
-			Go(GamePhase.PlayerFormation);
+			_flow.Go(GamePhase.PlayerFormation);
 		}));
+		_flow.AddBackButton();
 	}
 
 	// ── PHASE 1: PLAYER FORMATION ────────────────────────────
@@ -245,12 +447,13 @@ public partial class Main : Node2D
 	{
 		_statusLabel.Text = $"▶  我方阵型 — 拖拽角色到格子 (至少{_minSlots}人，最多6人)";
 		ClearLog();
-		BuildDragUI("我方", _playerSlots, () => {
-			int n = _playerSlots.Count(s => s != null);
+		_formationSetupView.BuildDragUI("我方", _playerSlots, _minSlots, slots => {
+			int n = slots.Count(s => s != null);
 			if (n < _minSlots) { Log($"至少需要{_minSlots}人 (当前{n})"); return; }
-			Log($"我方阵型确认 ({n}人) Day{_selectedDay} CC:{_selectedCc}: {string.Join(",", _playerSlots.Where(s => s != null))}");
-			Go(GamePhase.EnemyChoice);
-		});
+			Log($"我方阵型确认 ({n}人) Day{_selectedDay} CC:{_selectedCc}: {string.Join(",", slots.Where(s => s != null))}");
+			_flow.Go(GamePhase.EnemyChoice);
+		}, RebuildDragPhase);
+		_flow.AddBackButton();
 	}
 
 	// ── PHASE 2: ENEMY CHOICE ────────────────────────────────
@@ -265,7 +468,7 @@ public partial class Main : Node2D
 		_leftPanel.AddChild(Btn("[自定义拖拽敌人]", () => {
 			Array.Clear(_enemySlots);
 			_enemyUseDrag = true;
-			Go(GamePhase.EnemyDragFormation);
+			_flow.Go(GamePhase.EnemyDragFormation);
 		}));
 
 		_leftPanel.AddChild(new Label { Text = "\n── 预设敌人 ──" });
@@ -280,18 +483,20 @@ public partial class Main : Node2D
 				SelectPresetEnemy(idx);
 			}));
 		}
+		_flow.AddBackButton();
 	}
 
 	private void Phase_EnemyDragFormation()
 	{
 		_statusLabel.Text = $"▶  敌方阵型 — 拖拽角色到格子 (至少{_minSlots}人)";
-		BuildDragUI("敌方", _enemySlots, () => {
-			int n = _enemySlots.Count(s => s != null);
+		_formationSetupView.BuildDragUI("敌方", _enemySlots, _minSlots, slots => {
+			int n = slots.Count(s => s != null);
 			if (n < _minSlots) { Log($"至少需要{_minSlots}人 (当前{n})"); return; }
 			Log($"敌方阵型确认 ({n}人)");
 			CreateAllUnits(preset: false);
-			Go(GamePhase.EquipmentSetup);
-		});
+			_flow.Go(GamePhase.EquipmentSetup);
+		}, RebuildDragPhase);
+		_flow.AddBackButton();
 	}
 
 	private void SelectPresetEnemy(int idx)
@@ -311,60 +516,17 @@ public partial class Main : Node2D
 			_enemyConfig = selected.Units.Select(u => (u.CharacterId, u.Position, u.StrategyPresetId ?? "preset_aggressive")).ToList();
 		}
 		CreateAllUnits(preset: true);
-		Go(GamePhase.PassiveSetup);
-	}
-
-	// ── SHARED DRAG-AND-DROP UI ──────────────────────────────
-
-	private void BuildDragUI(string teamLabel, string[] slots, Action onConfirm)
-	{
-		// Left: scrollable character pool
-		_leftPanel.AddChild(new Label { Text = $"角色池 ({_allChars.Count}人，拖拽到右侧格子)" });
-		var charScroll = new ScrollContainer();
-		charScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		var charList = new VBoxContainer();
-		foreach (var ch in _allChars)
-			charList.AddChild(new DraggableChar { Text = ch.Name, CharId = ch.Id });
-		charScroll.AddChild(charList);
-		_leftPanel.AddChild(charScroll);
-
-		// Right: 6-slot formation grid
-		_rightPanel.AddChild(new Label { Text = "══ 前 排 ══" });
-		var frontRow = new HBoxContainer();
-		_rightPanel.AddChild(frontRow);
-		for (int i = 0; i < 3; i++) AddSlot(frontRow, slots, i);
-
-		_rightPanel.AddChild(new Label { Text = "══ 後 排 ══" });
-		var backRow = new HBoxContainer();
-		_rightPanel.AddChild(backRow);
-		for (int i = 3; i < 6; i++) AddSlot(backRow, slots, i);
-
-		// Highlight: confirm button — bold and prominent
-		int filled = slots.Count(s => s != null);
-		var confirmBtn = Btn($"★ 确认{teamLabel}阵型 ({filled}/{_minSlots}) ★", onConfirm);
-		confirmBtn.AddThemeFontSizeOverride("font_size", 20);
-		if (filled < _minSlots)
-		{
-			confirmBtn.Disabled = true;
-			confirmBtn.Text = $"⚠ 还需{_minSlots - filled}人 — 确认{teamLabel}阵型 ({filled}/{_minSlots})";
-		}
-		_buttonBar.AddChild(confirmBtn);
-	}
-
-	private void AddSlot(HBoxContainer row, string[] slots, int idx)
-	{
-		var slot = new DropSlot(slots, idx, () => RebuildDragPhase());
-		row.AddChild(slot);
-		row.AddChild(Btn("×", () => { slots[idx] = null; RebuildDragPhase(); }));
+		_flow.Go(GamePhase.PassiveSetup);
 	}
 
 	private void RebuildDragPhase()
 	{
-		ClearAll();
-		if (_phase == GamePhase.PlayerFormation)
+		_flow.ClearPanelsAndButtons();
+		if (_flow.CurrentPhase == GamePhase.PlayerFormation)
 			Phase_PlayerFormation();
-		else if (_phase == GamePhase.EnemyDragFormation)
+		else if (_flow.CurrentPhase == GamePhase.EnemyDragFormation)
 			Phase_EnemyDragFormation();
+		ReapplyFontScale();
 	}
 
 	// ── UNIT CREATION ────────────────────────────────────────
@@ -379,8 +541,7 @@ public partial class Main : Node2D
 		{
 			if (_playerSlots[i] != null)
 			{
-				var u = NewUnit(_playerSlots[i], true, i + 1, isCc: _selectedCc);
-				DayProgression.Apply(u, _selectedDay);
+				var u = _battleSetup.CreateUnit(_playerSlots[i], true, i + 1, _selectedDay, isCc: _selectedCc);
 				_playerUnits.Add(u);
 				_ctx.PlayerUnits.Add(u);
 			}
@@ -391,8 +552,7 @@ public partial class Main : Node2D
 		{
 			for (int i = 0; i < _enemyConfig.Count; i++)
 			{
-				var u = NewUnit(_enemyConfig[i].Item1, false, _enemyConfig[i].Item2, isCc: _selectedCc);
-				DayProgression.Apply(u, _selectedDay);
+				var u = _battleSetup.CreateUnit(_enemyConfig[i].Item1, false, _enemyConfig[i].Item2, _selectedDay, isCc: _selectedCc);
 				_enemyUnits.Add(u);
 				_ctx.EnemyUnits.Add(u);
 			}
@@ -404,8 +564,7 @@ public partial class Main : Node2D
 			{
 				if (_enemySlots[i] != null)
 				{
-					var u = NewUnit(_enemySlots[i], false, i + 1, isCc: _selectedCc);
-					DayProgression.Apply(u, _selectedDay);
+					var u = _battleSetup.CreateUnit(_enemySlots[i], false, i + 1, _selectedDay, isCc: _selectedCc);
 					_enemyUnits.Add(u);
 					_ctx.EnemyUnits.Add(u);
 				}
@@ -415,336 +574,56 @@ public partial class Main : Node2D
 
 		// Give enemies additional random passives (on top of auto-equipped defaults)
 		foreach (var u in _enemyUnits.Where(u => u != null))
-		{
-			int usedPp = u.GetUsedPp();
-			var avail = u.GetAvailablePassiveSkillIds()
-				.Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null)
-				.Where(s => !u.EquippedPassiveSkillIds.Contains(s.Id))
-				.OrderBy(_ => _rnd.Next()).ToList();
-			foreach (var s in avail)
-			{
-				if (usedPp + s.PpCost > u.MaxPp) break;
-				u.EquippedPassiveSkillIds.Add(s.Id);
-				usedPp += s.PpCost;
-			}
-		}
-	}
-
-	private BattleUnit NewUnit(string charId, bool isPlayer, int pos, bool isCc = false)
-	{
-		var cd = _gameData.GetCharacter(charId);
-		var u = new BattleUnit(cd, _gameData, isPlayer) { IsPlayer = isPlayer, Position = pos };
-		DayProgression.Apply(u, _selectedDay);
-		u.SetCcState(isCc);
-		var eq = u.IsCc && cd.CcInitialEquipmentIds?.Count > 0 ? cd.CcInitialEquipmentIds : cd.InitialEquipmentIds;
-		if (eq != null) foreach (var eid in eq) { var ed = _gameData.GetEquipment(eid); if (ed != null) u.Equipment.Equip(ed); }
-		ApplyDefaultStrategies(u);
-
-		// Auto-equip default passives (UnlockLevel <= 1) up to PP cap
-		var autoPassives = u.GetAvailablePassiveSkillIds()
-			.Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null)
-			.Where(s => s.UnlockLevel == null || s.UnlockLevel <= 1)
-			.OrderBy(s => s.PpCost).ToList();
-		int ppUsed = 0;
-		foreach (var s in autoPassives)
-		{
-			if (ppUsed + s.PpCost > u.MaxPp) continue;
-			u.EquippedPassiveSkillIds.Add(s.Id);
-			ppUsed += s.PpCost;
-		}
-		return u;
+			_battleSetup.AutoEquipAdditionalPassives(u, _rnd);
 	}
 
 	// ── PHASE 3: PASSIVE SETUP ───────────────────────────────
 
 	// ── PHASE 3: EQUIPMENT SETUP ──────────────────────────
 
-	private void ApplyDefaultStrategies(BattleUnit unit)
-	{
-		string presetId = "char_default_" + unit.Data.Id;
-		var ps = _gameData.GetStrategyPreset(presetId);
-		if (ps == null) return;
-
-		var ids = unit.GetAvailableActiveSkillIds();
-		unit.Strategies = ps.Strategies.Select(s => {
-			string sid = !string.IsNullOrEmpty(s.SkillId) ? s.SkillId
-				: s.SkillIndex >= 0 && s.SkillIndex < ids.Count ? ids[s.SkillIndex] : ids.FirstOrDefault();
-			return sid != null ? new Strategy { SkillId = sid, Condition1 = s.Condition1, Condition2 = s.Condition2, Mode1 = s.Mode1, Mode2 = s.Mode2 } : null;
-		}).Where(s => s != null).ToList();
-
-		if (unit.Strategies.Count > 0)
-		{
-			var firstId = unit.Strategies[0].SkillId;
-			while (unit.Strategies.Count < 8)
-				unit.Strategies.Add(new Strategy { SkillId = firstId });
-		}
-	}
-
 	private void Phase_EquipmentSetup() { _equipSetupIdx = 0; ShowEquipment(); }
 
 	private void ShowEquipment()
 	{
-		ClearAll();
+		_flow.ClearPanelsAndButtons();
 		var units = _playerUnits.Where(u => u != null).ToList();
-		if (_equipSetupIdx >= units.Count) { Go(GamePhase.PassiveSetup); return; }
+		if (_equipSetupIdx >= units.Count) { _flow.Go(GamePhase.PassiveSetup); return; }
 
 		var unit = units[_equipSetupIdx];
 		var cd = unit.Data;
-		bool isCc = unit.IsCc;
-		var slots = EquipmentSlot.GetSlotNames(cd, isCc);
-		var allEquip = _gameData.GetAllEquipment();
-
-		_statusLabel.Text = $"▶  装备配置 [{cd.Name}] — {slots.Count}槽";
-
-		// Left panel: slot dropdowns
-		var slotScroll = new ScrollContainer();
-		slotScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		var slotList = new VBoxContainer();
-		slotScroll.AddChild(slotList);
-		slotList.AddChild(new Label { Text = $"{cd.Name} 装备槽:\n" });
-
-		// Build filtered equipment lists per slot
-		foreach (var slotName in slots)
-		{
-			var current = unit.Equipment.GetBySlot(slotName);
-			string slotLabel = slotName switch
-			{
-				"MainHand" => "主手", "OffHand" => "副手", _ => slotName
-			};
-
-			var row = new HBoxContainer();
-			row.AddChild(new Label { Text = $"[{slotLabel}] " });
-
-			var dropdown = new OptionButton();
-			dropdown.AddItem("(空)");
-			int selectedIdx = 0;
-
-			// Determine which equipment fits this slot
-			string expectedCat = GetExpectedCategory(slotName, cd, isCc);
-			var candidates = new List<EquipmentData>();
-			if (expectedCat != null)
-			{
-				foreach (var eq in allEquip)
-				{
-					if (eq.Category.ToString() == expectedCat && EquipmentSlot.CanEquipCategory(eq.Category, cd, isCc))
-						candidates.Add(eq);
-				}
-			}
-
-			for (int i = 0; i < candidates.Count; i++)
-			{
-				var eq = candidates[i];
-				string desc = eq.Name;
-				foreach (var kv in eq.BaseStats)
-					desc += $" {kv.Key}+{kv.Value}";
-				if (eq.SpecialEffects.Count > 0)
-					desc += $" [{string.Join(",", eq.SpecialEffects)}]";
-				dropdown.AddItem(desc);
-				if (current != null && eq.Id == current.Data.Id)
-					selectedIdx = i + 1;
-			}
-			dropdown.Selected = selectedIdx;
-
-			string slotCapture = slotName;
-			var capsCopy = candidates;
-			dropdown.ItemSelected += (long sel) => {
-				int s = (int)sel;
-				if (s == 0) unit.Equipment.Unequip(slotCapture);
-				else if (s - 1 < capsCopy.Count)
-					unit.Equipment.EquipToSlot(slotCapture, capsCopy[s - 1]);
-				UpdateEquipDetail(unit);
-			};
-			row.AddChild(dropdown);
-			slotList.AddChild(row);
-		}
-
-		_leftPanel.AddChild(slotScroll);
-
-		// Right panel: stat overview
-		UpdateEquipDetail(unit);
-
-		// Bottom buttons
-		AddBtn("→ 确认/下一个角色", () => { _equipSetupIdx++; ShowEquipment(); });
-		AddBtn("→ 全部默认装备", () => { _equipSetupIdx = units.Count; ShowEquipment(); });
-		AddBackBtn();
-	}
-
-	private static string GetExpectedCategory(string slotName, CharacterData cd, bool isCc)
-	{
-		var types = isCc && cd.CcEquippableCategories?.Count > 0 ? cd.CcEquippableCategories : cd.EquippableCategories;
-		var slots = EquipmentSlot.GetSlotNames(cd, isCc);
-		int idx = slots.IndexOf(slotName);
-		if (idx < 0 || idx >= types.Count) return null;
-		return types[idx].ToString();
-	}
-
-	private void UpdateEquipDetail(BattleUnit unit)
-	{
-		ClearPanel(_rightPanel);
-		var cd = unit.Data;
-
-		var detailLabel = new RichTextLabel { BbcodeEnabled = true };
-		detailLabel.AddThemeFontSizeOverride("normal_font_size", 16);
-		detailLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_rightPanel.AddChild(detailLabel);
-
-		detailLabel.AppendText($"[color=yellow]══ {cd.Name} 属性 ══[/color]\n\n");
-
-		var statNames = new[] { "HP", "Str", "Def", "Mag", "MDef", "Hit", "Eva", "Crit", "Block", "Spd", "AP", "PP" };
-		foreach (var sn in statNames)
-		{
-			if (!cd.BaseStats.ContainsKey(sn)) continue;
-			int baseVal = cd.BaseStats[sn];
-			int equipVal = unit.Equipment.GetTotalStat(sn);
-			int buffVal = (int)(baseVal * BattleKing.Equipment.BuffManager.GetTotalBuffRatio(unit, sn));
-			int total = baseVal + equipVal + buffVal;
-
-			string line = $"{sn}: {baseVal}";
-			if (equipVal > 0) line += $" [color=#88ff88]+{equipVal}[/color]";
-			if (equipVal < 0) line += $" [color=#ff8888]{equipVal}[/color]";
-			if (buffVal != 0) line += $" [color=#8888ff]+{buffVal}(buff)[/color]";
-			if (equipVal != 0 || buffVal != 0) line += $" [color=yellow]= {total}[/color]";
-
-			detailLabel.AppendText(line + "\n");
-		}
-
-		detailLabel.AppendText("\n[color=cyan]══ 当前装备 ══[/color]\n");
-		foreach (var e in unit.Equipment.AllEquipped)
-		{
-			string stats = string.Join(" ", e.Data.BaseStats.Select(kv => $"{kv.Key}+{kv.Value}"));
-			detailLabel.AppendText($"{e.Data.Name}: {stats}\n");
-		}
+		_statusLabel.Text = $"▶  装备配置 [{cd.Name}] — {EquipmentSetupView.GetSlotCount(unit)}槽";
+		_equipmentSetupView.Show(
+			unit,
+			_gameData,
+			() => { _equipSetupIdx++; ShowEquipment(); },
+			() => { _equipSetupIdx = units.Count; ShowEquipment(); },
+			_flow.GoBack);
+		ReapplyFontScale();
 	}
 
 	private void Phase_PassiveSetup() { _passiveSetupIdx = 0; ShowPassive(); }
 
 	private void ShowPassive()
 	{
-		ClearAll();
+		_flow.ClearPanelsAndButtons();
 		var units = _playerUnits.Where(u => u != null).ToList();
 		if (_passiveSetupIdx >= units.Count)
 		{
-			Go(GamePhase.StrategySetup);
+			_flow.Go(GamePhase.StrategySetup);
 			return;
 		}
 
 		var unit = units[_passiveSetupIdx];
-		_statusLabel.Text = $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{StarStr(unit.GetUsedPp(), unit.MaxPp)}[/color]";
-		_leftPanel.AddChild(new Label { Text = $"{unit.Data.Name} 可用被动 (可设置发动条件):\n" });
-
-		foreach (var s in unit.GetAvailablePassiveSkillIds().Select(id => _gameData.GetPassiveSkill(id)).Where(s => s != null))
-		{
-			bool on = unit.EquippedPassiveSkillIds.Contains(s.Id);
-
-			// Toggle button
-			var toggleRow = new HBoxContainer();
-			toggleRow.AddChild(Btn($"{(on ? "[✓]" : "[  ]")} {s.Name} PP{s.PpCost} [{s.TriggerTiming}]", () => {
-				if (on) { unit.EquippedPassiveSkillIds.Remove(s.Id); unit.PassiveConditions.Remove(s.Id); Log($"  卸下: {s.Name}"); }
-				else if (!unit.CanEquipPassive(s.Id)) { Log("  PP不足!"); return; }
-				else { unit.EquippedPassiveSkillIds.Add(s.Id); Log($"  装备: {s.Name}"); }
-				ShowPassive();
-			}));
-			_leftPanel.AddChild(toggleRow);
-
-			// If equipped, show condition selector
-			if (on)
-			{
-				var condRow = new HBoxContainer();
-				condRow.AddChild(new Label { Text = "    发动条件:" });
-
-				var cond = unit.PassiveConditions.TryGetValue(s.Id, out var c) ? c : null;
-				var catOpt = new OptionButton();
-				catOpt.AddItem("(无条件)");
-				int catSel = 0;
-				var cats = ConditionMeta.AllCategories;
-				for (int ci = 0; ci < cats.Count; ci++)
-				{
-					catOpt.AddItem(ConditionMeta.CategoryLabel(cats[ci]));
-					if (cond != null && cats[ci] == cond.Category) catSel = ci + 1;
-				}
-				catOpt.Selected = catSel;
-				catOpt.ItemSelected += (long idx) => {
-					int i = (int)idx;
-					if (i <= 0) { unit.PassiveConditions.Remove(s.Id); }
-					else {
-						var cat = cats[i - 1];
-						var ops = ConditionMeta.GetOperators(cat);
-						var vals = ConditionMeta.GetValues(cat, ops[0]);
-						unit.PassiveConditions[s.Id] = ConditionMeta.BuildCondition(cat, ops[0], vals[0], true);
-					}
-					ShowPassive();
-				};
-				condRow.AddChild(catOpt);
-
-				// If category selected, show operator + value
-				if (catSel > 0)
-				{
-					var curCat = cats[catSel - 1];
-					var ops = ConditionMeta.GetOperators(curCat);
-					var opOpt = new OptionButton();
-					int opSel = 0;
-					for (int oi = 0; oi < ops.Count; oi++)
-					{
-						opOpt.AddItem(ops[oi]);
-						if (cond != null && ops[oi] == (cond.Operator switch { "less_than" => "低于", "greater_than" => "高于", "equals" => "等于", "lowest" => "最低", "highest" => "最高", _ => ops[oi] }))
-							opSel = oi;
-					}
-					opOpt.Selected = opSel;
-					opOpt.ItemSelected += (long _) => ShowPassive();
-					condRow.AddChild(opOpt);
-
-					var vals = ConditionMeta.GetValues(curCat, ops[opSel]);
-					var valOpt = new OptionButton();
-					int valSel = 0;
-					for (int vi = 0; vi < vals.Count; vi++)
-					{
-						valOpt.AddItem(vals[vi]);
-						if (cond != null && vals[vi] == cond.Value?.ToString()) valSel = vi;
-					}
-					valOpt.Selected = valSel;
-					valOpt.ItemSelected += (long _) => ShowPassive();
-					condRow.AddChild(valOpt);
-
-					// Save on each selection
-					catOpt.ItemSelected += (long idx) => {
-						int ii = (int)idx;
-						if (ii <= 0) { unit.PassiveConditions.Remove(s.Id); }
-						else {
-							var cc = cats[ii - 1];
-							var oo = ConditionMeta.GetOperators(cc);
-							var vv = ConditionMeta.GetValues(cc, oo[opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? Math.Min(opOpt.Selected, oo.Count - 1) : 0]);
-							var vo = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? Math.Min(valOpt.Selected, vv.Count - 1) : 0;
-							unit.PassiveConditions[s.Id] = ConditionMeta.BuildCondition(cc, oo[0], vv[vo], true);
-						}
-					};
-				}
-
-				_leftPanel.AddChild(condRow);
-			}
-		}
-
-		// Show first equipped passive detail in right panel
-		var firstEquippedId = unit.EquippedPassiveSkillIds.FirstOrDefault();
-		if (firstEquippedId != null) {
-			var ps = _gameData.GetPassiveSkill(firstEquippedId);
-			if (ps != null) PassiveDetailHelper.Show(_rightPanel, ps, true);
-		}
-
-		AddBtn("→ 下一个", () => { Log($"  [{unit.Data.Name}] 被动完成"); _passiveSetupIdx++; ShowPassive(); });
-		AddBtn("→ 全部跳过", () => { _passiveSetupIdx = units.Count; ShowPassive(); });
-		AddBackBtn();
-	}
-
-	private void ApplyPresetStrat(BattleUnit u, (string, int, string) cfg)
-	{
-		var pid = string.IsNullOrEmpty(cfg.Item3) || !_gameData.StrategyPresets.ContainsKey(cfg.Item3) ? "preset_aggressive" : cfg.Item3;
-		var ps = _gameData.GetStrategyPreset(pid);
-		var ids = u.GetAvailableActiveSkillIds();
-		u.Strategies = ps.Strategies.Select(s => {
-			string sid = !string.IsNullOrEmpty(s.SkillId) ? s.SkillId
-				: s.SkillIndex >= 0 && s.SkillIndex < ids.Count ? ids[s.SkillIndex] : ids.FirstOrDefault();
-			return sid != null ? new Strategy { SkillId = sid, Condition1 = s.Condition1, Condition2 = s.Condition2, Mode1 = s.Mode1, Mode2 = s.Mode2 } : null;
-		}).Where(s => s != null).ToList();
+		_statusLabel.Text = _passiveSetupView.BuildStatusText(unit);
+		_passiveSetupView.Show(
+			unit,
+			_gameData,
+			Log,
+			ShowPassive,
+			() => { Log($"  [{unit.Data.Name}] 被动完成"); _passiveSetupIdx++; ShowPassive(); },
+			() => { _passiveSetupIdx = units.Count; ShowPassive(); },
+			_flow.GoBack);
+		ReapplyFontScale();
 	}
 
 	// ── PHASE 4: STRATEGY SETUP ──────────────────────────────
@@ -753,7 +632,7 @@ public partial class Main : Node2D
 
 	private void ShowStrategy()
 	{
-		ClearAll();
+		_flow.ClearPanelsAndButtons();
 		var units = _editingEnemyStrategies
 			? _enemyUnits.Where(u => u != null).ToList()
 			: _playerUnits.Where(u => u != null).ToList();
@@ -768,250 +647,21 @@ public partial class Main : Node2D
 				ShowStrategy();
 				return;
 			}
-			Go(GamePhase.Battle);
+			_flow.Go(GamePhase.Battle);
 			return;
 		}
 
 		var unit = units[_strategySetupIdx];
 		string teamLabel = _editingEnemyStrategies ? "[敌方]" : "[我方]";
-		var avail = unit.GetAvailableActiveSkillIds().Select(id => _gameData.GetActiveSkill(id)).Where(s => s != null).ToList();
 		_statusLabel.Text = $"▶  策略编程 {teamLabel} [{unit.Data.Name}] — 技能条件组合";
-
-		// Left: scrollable strategy editor
-		var stratScroll = new ScrollContainer();
-		stratScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		var stratList = new VBoxContainer();
-		stratScroll.AddChild(stratList);
-
-		stratList.AddChild(new Label { Text = $"{unit.Data.Name} — 8条策略栏位 (AP:{unit.CurrentAp}/{unit.MaxAp})\n" });
-
-		for (int i = 0; i < 8; i++)
-		{
-			int slot = i;
-			var s = unit.Strategies.Count > i ? unit.Strategies[i] : null;
-
-			// Separator
-			if (i > 0) stratList.AddChild(new HSeparator());
-
-			// Row header: slot number + skill dropdown
-			var headerRow = new HBoxContainer();
-			headerRow.AddChild(new Label { Text = $"[{slot + 1}]" });
-			var skillOpt = new OptionButton();
-			skillOpt.AddItem("(空)");
-			int skillSel = 0;
-			for (int j = 0; j < avail.Count; j++)
-			{
-				skillOpt.AddItem($"{avail[j].Name} AP{avail[j].ApCost}");
-				if (s != null && avail[j].Id == s.SkillId) skillSel = j + 1;
-			}
-			skillOpt.Selected = skillSel;
-			int cap = slot;
-			skillOpt.ItemSelected += (long idx) => {
-				int si = (int)idx;
-				while (unit.Strategies.Count <= cap) unit.Strategies.Add(new Strategy { SkillId = avail[0].Id });
-				unit.Strategies[cap].SkillId = si == 0 ? avail[0].Id : avail[si - 1].Id;
-			};
-			headerRow.AddChild(skillOpt);
-			stratList.AddChild(headerRow);
-
-			// Condition 1 row
-			BuildConditionRow(stratList, unit, slot, isCond1: true);
-
-			// Condition 2 row
-			BuildConditionRow(stratList, unit, slot, isCond1: false);
-		}
-
-		_leftPanel.AddChild(stratScroll);
-
-		// Right: skill detail
-		UpdateSkillDetail(unit);
-
-		// Bottom
-		string nextLabel = _editingEnemyStrategies ? "→ 下一个敌方角色" : "→ 下一个我方角色";
-		AddBtn(nextLabel, () => { _strategySetupIdx++; ShowStrategy(); });
-		string skipLabel = _editingEnemyStrategies ? "→ 敌方全默认(开始战斗)" : "→ 跳过全部策略配置";
-		AddBtn(skipLabel, () => { _strategySetupIdx = units.Count; ShowStrategy(); });
-		AddBackBtn();
-	}
-
-	private void BuildConditionRow(VBoxContainer parent, BattleUnit unit, int slot, bool isCond1)
-	{
-		var strategy = unit.Strategies.Count > slot ? unit.Strategies[slot] : null;
-		var cond = isCond1 ? strategy?.Condition1 : strategy?.Condition2;
-		var mode = isCond1 ? strategy?.Mode1 : strategy?.Mode2;
-		bool isOnly = mode == ConditionMode.Only;
-
-		// Row 1: category + operator + value + mode buttons
-		var row1 = new HBoxContainer();
-		string label = isCond1 ? "  条件1:" : "  条件2:";
-		row1.AddChild(new Label { Text = label });
-
-		var catOpt = new OptionButton();
-		catOpt.AddItem("(无)");
-		int catSel = 0;
-		for (int c = 0; c < ConditionMeta.AllCategories.Count; c++)
-		{
-			catOpt.AddItem(ConditionMeta.CategoryLabel(ConditionMeta.AllCategories[c]));
-			if (cond != null && ConditionMeta.AllCategories[c] == cond.Category) catSel = c + 1;
-		}
-		catOpt.Selected = catSel;
-
-		var opOpt = new OptionButton();
-		var valOpt = new OptionButton();
-
-		// Mode toggle buttons: [优先] [仅]
-		var priBtn = new Button { Text = "优先", Flat = false };
-		var onlyBtn = new Button { Text = "仅", Flat = false };
-		priBtn.AddThemeColorOverride("font_color", isOnly ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.3f, 1.0f, 0.3f));
-		onlyBtn.AddThemeColorOverride("font_color", isOnly ? new Color(1.0f, 0.3f, 0.3f) : new Color(0.6f, 0.6f, 0.6f));
-		Label previewLabel = new Label();
-
-		// Populate operator & value
-		var selCat = catSel > 0 ? ConditionMeta.AllCategories[catSel - 1] : (ConditionCategory?)null;
-		RebuildCondDropdowns(opOpt, valOpt, selCat, cond?.Operator, cond?.Value);
-
-		Action refreshUi = () => {
-			bool nowOnly = onlyBtn.GetMeta("active", false).AsBool();
-			priBtn.AddThemeColorOverride("font_color", nowOnly ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.3f, 1.0f, 0.3f));
-			onlyBtn.AddThemeColorOverride("font_color", nowOnly ? new Color(1.0f, 0.3f, 0.3f) : new Color(0.6f, 0.6f, 0.6f));
-			SaveCondition(unit, slot, isCond1, catOpt, opOpt, valOpt, nowOnly);
-			// Update preview
-			previewLabel.Text = BuildCondPreview(catOpt, opOpt, valOpt, nowOnly);
-		};
-
-		// Use SetMeta to track only/priority state
-		onlyBtn.SetMeta("active", Variant.From(isOnly));
-		priBtn.SetMeta("active", Variant.From(!isOnly));
-
-		priBtn.Pressed += () => {
-			onlyBtn.SetMeta("active", Variant.From(false));
-			priBtn.SetMeta("active", Variant.From(true));
-			refreshUi();
-		};
-		onlyBtn.Pressed += () => {
-			onlyBtn.SetMeta("active", Variant.From(true));
-			priBtn.SetMeta("active", Variant.From(false));
-			refreshUi();
-		};
-
-		// Cascade handlers
-		catOpt.ItemSelected += (long idx) => {
-			int ci = (int)idx;
-			var newCat = ci > 0 ? ConditionMeta.AllCategories[ci - 1] : (ConditionCategory?)null;
-			RebuildCondDropdowns(opOpt, valOpt, newCat, null, null);
-			refreshUi();
-		};
-		opOpt.ItemSelected += (long _) => {
-			int ci = catOpt.Selected;
-			var curCat = ci > 0 ? ConditionMeta.AllCategories[ci - 1] : (ConditionCategory?)null;
-			string curOp = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : null;
-			RebuildValueDropdown(valOpt, curCat, curOp);
-			refreshUi();
-		};
-		valOpt.ItemSelected += (_) => refreshUi();
-
-		row1.AddChild(catOpt);
-		row1.AddChild(opOpt);
-		row1.AddChild(valOpt);
-		row1.AddChild(priBtn);
-		row1.AddChild(onlyBtn);
-		parent.AddChild(row1);
-
-		// Row 2: preview text
-		var row2 = new HBoxContainer();
-		row2.AddChild(new Label { Text = "       → " });
-		previewLabel.Text = BuildCondPreview(catOpt, opOpt, valOpt, isOnly);
-		previewLabel.AddThemeColorOverride("font_color", new Color(0.7f, 0.7f, 1.0f));
-		row2.AddChild(previewLabel);
-		parent.AddChild(row2);
-	}
-
-	private static string BuildCondPreview(OptionButton catOpt, OptionButton opOpt, OptionButton valOpt, bool isOnly)
-	{
-		int ci = catOpt.Selected;
-		if (ci <= 0) return "(无条件)";
-		string cat = catOpt.GetItemText(ci);
-		string op = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : "";
-		string val = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? valOpt.GetItemText(valOpt.Selected) : "";
-		string modeStr = isOnly ? "仅" : "优先";
-		if (string.IsNullOrEmpty(op) || op == "-") return $"[{modeStr}] {cat}";
-		if (string.IsNullOrEmpty(val) || val == "-") return $"[{modeStr}] {cat} {op}";
-		return $"[{modeStr}] {cat} {op}{val}";
-	}
-
-	private static void RebuildCondDropdowns(OptionButton opOpt, OptionButton valOpt, ConditionCategory? cat, string currentOp, object currentVal)
-	{
-		opOpt.Clear();
-		if (cat == null) { opOpt.AddItem("-"); valOpt.Clear(); valOpt.AddItem("-"); return; }
-
-		var ops = ConditionMeta.GetOperators(cat.Value);
-		int opSel = 0;
-		for (int o = 0; o < ops.Count; o++)
-		{
-			opOpt.AddItem(ops[o]);
-			if (ops[o] == currentOp) opSel = o;
-		}
-		opOpt.Selected = opSel;
-		string selOp = ops[opSel];
-		RebuildValueDropdown(valOpt, cat, selOp);
-	}
-
-	private static void RebuildValueDropdown(OptionButton valOpt, ConditionCategory? cat, string op)
-	{
-		valOpt.Clear();
-		if (cat == null || string.IsNullOrEmpty(op)) { valOpt.AddItem("-"); return; }
-
-		var vals = ConditionMeta.GetValues(cat.Value, op);
-		foreach (var v in vals) valOpt.AddItem(v);
-	}
-
-	private void SaveCondition(BattleUnit unit, int slot, bool isCond1, OptionButton catOpt, OptionButton opOpt, OptionButton valOpt, bool isOnly)
-	{
-		while (unit.Strategies.Count <= slot)
-			unit.Strategies.Add(new Strategy { SkillId = unit.GetAvailableActiveSkillIds().FirstOrDefault() ?? "" });
-
-		int ci = catOpt.Selected;
-		if (ci <= 0)
-		{
-			if (isCond1) { unit.Strategies[slot].Condition1 = null; unit.Strategies[slot].Mode1 = ConditionMode.Priority; }
-			else { unit.Strategies[slot].Condition2 = null; unit.Strategies[slot].Mode2 = ConditionMode.Priority; }
-			return;
-		}
-
-		var cat = ConditionMeta.AllCategories[ci - 1];
-		string op = opOpt.Selected >= 0 && opOpt.ItemCount > 0 ? opOpt.GetItemText(opOpt.Selected) : "";
-		string val = valOpt.Selected >= 0 && valOpt.ItemCount > 0 ? valOpt.GetItemText(valOpt.Selected) : "";
-
-		var cond = ConditionMeta.BuildCondition(cat, op, val, isOnly);
-		if (isCond1) { unit.Strategies[slot].Condition1 = cond; unit.Strategies[slot].Mode1 = isOnly ? ConditionMode.Only : ConditionMode.Priority; }
-		else { unit.Strategies[slot].Condition2 = cond; unit.Strategies[slot].Mode2 = isOnly ? ConditionMode.Only : ConditionMode.Priority; }
-	}
-
-	private void UpdateSkillDetail(BattleUnit unit)
-	{
-		ClearPanel(_rightPanel);
-		var detailLabel = new RichTextLabel { BbcodeEnabled = true };
-		detailLabel.AddThemeFontSizeOverride("normal_font_size", 15);
-		detailLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_rightPanel.AddChild(detailLabel);
-
-		detailLabel.AppendText($"[color=yellow]══ 策略编程说明 ══[/color]\n\n");
-		detailLabel.AppendText("每条策略 = 技能 + 条件1 + 条件2\n\n");
-		detailLabel.AppendText("[color=cyan]条件组合逻辑:[/color]\n");
-		detailLabel.AppendText("• 仅+仅 = AND (两个条件都满足才发动)\n");
-		detailLabel.AppendText("• 仅+优先 = 先过滤, 再排序\n");
-		detailLabel.AppendText("• 优先+优先 = 条件2优先于条件1!\n");
-		detailLabel.AppendText("  顺序: 1+2 > 2 > 1\n\n");
-		detailLabel.AppendText("[color=cyan]模式:[/color]\n");
-		detailLabel.AppendText("• 仅 = 条件不满足则[color=red]跳过技能[/color]\n");
-		detailLabel.AppendText("• 优先(不勾选仅) = 条件不满足[color=green]仍会发动[/color]\n\n");
-		detailLabel.AppendText($"[color=orange]{unit.Data.Name} 可用技能:[/color]\n");
-		foreach (var sid in unit.GetAvailableActiveSkillIds())
-		{
-			var sk = _gameData.GetActiveSkill(sid);
-			if (sk == null) continue;
-			detailLabel.AppendText($"  AP{sk.ApCost} {sk.Name} — {sk.EffectDescription}\n");
-		}
+		_strategySetupView.Show(
+			unit,
+			_gameData,
+			_editingEnemyStrategies,
+			() => { _strategySetupIdx++; ShowStrategy(); },
+			() => { _strategySetupIdx = units.Count; ShowStrategy(); },
+			_flow.GoBack);
+		ReapplyFontScale();
 	}
 
 // ── PHASE 5: BATTLE ──────────────────────────────────────
@@ -1020,77 +670,13 @@ public partial class Main : Node2D
 
 	private void Phase_Battle()
 	{
-		ClearAll();
-		_statusLabel.Text = "▶  战斗 — 点击「下一步」逐行动推进";
-
-		// Left: unit status — fill panel height
-		var unitScroll = new ScrollContainer();
-		unitScroll.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		unitScroll.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_leftPanel.AddChild(unitScroll);
-		var unitLabel = new RichTextLabel { BbcodeEnabled = true };
-		unitLabel.AddThemeFontSizeOverride("normal_font_size", 16);
-		unitLabel.AddThemeColorOverride("default_color", new Color(0.9f, 0.9f, 0.9f));
-		unitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		unitLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		unitLabel.ScrollFollowing = true;
-		unitScroll.AddChild(unitLabel);
-
-		// Right: reparent log TextEdit — full height
-		_logOriginalParent = _logLabel.GetParent();
-		if (_logOriginalParent != null) _logOriginalParent.RemoveChild(_logLabel);
-		_logLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		_logLabel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		_rightPanel.AddChild(_logLabel);
-
-		// Init engine
+		_flow.ClearPanelsAndButtons();
+		_statusLabel.Text = "▶  战斗 — 点击「下一名角色行动」逐个角色推进";
 		_engine = new BattleEngine(_ctx);
-		_engine.OnLog = msg => { _logLabel.InsertTextAtCaret(msg + "\n"); };
-		_passiveProc = new BattleKing.Skills.PassiveSkillProcessor(_engine.EventBus, _gameData,
-			msg => { _logLabel.InsertTextAtCaret(msg + "\n"); },
-			_engine.EnqueueAction);
-		_passiveProc.SubscribeAll();
-		_engine.InitBattle();
-
-		ClearLog();
-		RefreshBattleStatus(unitLabel);
-
-		AddBtn("▶ 下一步", () => StepOneAction(unitLabel));
-	}
-
-	private static string ClassColor(UnitClass c) => BattleStatusHelper.ClassColor(c);
-
-	private void AppendUnitStatus(RichTextLabel label, BattleUnit u)
-	{
-		BattleStatusHelper.AppendUnit(label, u);
-	}
-
-	private void RefreshBattleStatus(RichTextLabel label)
-	{
-		label.Clear();
-		label.AppendText("[color=yellow]══ 战场 ══[/color]\n\n");
-		label.AppendText("[color=cyan]▸ 己方[/color]\n");
-		foreach (var u in _playerUnits) AppendUnitStatus(label, u);
-		label.AppendText("\n[color=orange]▸ 敌方[/color]\n");
-		foreach (var u in _enemyUnits) AppendUnitStatus(label, u);
-	}
-
-	private void StepOneAction(RichTextLabel label)
-	{
-		var result = _engine.StepOneAction();
-		RefreshBattleStatus(label);
-		if (result == SingleActionResult.PlayerWin || result == SingleActionResult.EnemyWin || result == SingleActionResult.Draw)
-		{
-			ClearButtons();
-			_battleResult = result switch
-			{
-				SingleActionResult.PlayerWin => BattleResult.PlayerWin,
-				SingleActionResult.EnemyWin => BattleResult.EnemyWin,
-				_ => BattleResult.Draw
-			};
-			Log("\n=== " + _battleResult + " ===");
-			AddBtn("结果", () => Go(GamePhase.Result));
-		}
+		_battleView.Show(_engine, _ctx, _gameData, result => {
+			_battleResult = result;
+			_flow.Go(GamePhase.Result);
+		});
 	}
 
 	// ── PHASE 6: RESULT ──────────────────────────────────────
@@ -1099,76 +685,7 @@ public partial class Main : Node2D
 	{
 		_statusLabel.Text = $"战斗结果: {_battleResult}";
 		Log($"\n=== {_battleResult} ===");
-		AddBtn("再来一局", () => { Array.Clear(_playerSlots); Array.Clear(_enemySlots); Go(GamePhase.ModeSelect); });
-		AddBtn("结束", () => { _statusLabel.Text = "游戏结束"; });
-	}
-}
-
-// ── DRAG SOURCE ─────────────────────────────────────────────
-
-public partial class DraggableChar : Button
-{
-	public string CharId;
-	public DraggableChar() { MouseDefaultCursorShape = Control.CursorShape.Drag; }
-	public override Variant _GetDragData(Vector2 atPosition)
-	{
-		SetDragPreview(new Label { Text = Text });
-		return CharId;
-	}
-}
-
-// ── DROP TARGET ─────────────────────────────────────────────
-
-public partial class DropSlot : Panel
-{
-	private string[] _slots;
-	private int _idx;
-	private Action _onChanged;
-	private Label _label;
-
-	public DropSlot(string[] slots, int idx, Action onChanged)
-	{
-		_slots = slots; _idx = idx; _onChanged = onChanged;
-		CustomMinimumSize = new Vector2(90, 52);
-		AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.18f, 0.18f, 0.22f) });
-		_label = new Label { HorizontalAlignment = HorizontalAlignment.Center };
-		_label.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		AddChild(_label);
-		UpdateDisplay();
-	}
-
-	private void UpdateDisplay()
-	{
-		_label.Text = _slots[_idx] != null ? $"[{_idx + 1}]\n{_slots[_idx]}" : $"[{_idx + 1}]\n空";
-	}
-
-	public override Variant _GetDragData(Vector2 atPosition)
-	{
-		if (_slots[_idx] == null) return default;
-		SetDragPreview(new Label { Text = $"[{_idx + 1}] {_slots[_idx]}" });
-		return $"SLOT:{_idx}:{_slots[_idx]}";
-	}
-
-	public override bool _CanDropData(Vector2 atPosition, Variant data)
-		=> data.VariantType == Variant.Type.String;
-
-	public override void _DropData(Vector2 atPosition, Variant data)
-	{
-		string raw = (string)data;
-		if (raw.StartsWith("SLOT:"))
-		{
-			var parts = raw.Split(':', 3);
-			int srcIdx = int.Parse(parts[1]);
-			string srcChar = parts[2];
-			string myChar = _slots[_idx];
-			_slots[srcIdx] = myChar;
-			_slots[_idx] = srcChar;
-		}
-		else
-		{
-			_slots[_idx] = raw;
-		}
-		UpdateDisplay();
-		_onChanged?.Invoke();
+		_flow.AddButton("再来一局", () => { Array.Clear(_playerSlots); Array.Clear(_enemySlots); _flow.Go(GamePhase.ModeSelect); });
+		_flow.AddButton("结束", () => { _statusLabel.Text = "游戏结束"; });
 	}
 }

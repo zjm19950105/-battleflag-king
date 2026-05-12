@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using BattleKing.Ai;
 using BattleKing.Data;
 using NUnit.Framework;
 
@@ -40,6 +42,87 @@ namespace BattleKing.Tests
             "phys_def",
             "mag_def",
             "block_rate"
+        };
+
+        private static readonly HashSet<string> AttackAttributeConditionValues = new()
+        {
+            "physical",
+            "magical",
+            "melee",
+            "ranged",
+            "row",
+            "column",
+            "all"
+        };
+
+        // These are legacy Phase 1 skill records that still carry behavior in Tags
+        // without structured Effects. Keep this list explicit so new tag-only combat
+        // logic cannot enter data quietly; remove entries as effects are migrated.
+        private const string LegacyTagOnlyReason = "Legacy tag-only skill pending structured effects migration.";
+        private static readonly Dictionary<string, string> LegacyTagOnlySkillAllowlist = new()
+        {
+            ["active:act_pierce"] = LegacyTagOnlyReason,
+            ["active:act_kill_chain"] = LegacyTagOnlyReason,
+            ["active:act_cavalry_bane"] = LegacyTagOnlyReason,
+            ["active:act_arrow_cover"] = LegacyTagOnlyReason,
+            ["active:act_shield_bash"] = LegacyTagOnlyReason,
+            ["active:act_attract_attention"] = LegacyTagOnlyReason,
+            ["active:act_enhanced_spear"] = LegacyTagOnlyReason,
+            ["active:act_spear_pierce"] = LegacyTagOnlyReason,
+            ["active:act_throwing_spear"] = LegacyTagOnlyReason,
+            ["active:act_whirlwind_slash"] = LegacyTagOnlyReason,
+            ["active:act_break_formation"] = LegacyTagOnlyReason,
+            ["active:act_spike"] = LegacyTagOnlyReason,
+            ["active:act_line_defense"] = LegacyTagOnlyReason,
+            ["active:act_great_shield"] = LegacyTagOnlyReason,
+            ["active:act_full_assault"] = LegacyTagOnlyReason,
+            ["active:act_formation_breaker"] = LegacyTagOnlyReason,
+            ["active:act_accumulate"] = LegacyTagOnlyReason,
+            ["active:act_heavy_slayer"] = LegacyTagOnlyReason,
+            ["active:act_charge_strike"] = LegacyTagOnlyReason,
+            ["active:act_line_destruction"] = LegacyTagOnlyReason,
+            ["active:act_single_shot"] = LegacyTagOnlyReason,
+            ["active:act_dual_shot"] = LegacyTagOnlyReason,
+            ["active:act_array_shot"] = LegacyTagOnlyReason,
+            ["active:act_heavy_bolt"] = LegacyTagOnlyReason,
+            ["active:act_poison_bolt"] = LegacyTagOnlyReason,
+            ["active:act_frontline_heavy_bolt"] = LegacyTagOnlyReason,
+            ["active:act_passive_steal"] = LegacyTagOnlyReason,
+            ["active:act_poison_throw"] = LegacyTagOnlyReason,
+            ["active:act_shadow_bite"] = LegacyTagOnlyReason,
+            ["active:act_thunderstorm"] = LegacyTagOnlyReason,
+            ["active:act_volcano"] = LegacyTagOnlyReason,
+            ["active:act_ice_arrow"] = LegacyTagOnlyReason,
+            ["active:act_magic_missile"] = LegacyTagOnlyReason,
+            ["active:act_ice_coffin"] = LegacyTagOnlyReason,
+            ["active:act_hache"] = LegacyTagOnlyReason,
+            ["active:act_dive_strike"] = LegacyTagOnlyReason,
+            ["active:act_wing_gust"] = LegacyTagOnlyReason,
+            ["active:act_passive_curse"] = LegacyTagOnlyReason,
+            ["active:act_attack_curse"] = LegacyTagOnlyReason,
+            ["active:act_defense_curse"] = LegacyTagOnlyReason,
+            ["active:act_curse_disaster"] = LegacyTagOnlyReason,
+            ["passive:pas_rapid_order"] = LegacyTagOnlyReason,
+            ["passive:pas_hundred_crit"] = LegacyTagOnlyReason,
+            ["passive:pas_muscle_swelling"] = LegacyTagOnlyReason,
+            ["passive:pas_formation_counter"] = LegacyTagOnlyReason,
+            ["passive:pas_calm_cover"] = LegacyTagOnlyReason,
+            ["passive:pas_hawk_eye"] = LegacyTagOnlyReason,
+            ["passive:pas_rapid_reload"] = LegacyTagOnlyReason,
+            ["passive:pas_emergency_cover"] = LegacyTagOnlyReason,
+            ["passive:pas_cut_grass"] = LegacyTagOnlyReason,
+            ["passive:pas_fervor"] = LegacyTagOnlyReason,
+            ["passive:pas_quick_reload"] = LegacyTagOnlyReason,
+            ["passive:pas_aid_cover"] = LegacyTagOnlyReason,
+            ["passive:pas_pursuit_magic"] = LegacyTagOnlyReason,
+            ["passive:pas_concentration"] = LegacyTagOnlyReason,
+            ["passive:pas_magic_blade"] = LegacyTagOnlyReason,
+            ["passive:pas_quick_cast"] = LegacyTagOnlyReason,
+            ["passive:pas_magic_barrier"] = LegacyTagOnlyReason,
+            ["passive:pas_row_barrier"] = LegacyTagOnlyReason,
+            ["passive:pas_curse_swamp"] = LegacyTagOnlyReason,
+            ["passive:pas_bounce"] = LegacyTagOnlyReason,
+            ["passive:pas_berserk"] = LegacyTagOnlyReason
         };
 
         [Test]
@@ -186,6 +269,86 @@ namespace BattleKing.Tests
             Assert.That(unknownKeys, Is.Empty);
         }
 
+        [Test]
+        public void RealData_StrategyConditionCanonicalValues_AreParseable()
+        {
+            var failures = new List<string>();
+            var presets = LoadList<StrategyPresetData>("strategy_presets.json");
+
+            foreach (var preset in presets)
+            {
+                for (var i = 0; i < preset.Strategies.Count; i++)
+                {
+                    var strategy = preset.Strategies[i];
+                    ValidateConditionValue(strategy.Condition1, $"{preset.Id}.strategies[{i}].condition1", failures);
+                    ValidateConditionValue(strategy.Condition2, $"{preset.Id}.strategies[{i}].condition2", failures);
+                }
+            }
+
+            Assert.That(failures, Is.Empty);
+        }
+
+        [Test]
+        public void RealData_StrategyPresetHpConditionValues_AreRatios()
+        {
+            var strategyPresets = LoadList<StrategyPresetData>("strategy_presets.json");
+            var invalidConditions = new List<string>();
+
+            foreach (var preset in strategyPresets)
+            {
+                for (var index = 0; index < preset.Strategies.Count; index++)
+                {
+                    var strategy = preset.Strategies[index];
+                    AddInvalidHpConditionValue(invalidConditions, preset.Id, index, "condition1", strategy.Condition1);
+                    AddInvalidHpConditionValue(invalidConditions, preset.Id, index, "condition2", strategy.Condition2);
+                }
+            }
+
+            Assert.That(invalidConditions, Is.Empty);
+        }
+
+        [Test]
+        public void RealData_SkillEffectsCoverage_IsReportedAndTagOnlySkillsAreExplicit()
+        {
+            var activeSkills = LoadList<ActiveSkillData>("active_skills.json");
+            var passiveSkills = LoadList<PassiveSkillData>("passive_skills.json");
+            var records = activeSkills
+                .Select(skill => SkillEffectCoverageRecord.FromActive(skill))
+                .Concat(passiveSkills.Select(skill => SkillEffectCoverageRecord.FromPassive(skill)))
+                .ToList();
+
+            WriteEffectCoverageReport("active", records.Where(record => record.Kind == "active"));
+            WriteEffectCoverageReport("passive", records.Where(record => record.Kind == "passive"));
+
+            var tagOnlyKeys = records
+                .Where(record => record.Tags.Count > 0 && record.EffectCount == 0)
+                .Select(record => record.Key)
+                .ToHashSet();
+            var tagOnlyMissingAllowlist = tagOnlyKeys
+                .Where(key => !LegacyTagOnlySkillAllowlist.ContainsKey(key))
+                .OrderBy(key => key)
+                .ToList();
+            var staleAllowlistEntries = LegacyTagOnlySkillAllowlist.Keys
+                .Where(key => !tagOnlyKeys.Contains(key))
+                .OrderBy(key => key)
+                .ToList();
+            var blankReasons = LegacyTagOnlySkillAllowlist
+                .Where(pair => string.IsNullOrWhiteSpace(pair.Value))
+                .Select(pair => pair.Key)
+                .OrderBy(key => key)
+                .ToList();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(tagOnlyMissingAllowlist, Is.Empty,
+                    "Tag-only skills must be explicit legacy exceptions or receive structured effects.");
+                Assert.That(staleAllowlistEntries, Is.Empty,
+                    "Remove allowlist entries when a legacy tag-only skill gains structured effects.");
+                Assert.That(blankReasons, Is.Empty,
+                    "Each tag-only allowlist entry must state why it is temporarily allowed.");
+            });
+        }
+
         private static GameDataRepository LoadRepository()
         {
             var repository = new GameDataRepository();
@@ -214,6 +377,78 @@ namespace BattleKing.Tests
             Assert.That(duplicateIds, Is.Empty, $"{label} contains duplicate ids");
         }
 
+        private static void ValidateConditionValue(Condition? condition, string path, List<string> failures)
+        {
+            if (condition == null)
+            {
+                return;
+            }
+
+            switch (condition.Category)
+            {
+                case ConditionCategory.UnitClass:
+                case ConditionCategory.EnemyClassExists:
+                    RequireStringValue(condition, path, failures, value =>
+                        Enum.TryParse<UnitClass>(value, ignoreCase: false, out _),
+                        "UnitClass enum name");
+                    break;
+                case ConditionCategory.TeamSize:
+                    RequireStringValue(condition, path, failures, value =>
+                        Regex.IsMatch(value, "^(enemy|ally):[1-9][0-9]*$"),
+                        "enemy:N or ally:N");
+                    break;
+                case ConditionCategory.Status:
+                    RequireStringValue(condition, path, failures, IsCanonicalStatusConditionValue,
+                        "buff, debuff, StatusAilment enum name, or not:StatusAilment");
+                    break;
+                case ConditionCategory.AttackAttribute:
+                    RequireStringValue(condition, path, failures, AttackAttributeConditionValues.Contains,
+                        "known attack attribute");
+                    break;
+            }
+        }
+
+        private static void RequireStringValue(
+            Condition condition,
+            string path,
+            List<string> failures,
+            Func<string, bool> isValid,
+            string expected)
+        {
+            var value = ConditionValueToString(condition.Value);
+            if (string.IsNullOrWhiteSpace(value) || !isValid(value))
+            {
+                failures.Add($"{path} has invalid {condition.Category} value '{value ?? "<null>"}'; expected {expected}");
+            }
+        }
+
+        private static bool IsCanonicalStatusConditionValue(string value)
+        {
+            if (value == "buff" || value == "debuff")
+            {
+                return true;
+            }
+
+            if (value.StartsWith("not:", StringComparison.Ordinal))
+            {
+                value = value["not:".Length..];
+            }
+
+            return Enum.TryParse<StatusAilment>(value, ignoreCase: false, out _);
+        }
+
+        private static string? ConditionValueToString(object? value)
+        {
+            return value switch
+            {
+                null => null,
+                JsonElement { ValueKind: JsonValueKind.String } json => json.GetString(),
+                JsonElement { ValueKind: JsonValueKind.Null } => null,
+                JsonElement json => json.ToString(),
+                _ => value.ToString()
+            };
+        }
+
         private static void AddMissingRefs<T>(
             ICollection<string> missingRefs,
             string owner,
@@ -227,6 +462,76 @@ namespace BattleKing.Tests
                     missingRefs.Add($"{owner}: {id}");
                 }
             }
+        }
+
+        private static void AddInvalidHpConditionValue(
+            ICollection<string> invalidConditions,
+            string presetId,
+            int strategyIndex,
+            string conditionName,
+            BattleKing.Ai.Condition? condition)
+        {
+            if (condition == null)
+            {
+                return;
+            }
+
+            if (condition.Category is not (ConditionCategory.Hp or ConditionCategory.SelfHp))
+            {
+                return;
+            }
+
+            if (condition.Operator is "lowest" or "highest")
+            {
+                return;
+            }
+
+            if (!TryReadNumber(condition.Value, out var value) || value < 0 || value > 1)
+            {
+                invalidConditions.Add(
+                    $"{presetId}.strategies[{strategyIndex}].{conditionName} {condition.Category} {condition.Operator} value={condition.Value}");
+            }
+        }
+
+        private static bool TryReadNumber(object? value, out double number)
+        {
+            switch (value)
+            {
+                case JsonElement { ValueKind: JsonValueKind.Number } json:
+                    return json.TryGetDouble(out number);
+                case byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal:
+                    number = Convert.ToDouble(value);
+                    return true;
+                default:
+                    number = default;
+                    return false;
+            }
+        }
+
+        private static void WriteEffectCoverageReport(string kind, IEnumerable<SkillEffectCoverageRecord> records)
+        {
+            var list = records.ToList();
+            var withEffects = list.Count(record => record.EffectCount > 0);
+            var tagOnly = list.Count(record => record.Tags.Count > 0 && record.EffectCount == 0);
+            var noTagsNoEffects = list.Count(record => record.Tags.Count == 0 && record.EffectCount == 0);
+
+            TestContext.WriteLine(
+                $"{kind} skill effects coverage: total={list.Count}, withEffects={withEffects}, tagOnly={tagOnly}, noTagsNoEffects={noTagsNoEffects}");
+        }
+
+        private sealed record SkillEffectCoverageRecord(
+            string Kind,
+            string Id,
+            IReadOnlyList<string> Tags,
+            int EffectCount)
+        {
+            public string Key => $"{Kind}:{Id}";
+
+            public static SkillEffectCoverageRecord FromActive(ActiveSkillData skill) =>
+                new("active", skill.Id, skill.Tags ?? new List<string>(), skill.Effects?.Count ?? 0);
+
+            public static SkillEffectCoverageRecord FromPassive(PassiveSkillData skill) =>
+                new("passive", skill.Id, skill.Tags ?? new List<string>(), skill.Effects?.Count ?? 0);
         }
     }
 }

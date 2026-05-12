@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BattleKing.Core;
 using BattleKing.Data;
 
 namespace BattleKing.Pipeline
@@ -12,6 +13,7 @@ namespace BattleKing.Pipeline
         public bool IsCritical { get; }
         public bool IsBlocked { get; }
         public bool IsEvaded { get; }
+        public BattleUnit ResolvedDefender { get; }
         public IReadOnlyList<StatusAilment> AppliedAilments { get; }
 
         public DamageResult(
@@ -21,7 +23,8 @@ namespace BattleKing.Pipeline
             bool isCritical,
             bool isBlocked,
             bool isEvaded,
-            List<StatusAilment> appliedAilments)
+            List<StatusAilment> appliedAilments,
+            BattleUnit resolvedDefender = null)
         {
             PhysicalDamage = physicalDamage;
             MagicalDamage = magicalDamage;
@@ -29,6 +32,7 @@ namespace BattleKing.Pipeline
             IsCritical = isCritical;
             IsBlocked = isBlocked;
             IsEvaded = isEvaded;
+            ResolvedDefender = resolvedDefender;
             AppliedAilments = appliedAilments != null
                 ? new List<StatusAilment>(appliedAilments)
                 : new List<StatusAilment>();

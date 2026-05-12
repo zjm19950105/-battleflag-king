@@ -41,6 +41,7 @@ namespace BattleKing.Core
         public List<Buff> Buffs { get; private set; } = new List<Buff>();
         public List<StatusAilment> Ailments { get; private set; } = new List<StatusAilment>();
         public List<Strategy> Strategies { get; set; } = new List<Strategy>();
+        public List<PassiveStrategy> PassiveStrategies { get; set; } = new List<PassiveStrategy>();
         public List<string> EquippedPassiveSkillIds { get; set; } = new List<string>();
         public List<string> TemporaryActiveSkillIds { get; private set; } = new List<string>();
         public List<string> TemporaryPassiveSkillIds { get; private set; } = new List<string>();
@@ -186,6 +187,39 @@ namespace BattleKing.Core
                 if (GameData.PassiveSkills.TryGetValue(id, out var skill))
                     result.Add(skill);
             }
+            return result;
+        }
+
+        public List<PassiveStrategy> GetPassiveStrategiesInOrder()
+        {
+            if (PassiveStrategies.Count == 0)
+            {
+                return EquippedPassiveSkillIds
+                    .Select(id => new PassiveStrategy
+                    {
+                        SkillId = id,
+                        Condition1 = PassiveConditions.TryGetValue(id, out var condition) ? condition : null
+                    })
+                    .ToList();
+            }
+
+            var equipped = EquippedPassiveSkillIds.ToHashSet();
+            var result = PassiveStrategies
+                .Where(row => row != null
+                    && !string.IsNullOrWhiteSpace(row.SkillId)
+                    && equipped.Contains(row.SkillId))
+                .ToList();
+
+            var represented = result.Select(row => row.SkillId).ToHashSet();
+            foreach (var id in EquippedPassiveSkillIds.Where(id => !represented.Contains(id)))
+            {
+                result.Add(new PassiveStrategy
+                {
+                    SkillId = id,
+                    Condition1 = PassiveConditions.TryGetValue(id, out var condition) ? condition : null
+                });
+            }
+
             return result;
         }
 

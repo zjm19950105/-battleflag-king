@@ -715,7 +715,14 @@
     "tags": [
       "StealAp1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 4
+        }
+      }
+    ],
     "learnCondition": "恶棍 Lv30",
     "unlockLevel": 30
   },

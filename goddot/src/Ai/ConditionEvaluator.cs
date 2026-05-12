@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using BattleKing.Core;
@@ -27,7 +28,7 @@ namespace BattleKing.Ai
             return Convert.ToInt32(value);
         }
 
-        public bool Evaluate(Condition condition, BattleUnit subject, BattleUnit target = null)
+        public bool Evaluate(Condition condition, BattleUnit subject, BattleUnit target = null, ActiveSkillData skill = null)
         {
             if (condition == null)
                 return true;
@@ -39,31 +40,57 @@ namespace BattleKing.Ai
                 ConditionCategory.Hp => EvaluateHp(condition, subject, target),
                 ConditionCategory.ApPp => EvaluateApPp(condition, subject, target),
                 ConditionCategory.Status => EvaluateStatus(condition, subject, target),
-                ConditionCategory.AttackAttribute => EvaluateAttackAttribute(condition, subject, target),
+                ConditionCategory.AttackAttribute => EvaluateAttackAttribute(condition, subject, target, skill),
                 ConditionCategory.TeamSize => EvaluateTeamSize(condition, subject),
-                ConditionCategory.SelfState => EvaluateSelfState(condition, subject),
+                ConditionCategory.SelfState => EvaluateSelfState(condition, subject, target),
                 ConditionCategory.SelfHp => EvaluateSelfHp(condition, subject),
                 ConditionCategory.SelfApPp => EvaluateSelfApPp(condition, subject),
-                ConditionCategory.EnemyClassExists => EvaluateEnemyClassExists(condition),
+                ConditionCategory.EnemyClassExists => EvaluateEnemyClassExists(condition, subject),
                 ConditionCategory.AttributeRank => EvaluateAttributeRank(condition, subject, target),
-                _ => true
+                _ => false
             };
         }
 
         private bool EvaluatePosition(Condition c, BattleUnit subject, BattleUnit target)
         {
-            if (target == null) return true;
             string value = c.Value?.ToString() ?? "";
+            if (string.Equals(value, "daytime", StringComparison.OrdinalIgnoreCase))
+                return c.Operator == "equals" && _ctx.IsDaytime;
+            if (string.Equals(value, "nighttime", StringComparison.OrdinalIgnoreCase))
+                return c.Operator == "equals" && !_ctx.IsDaytime;
+
+            if (target == null) return true;
             return c.Operator switch
             {
                 "equals" => value switch
                 {
                     "front" => target.IsFrontRow,
                     "back" => !target.IsFrontRow,
-                    _ => true
+                    "front_and_back" => HasAliveOppositeRowUnitInSameColumn(target),
+                    _ => false
                 },
-                _ => true
+                "greater_or_equal" => EvaluateColumnCount(value, target, (count, threshold) => count >= threshold),
+                "less_or_equal" => EvaluateColumnCount(value, target, (count, threshold) => count <= threshold),
+                _ => false
             };
+        }
+
+        private bool EvaluateColumnCount(string value, BattleUnit target, Func<int, int, bool> compare)
+        {
+            if (!TryParsePrefixedInt(value, "column_units:", out int threshold))
+                return false;
+
+            int count = GetAliveColumnUnitCount(target);
+            return compare(count, threshold);
+        }
+
+        private bool HasAliveOppositeRowUnitInSameColumn(BattleUnit target)
+        {
+            int column = (target.Position - 1) % 3;
+            return _ctx.GetAliveUnits(target.IsPlayer)
+                .Any(unit => unit != target
+                    && unit.IsFrontRow != target.IsFrontRow
+                    && (unit.Position - 1) % 3 == column);
         }
 
         private bool EvaluateUnitClass(Condition c, BattleUnit subject, BattleUnit target)
@@ -71,13 +98,13 @@ namespace BattleKing.Ai
             if (target == null) return true;
             string value = c.Value?.ToString() ?? "";
             if (!Enum.TryParse<UnitClass>(value, true, out var unitClass))
-                return true;
+                return false;
 
             return c.Operator switch
             {
-                "equals" => target.Data.Classes.Contains(unitClass),
-                "contains" => target.Data.Classes.Contains(unitClass),
-                _ => true
+                "equals" => target.GetEffectiveClasses().Contains(unitClass),
+                "contains" => target.GetEffectiveClasses().Contains(unitClass),
+                _ => false
             };
         }
 
@@ -86,16 +113,18 @@ namespace BattleKing.Ai
             var unit = target ?? subject;
             if (unit?.Data == null) return true;
 
-            int maxHp = unit.Data.BaseStats.ContainsKey("HP") ? unit.Data.BaseStats["HP"] : 1;
-            if (maxHp <= 0) maxHp = 1;
-            float hpRatio = (float)unit.CurrentHp / maxHp;
+            float hpRatio = GetHpRatio(unit);
 
             return c.Operator switch
             {
                 "less_than" => hpRatio < ToFloat(c.Value),
                 "greater_than" => hpRatio > ToFloat(c.Value),
+                "less_or_equal" => hpRatio <= ToFloat(c.Value),
+                "greater_or_equal" => hpRatio >= ToFloat(c.Value),
                 "equals" => Math.Abs(hpRatio - ToFloat(c.Value)) < 0.001f,
-                _ => true
+                "less_than_average" => hpRatio < GetAverageHpRatio(unit.IsPlayer),
+                "greater_than_average" => hpRatio > GetAverageHpRatio(unit.IsPlayer),
+                _ => false
             };
         }
 
@@ -104,18 +133,19 @@ namespace BattleKing.Ai
             var unit = target ?? subject;
             if (unit == null) return true;
 
-            string resource = c.Value?.ToString() ?? "";
-            int current = resource.ToLower() == "pp" ? unit.CurrentPp : unit.CurrentAp;
-            int max = resource.ToLower() == "pp" ? unit.MaxPp : unit.MaxAp;
-            if (max <= 0) max = 1;
-            float ratio = (float)current / max;
+            if (!TryParseResourceThreshold(c.Value, out string resource, out int threshold))
+                return false;
+
+            int current = GetResourceValue(unit, resource);
 
             return c.Operator switch
             {
-                "less_than" => ratio < Convert.ToSingle(c.Value),
-                "greater_than" => ratio > Convert.ToSingle(c.Value),
-                "equals" => Math.Abs(ratio - Convert.ToSingle(c.Value)) < 0.001f,
-                _ => true
+                "less_than" => current < threshold,
+                "greater_than" => current > threshold,
+                "less_or_equal" => current <= threshold,
+                "greater_or_equal" => current >= threshold,
+                "equals" => current == threshold,
+                _ => false
             };
         }
 
@@ -126,26 +156,22 @@ namespace BattleKing.Ai
 
             string value = c.Value?.ToString() ?? "";
 
-            // "非毒"/"非炎上" etc. — negated ailment check
-            bool negate = value.StartsWith("非");
-            if (negate) value = value.Substring(1);
+            // Unknown values return false so malformed strategy data cannot silently
+            // turn into an always-true condition.
+            bool negate = value.StartsWith("not:", StringComparison.OrdinalIgnoreCase);
+            if (negate) value = value.Substring("not:".Length);
 
             bool result = c.Operator switch
             {
-                "equals" => value.ToLower() switch
-                {
-                    "buff" => unit.Buffs.Any(b => b.Ratio > 0),
-                    "debuff" => unit.Buffs.Any(b => b.Ratio < 0),
-                    "格挡封印" => unit.Ailments.Contains(StatusAilment.BlockSeal),
-                    _ => unit.Ailments.Any(a => a.ToString().Equals(value, StringComparison.OrdinalIgnoreCase))
-                },
-                _ => true
+                "equals" => HasStatus(unit, value),
+                "not_equals" => !HasStatus(unit, value),
+                _ => false
             };
 
             return negate ? !result : result;
         }
 
-        private bool EvaluateSelfState(Condition c, BattleUnit subject)
+        private bool EvaluateSelfState(Condition c, BattleUnit subject, BattleUnit target)
         {
             if (subject == null) return true;
             string value = c.Value?.ToString() ?? "";
@@ -154,28 +180,39 @@ namespace BattleKing.Ai
             {
                 "equals" => value.ToLower() switch
                 {
+                    "self" => target == null || ReferenceEquals(target, subject),
+                    "not_self" => target != null && !ReferenceEquals(target, subject),
+                    "buff" => subject.Buffs.Any(b => b.Ratio > 0 || b.FlatAmount > 0),
+                    "debuff" => subject.Buffs.Any(b => b.Ratio < 0 || b.FlatAmount < 0),
                     "charging" => subject.State == UnitState.Charging,
                     "stunned" => subject.State == UnitState.Stunned,
                     "frozen" => subject.State == UnitState.Frozen,
                     "darkness" => subject.State == UnitState.Darkness,
-                    _ => true
+                    _ => EvaluateActionCount(value, subject)
                 },
-                _ => true
+                _ => false
             };
         }
 
-        private bool EvaluateEnemyClassExists(Condition c)
+        private bool EvaluateEnemyClassExists(Condition c, BattleUnit subject)
         {
+            if (subject == null) return false;
+
             string value = c.Value?.ToString() ?? "";
             if (!Enum.TryParse<UnitClass>(value, true, out var unitClass))
-                return true;
+                return false;
 
-            bool exists = _ctx.EnemyUnits.Any(u => u.IsAlive && u.Data.Classes.Contains(unitClass));
+            var enemyUnits = subject.IsPlayer ? _ctx.EnemyUnits : _ctx.PlayerUnits;
+            bool exists = enemyUnits.Any(u =>
+                u != null
+                && u.IsAlive
+                && u.GetEffectiveClasses().Contains(unitClass));
             return c.Operator switch
             {
                 "equals" => exists,
                 "contains" => exists,
-                _ => true
+                "not_equals" => !exists,
+                _ => false
             };
         }
 
@@ -189,21 +226,28 @@ namespace BattleKing.Ai
             {
                 "less_than" => hpRatio < ToFloat(c.Value),
                 "greater_than" => hpRatio > ToFloat(c.Value),
+                "less_or_equal" => hpRatio <= ToFloat(c.Value),
+                "greater_or_equal" => hpRatio >= ToFloat(c.Value),
                 "equals" => Math.Abs(hpRatio - ToFloat(c.Value)) < 0.001f,
-                _ => true
+                _ => false
             };
         }
 
         private bool EvaluateSelfApPp(Condition c, BattleUnit subject)
         {
             if (subject == null) return true;
-            int threshold = c.Value != null ? ToInt(c.Value) : 0;
+            if (!TryParseResourceThreshold(c.Value, out string resource, out int threshold))
+                return false;
+
+            int current = GetResourceValue(subject, resource);
             return c.Operator switch
             {
-                "less_than" => subject.CurrentAp < threshold,
-                "greater_than" => subject.CurrentAp > threshold,
-                "equals" => subject.CurrentAp == threshold,
-                _ => true
+                "less_than" => current < threshold,
+                "greater_than" => current > threshold,
+                "less_or_equal" => current <= threshold,
+                "greater_or_equal" => current >= threshold,
+                "equals" => current == threshold,
+                _ => false
             };
         }
 
@@ -219,72 +263,225 @@ namespace BattleKing.Ai
             var alive = pool.Where(u => u != null && u.IsAlive).ToList();
             if (alive.Count == 0) return true;
 
-            int targetVal = BattleContext.GetStatValue(target, statName);
+            int targetVal = GetAttributeRankValue(target, statName);
 
             return c.Operator switch
             {
-                "highest" => alive.All(u => BattleContext.GetStatValue(u, statName) <= targetVal),
-                "lowest" => alive.All(u => BattleContext.GetStatValue(u, statName) >= targetVal),
+                "highest" => alive.All(u => GetAttributeRankValue(u, statName) <= targetVal),
+                "lowest" => alive.All(u => GetAttributeRankValue(u, statName) >= targetVal),
                 "greater_than" => targetVal > ToInt(c.Value),
                 "less_than" => targetVal < ToInt(c.Value),
-                _ => true
+                _ => false
             };
         }
 
+        private static int GetAttributeRankValue(BattleUnit unit, string statName)
+        {
+            if (unit == null) return 0;
+
+            // HP rank is about current battle state, so it uses CurrentHp.
+            // Other attributes include equipment and buffs via GetCurrentStat().
+            if (string.Equals(statName, "HP", StringComparison.OrdinalIgnoreCase))
+                return unit.CurrentHp;
+            if (string.Equals(statName, "MaxHp", StringComparison.OrdinalIgnoreCase))
+                return unit.GetCurrentStat("HP");
+            if (string.Equals(statName, "MaxAp", StringComparison.OrdinalIgnoreCase))
+                return unit.MaxAp;
+            if (string.Equals(statName, "MaxPp", StringComparison.OrdinalIgnoreCase))
+                return unit.MaxPp;
+
+            return unit.GetCurrentStat(statName);
+        }
+
         /// <summary>
-        /// EvaluateTeamSize — checks number of alive units on a team.
-        /// Value format: "enemy:N" or "ally:N" (e.g. "enemy:2" = 2+ enemies, "ally:3" = 3+ allies).
+        /// EvaluateTeamSize — checks alive unit count relative to the acting subject.
+        /// Value format: "enemy:N" or "ally:N" (e.g. "enemy:2" = at least 2 enemies).
         /// </summary>
         private bool EvaluateTeamSize(Condition c, BattleUnit subject)
         {
+            if (subject == null) return false;
+
             string raw = c.Value?.ToString() ?? "";
             string[] parts = raw.Split(':');
-            if (parts.Length < 2) return true;
+            if (parts.Length != 2) return false;
             string team = parts[0]; // "enemy" or "ally"
-            if (!int.TryParse(parts[1], out int threshold)) return true;
+            if (!int.TryParse(parts[1], out int threshold)) return false;
 
             int count;
             if (team == "enemy")
-                count = _ctx.EnemyUnits.Count(u => u != null && u.IsAlive);
+                count = GetRelativeTeam(subject, enemy: true).Count(u => u != null && u.IsAlive);
+            else if (team == "ally")
+                count = GetRelativeTeam(subject, enemy: false).Count(u => u != null && u.IsAlive);
             else
-                count = _ctx.PlayerUnits.Count(u => u != null && u.IsAlive);
+                return false;
 
             return c.Operator switch
             {
                 "greater_than" => count > threshold,
                 "less_than" => count < threshold,
+                "greater_or_equal" => count >= threshold,
+                "less_or_equal" => count <= threshold,
                 "equals" => count == threshold,
-                _ => true
+                _ => false
             };
+        }
+
+        private List<BattleUnit> GetRelativeTeam(BattleUnit subject, bool enemy)
+        {
+            bool wantPlayerSide = enemy ? !subject.IsPlayer : subject.IsPlayer;
+            return wantPlayerSide ? _ctx.PlayerUnits : _ctx.EnemyUnits;
         }
 
         /// <summary>
         /// EvaluateAttackAttribute — checks the type of attack being made.
         /// Reads from BattleContext.CurrentCalc set by BattleEngine before BeforeHitEvent.
         /// </summary>
-        private bool EvaluateAttackAttribute(Condition c, BattleUnit subject, BattleUnit target)
+        private bool EvaluateAttackAttribute(Condition c, BattleUnit subject, BattleUnit target, ActiveSkillData skillData = null)
         {
             string value = c.Value?.ToString() ?? "";
             if (string.IsNullOrEmpty(value)) return true;
 
-            var calc = _ctx.CurrentCalc;
-            if (calc == null) return true;
+            skillData ??= _ctx.CurrentCalc?.Skill?.Data;
+            if (skillData == null) return false;
 
             return c.Operator switch
             {
                 "equals" => value.ToLower() switch
                 {
-                    "physical" => calc.Skill.Type == Data.SkillType.Physical,
-                    "magical" => calc.Skill.Type == Data.SkillType.Magical,
-                    "row" => calc.Skill.TargetType == Data.TargetType.Row,
-                    "column" => calc.Skill.TargetType == Data.TargetType.Column,
-                    "all" => calc.Skill.TargetType == Data.TargetType.AllEnemies,
-                    "melee" => calc.Skill.AttackType == Data.AttackType.Melee,
-                    "ranged" => calc.Skill.AttackType == Data.AttackType.Ranged,
-                    _ => true
+                    "physical" => skillData.Type == Data.SkillType.Physical,
+                    "magical" => skillData.Type == Data.SkillType.Magical,
+                    "row" => skillData.TargetType == Data.TargetType.Row,
+                    "column" => skillData.TargetType == Data.TargetType.Column,
+                    "front_and_back" => skillData.TargetType == Data.TargetType.FrontAndBack,
+                    "all" => skillData.TargetType == Data.TargetType.AllEnemies || skillData.TargetType == Data.TargetType.AllAllies,
+                    "melee" => skillData.AttackType == Data.AttackType.Melee,
+                    "ranged" => skillData.AttackType == Data.AttackType.Ranged,
+                    _ => false
                 },
-                _ => true
+                _ => false
             };
+        }
+
+        private int GetAliveColumnUnitCount(BattleUnit target)
+        {
+            if (target == null)
+                return 0;
+
+            int column = (target.Position - 1) % 3;
+            return _ctx.GetAliveUnits(target.IsPlayer)
+                .Count(unit => (unit.Position - 1) % 3 == column);
+        }
+
+        private static float GetHpRatio(BattleUnit unit)
+        {
+            if (unit?.Data == null)
+                return 0f;
+
+            int maxHp = unit.Data.BaseStats.ContainsKey("HP") ? unit.Data.BaseStats["HP"] : 1;
+            if (maxHp <= 0) maxHp = 1;
+            return (float)unit.CurrentHp / maxHp;
+        }
+
+        private float GetAverageHpRatio(bool isPlayer)
+        {
+            var alive = _ctx.GetAliveUnits(isPlayer);
+            if (alive.Count == 0)
+                return 0f;
+
+            return alive.Average(GetHpRatio);
+        }
+
+        private static bool HasStatus(BattleUnit unit, string value)
+        {
+            if (unit == null)
+                return false;
+
+            return value.ToLower() switch
+            {
+                "buff" => unit.Buffs.Any(b => b.Ratio > 0 || b.FlatAmount > 0),
+                "debuff" => unit.Buffs.Any(b => b.Ratio < 0 || b.FlatAmount < 0),
+                "ailment" => unit.Ailments.Count > 0,
+                "none" => !HasAnyStatus(unit),
+                _ => Enum.TryParse<StatusAilment>(value, true, out var ailment)
+                    && unit.Ailments.Contains(ailment)
+            };
+        }
+
+        private static bool HasAnyStatus(BattleUnit unit)
+        {
+            return unit.Buffs.Any(b => b.Ratio != 0 || b.FlatAmount != 0)
+                || unit.Ailments.Count > 0;
+        }
+
+        private static bool EvaluateActionCount(string value, BattleUnit subject)
+        {
+            if (!TryParsePrefixedInt(value, "action:", out int actionNumber))
+                return false;
+
+            return subject.ActionCount + 1 == actionNumber;
+        }
+
+        private static int GetResourceValue(BattleUnit unit, string resource)
+        {
+            return string.Equals(resource, "PP", StringComparison.OrdinalIgnoreCase)
+                ? unit.CurrentPp
+                : unit.CurrentAp;
+        }
+
+        private static bool TryParseResourceThreshold(object rawValue, out string resource, out int threshold)
+        {
+            resource = "AP";
+            threshold = 0;
+
+            if (rawValue is JsonElement json)
+            {
+                if (json.ValueKind == JsonValueKind.Number)
+                {
+                    threshold = json.GetInt32();
+                    return true;
+                }
+
+                if (json.ValueKind == JsonValueKind.String)
+                    rawValue = json.GetString();
+            }
+
+            if (rawValue is int intValue)
+            {
+                threshold = intValue;
+                return true;
+            }
+
+            if (rawValue is long longValue)
+            {
+                threshold = (int)longValue;
+                return true;
+            }
+
+            string value = rawValue?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string[] parts = value.Split(':');
+            if (parts.Length == 2)
+            {
+                resource = parts[0];
+                return int.TryParse(parts[1], out threshold);
+            }
+
+            if (int.TryParse(value, out threshold))
+                return true;
+
+            return false;
+        }
+
+        private static bool TryParsePrefixedInt(string value, string prefix, out int result)
+        {
+            result = 0;
+            if (string.IsNullOrWhiteSpace(value)
+                || !value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return int.TryParse(value.Substring(prefix.Length), out result);
         }
     }
 }

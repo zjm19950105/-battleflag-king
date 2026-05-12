@@ -1,6 +1,6 @@
 <Project Sdk="Godot.NET.Sdk/4.6.2">
   <PropertyGroup>
-    <DefaultItemExcludes>$(DefaultItemExcludes);test/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);test/**;【自用】学习代码用/**</DefaultItemExcludes>
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>

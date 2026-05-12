@@ -15,6 +15,8 @@ namespace BattleKing.Skills
         public SkillType DamageType { get; set; }
         public AttackType AttackType { get; set; }
         public TargetType TargetType { get; set; }
+        public float IgnoreDefenseRatio { get; set; } = 0f;
+        public UnitClass? IgnoreDefenseTargetClass { get; set; }
 
         public List<string> Tags { get; set; } = new List<string>();
 

@@ -79,37 +79,25 @@ namespace BattleKing.Skills
             switch (effect.EffectType)
             {
                 case "ModifyDamageCalc":
-                    ApplyDamageCalculation(parameters, caster, calculation, state, logs);
+                    ApplyCalculationEffect(parameters, caster, calculation, state, effect.EffectType, logs);
                     break;
                 case "AddBuff":
-                    ApplyBuff(context, caster, targets, parameters, sourceSkillId, calculation, logs);
-                    break;
                 case "AddDebuff":
-                    ApplyBuff(context, caster, targets, parameters, sourceSkillId, calculation, logs, forceDebuff: true);
-                    break;
                 case "RemoveBuff":
                 case "RemoveDebuff":
                 case "CleanseDebuff":
-                    ApplyRemoveBuff(context, caster, targets, parameters, calculation, effect.EffectType, logs);
+                    ApplyBuffEffect(context, caster, targets, parameters, sourceSkillId, calculation, effect.EffectType, logs);
                     break;
                 case "RecoverAp":
-                    ApplyRecoverAp(context, caster, targets, parameters, calculation, logs);
-                    break;
                 case "ApDamage":
-                    ApplyApDamage(context, caster, targets, parameters, calculation, logs);
-                    break;
                 case "RecoverPp":
-                    ApplyRecoverPp(context, caster, targets, parameters, calculation, logs);
-                    break;
                 case "PpDamage":
-                    ApplyPpDamage(context, caster, targets, parameters, calculation, logs);
+                    ApplyResourceEffect(context, caster, targets, parameters, calculation, effect.EffectType, logs);
                     break;
                 case "RecoverHp":
                 case "Heal":
-                    ApplyRecoverHp(context, caster, targets, parameters, calculation, logs);
-                    break;
                 case "HealRatio":
-                    ApplyHealRatio(context, caster, targets, parameters, calculation, logs);
+                    ApplyHpEffect(context, caster, targets, parameters, calculation, effect.EffectType, logs);
                     break;
                 case "StatusAilment":
                     ApplyStatusAilment(context, caster, targets, parameters, calculation, logs);
@@ -121,25 +109,43 @@ namespace BattleKing.Skills
                     ApplyModifyCounter(context, caster, targets, parameters, calculation, logs);
                     break;
                 case "ConsumeCounter":
-                    ApplyConsumeCounter(caster, parameters, calculation, state, logs);
+                case "CoverAlly":
+                    ApplyCalculationEffect(parameters, caster, calculation, state, effect.EffectType, logs);
                     break;
                 case "GrantSkill":
                     ApplyGrantSkill(context, caster, targets, parameters, calculation, logs);
                     break;
-                case "CoverAlly":
-                    ApplyCoverAlly(caster, calculation, logs);
-                    break;
                 case "CounterAttack":
-                    ApplyPendingAction(PendingActionType.Counter, caster, targets, parameters, logs);
-                    break;
                 case "PursuitAttack":
-                    ApplyPendingAction(PendingActionType.Pursuit, caster, targets, parameters, logs);
-                    break;
                 case "PreemptiveAttack":
-                    ApplyPendingAction(PendingActionType.Preemptive, caster, targets, parameters, logs);
+                case "BattleEndAttack":
+                case "PendingAttack":
+                    ApplyPendingActionEffect(caster, targets, parameters, sourceSkillId, effect.EffectType, logs);
                     break;
                 default:
                     logs.Add($"{effect.EffectType}: unsupported");
+                    break;
+            }
+        }
+
+        private static void ApplyCalculationEffect(
+            Dictionary<string, object> parameters,
+            BattleUnit caster,
+            DamageCalculation calculation,
+            SkillEffectExecutionState state,
+            string effectType,
+            List<string> logs)
+        {
+            switch (effectType)
+            {
+                case "ModifyDamageCalc":
+                    ApplyDamageCalculation(parameters, caster, calculation, state, logs);
+                    break;
+                case "ConsumeCounter":
+                    ApplyConsumeCounter(caster, parameters, calculation, state, logs);
+                    break;
+                case "CoverAlly":
+                    ApplyCoverAlly(caster, calculation, logs);
                     break;
             }
         }
@@ -231,6 +237,32 @@ namespace BattleKing.Skills
             }
         }
 
+        private static void ApplyBuffEffect(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            string sourceSkillId,
+            DamageCalculation calculation,
+            string effectType,
+            List<string> logs)
+        {
+            switch (effectType)
+            {
+                case "AddBuff":
+                    ApplyBuff(context, caster, targets, parameters, sourceSkillId, calculation, logs);
+                    break;
+                case "AddDebuff":
+                    ApplyBuff(context, caster, targets, parameters, sourceSkillId, calculation, logs, forceDebuff: true);
+                    break;
+                case "RemoveBuff":
+                case "RemoveDebuff":
+                case "CleanseDebuff":
+                    ApplyRemoveBuff(context, caster, targets, parameters, calculation, effectType, logs);
+                    break;
+            }
+        }
+
         private static void ApplyBuff(
             BattleContext context,
             BattleUnit caster,
@@ -253,6 +285,12 @@ namespace BattleKing.Skills
             bool isOneTime = GetBool(parameters, "oneTime", false);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
             {
+                if (forceDebuff && target.TryConsumeTemporal("DebuffNullify"))
+                {
+                    logs.Add($"{target.Data.Name}.DebuffNullified");
+                    continue;
+                }
+
                 int before = target.GetCurrentStat(stat);
                 BuffManager.ApplyBuff(target, new Buff
                 {
@@ -265,6 +303,32 @@ namespace BattleKing.Skills
                     IsPureBuffOrDebuff = true
                 });
                 logs.Add($"{target.Data.Name}.{stat} {before}->{target.GetCurrentStat(stat)}");
+            }
+        }
+
+        private static void ApplyResourceEffect(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            string effectType,
+            List<string> logs)
+        {
+            switch (effectType)
+            {
+                case "RecoverAp":
+                    ApplyRecoverAp(context, caster, targets, parameters, calculation, logs);
+                    break;
+                case "ApDamage":
+                    ApplyApDamage(context, caster, targets, parameters, calculation, logs);
+                    break;
+                case "RecoverPp":
+                    ApplyRecoverPp(context, caster, targets, parameters, calculation, logs);
+                    break;
+                case "PpDamage":
+                    ApplyPpDamage(context, caster, targets, parameters, calculation, logs);
+                    break;
             }
         }
 
@@ -336,6 +400,27 @@ namespace BattleKing.Skills
             }
         }
 
+        private static void ApplyHpEffect(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            string effectType,
+            List<string> logs)
+        {
+            switch (effectType)
+            {
+                case "RecoverHp":
+                case "Heal":
+                    ApplyRecoverHp(context, caster, targets, parameters, calculation, logs);
+                    break;
+                case "HealRatio":
+                    ApplyHealRatio(context, caster, targets, parameters, calculation, logs);
+                    break;
+            }
+        }
+
         private static void ApplyRecoverHp(
             BattleContext context,
             BattleUnit caster,
@@ -368,7 +453,14 @@ namespace BattleKing.Skills
             {
                 int maxHp = target.Data.BaseStats.GetValueOrDefault("HP", 1);
                 int before = target.CurrentHp;
-                int heal = Math.Max(1, (int)(maxHp * ratio));
+                float effectiveRatio = ratio;
+                if (TryGetFloat(parameters, "lowHpThreshold", out float lowHpThreshold)
+                    && TryGetFloat(parameters, "lowHpMultiplier", out float lowHpMultiplier)
+                    && GetHpRatio(target) <= NormalizeRatio(lowHpThreshold))
+                {
+                    effectiveRatio *= lowHpMultiplier;
+                }
+                int heal = Math.Max(1, (int)(maxHp * effectiveRatio));
                 target.CurrentHp = Math.Min(maxHp, target.CurrentHp + heal);
                 logs.Add($"{target.Data.Name}.HP {before}->{target.CurrentHp}");
             }
@@ -509,11 +601,32 @@ namespace BattleKing.Skills
             logs.Add($"Cover={caster.Data.Name}");
         }
 
+        private void ApplyPendingActionEffect(
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            string sourceSkillId,
+            string effectType,
+            List<string> logs)
+        {
+            var pendingType = effectType switch
+            {
+                "CounterAttack" => PendingActionType.Counter,
+                "PursuitAttack" => PendingActionType.Pursuit,
+                "PreemptiveAttack" => PendingActionType.Preemptive,
+                "BattleEndAttack" => PendingActionType.BattleEnd,
+                "PendingAttack" => ParseEnum(GetString(parameters, "pendingActionType", "BattleEnd"), PendingActionType.BattleEnd),
+                _ => PendingActionType.BattleEnd
+            };
+            ApplyPendingAction(pendingType, caster, targets, parameters, sourceSkillId, logs);
+        }
+
         private void ApplyPendingAction(
             PendingActionType type,
             BattleUnit caster,
             IReadOnlyList<BattleUnit> targets,
             Dictionary<string, object> parameters,
+            string sourceSkillId,
             List<string> logs)
         {
             if (_enqueueAction == null)
@@ -536,10 +649,54 @@ namespace BattleKing.Skills
                 DamageType = ParseEnum(GetString(parameters, "damageType", "Physical"), SkillType.Physical),
                 AttackType = ParseEnum(GetString(parameters, "attackType", "Melee"), AttackType.Melee),
                 TargetType = ParseEnum(GetString(parameters, "targetType", "SingleEnemy"), TargetType.SingleEnemy),
-                Tags = GetStringList(parameters, "tags")
+                IgnoreDefenseRatio = Math.Clamp(
+                    GetFloat(parameters, "ignoreDefenseRatio", GetFloat(parameters, "IgnoreDefenseRatio", 0f)),
+                    0f,
+                    1f),
+                IgnoreDefenseTargetClass = ParseNullableUnitClass(
+                    GetString(parameters, "ignoreDefenseTargetClass", "")),
+                Tags = GetStringList(parameters, "tags"),
+                SourcePassiveId = sourceSkillId
             };
             _enqueueAction(action);
-            logs.Add($"{type} queued");
+            logs.Add(FormatPendingActionQueuedLog(action));
+        }
+
+        private static string FormatPendingActionQueuedLog(PendingAction action)
+        {
+            var targets = action.Targets
+                .Where(t => t != null)
+                .Select(t => t.Data?.Name ?? t.Data?.Id ?? "")
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList();
+            var tags = action.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? new List<string>();
+            string hitRate = action.HitRate.HasValue ? action.HitRate.Value.ToString() : "default";
+
+            return $"{action.Type} queued actor={action.Actor?.Data?.Name ?? ""}"
+                + $" passive={action.SourcePassiveId}"
+                + $" targets={FormatList(targets)}"
+                + $" power={action.Power}"
+                + $" hitRate={hitRate}"
+                + $" damageType={action.DamageType}"
+                + $" attackType={action.AttackType}"
+                + $" targetType={action.TargetType}"
+                + $" ignoreDefense={FormatPendingIgnoreDefense(action)}"
+                + $" tags={FormatList(tags)}";
+        }
+
+        private static string FormatPendingIgnoreDefense(PendingAction action)
+        {
+            if (action.IgnoreDefenseRatio <= 0f)
+                return "None";
+
+            return action.IgnoreDefenseTargetClass.HasValue
+                ? $"{action.IgnoreDefenseRatio:0.##}@{action.IgnoreDefenseTargetClass.Value}"
+                : $"{action.IgnoreDefenseRatio:0.##}";
+        }
+
+        private static string FormatList(IReadOnlyList<string> values)
+        {
+            return values.Count == 0 ? "None" : string.Join("|", values);
         }
 
         private static List<BattleUnit> SelectTargets(
@@ -551,7 +708,7 @@ namespace BattleKing.Skills
             string defaultTarget)
         {
             string targetKind = GetString(parameters, "target", defaultTarget);
-            return targetKind.ToLowerInvariant() switch
+            var selected = targetKind.ToLowerInvariant() switch
             {
                 "self" => new List<BattleUnit> { caster },
                 "caster" => new List<BattleUnit> { caster },
@@ -563,11 +720,20 @@ namespace BattleKing.Skills
                 "allies" => context.GetAliveUnits(caster.IsPlayer),
                 "allenemies" => context.GetAliveUnits(!caster.IsPlayer),
                 "enemies" => context.GetAliveUnits(!caster.IsPlayer),
+                "rowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => u.IsFrontRow == caster.IsFrontRow).ToList(),
+                "frontrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => u.IsFrontRow).ToList(),
+                "backrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => !u.IsFrontRow).ToList(),
+                "columnallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => IsSameColumn(u.Position, caster.Position)).ToList(),
                 "lowesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderBy(u => u.CurrentHp).Take(1).ToList(),
                 "highesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderByDescending(u => u.CurrentHp).Take(1).ToList(),
                 "randomally" => SelectRandomUnit(context.GetAliveUnits(caster.IsPlayer)),
                 _ => targets.Where(t => t != null).ToList()
             };
+
+            if (TryGetInt(parameters, "maxTargets", out int maxTargets))
+                selected = selected.Take(Math.Max(0, maxTargets)).ToList();
+
+            return selected;
         }
 
         private static bool MatchesBuffRemoval(Buff buff, string kind, string stat)
@@ -590,6 +756,21 @@ namespace BattleKing.Skills
             return Math.Clamp(ratio, 0f, 1f);
         }
 
+        private static float GetHpRatio(BattleUnit unit)
+        {
+            int maxHp = unit.Data.BaseStats.GetValueOrDefault("HP", 1);
+            if (maxHp <= 0)
+                return 0f;
+            return (float)unit.CurrentHp / maxHp;
+        }
+
+        private static bool IsSameColumn(int a, int b)
+        {
+            if (a <= 0 || b <= 0)
+                return false;
+            return (a - 1) % 3 == (b - 1) % 3;
+        }
+
         private static List<BattleUnit> SelectRandomUnit(List<BattleUnit> units)
         {
             return units.Count == 0
@@ -605,7 +786,7 @@ namespace BattleKing.Skills
             return false;
         }
 
-        private static int GetInt(Dictionary<string, object> parameters, string key, int fallback)
+        internal static int GetInt(Dictionary<string, object> parameters, string key, int fallback)
         {
             return TryGetInt(parameters, key, out int value) ? value : fallback;
         }
@@ -618,7 +799,7 @@ namespace BattleKing.Skills
             return false;
         }
 
-        private static float GetFloat(Dictionary<string, object> parameters, string key, float fallback)
+        internal static float GetFloat(Dictionary<string, object> parameters, string key, float fallback)
         {
             return TryGetFloat(parameters, key, out float value) ? value : fallback;
         }
@@ -634,12 +815,12 @@ namespace BattleKing.Skills
             return false;
         }
 
-        private static string GetString(Dictionary<string, object> parameters, string key, string fallback)
+        internal static string GetString(Dictionary<string, object> parameters, string key, string fallback)
         {
             return TryGetString(parameters, key, out string value) ? value : fallback;
         }
 
-        private static List<string> GetStringList(Dictionary<string, object> parameters, string key)
+        internal static List<string> GetStringList(Dictionary<string, object> parameters, string key)
         {
             if (!parameters.TryGetValue(key, out var raw) || raw == null)
                 return new List<string>();
@@ -660,9 +841,14 @@ namespace BattleKing.Skills
             return new List<string>();
         }
 
-        private static TEnum ParseEnum<TEnum>(string value, TEnum fallback) where TEnum : struct
+        internal static TEnum ParseEnum<TEnum>(string value, TEnum fallback) where TEnum : struct
         {
             return Enum.TryParse<TEnum>(value, true, out var parsed) ? parsed : fallback;
+        }
+
+        private static UnitClass? ParseNullableUnitClass(string value)
+        {
+            return Enum.TryParse<UnitClass>(value, true, out var parsed) ? parsed : null;
         }
 
         private static bool GetBool(Dictionary<string, object> parameters, string key, bool fallback)

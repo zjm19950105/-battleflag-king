@@ -30,6 +30,10 @@ namespace BattleKing.Pipeline
         public int PhysicalDamage { get; set; }
         public int MagicalDamage { get; set; }
         public int TotalDamage => PhysicalDamage + MagicalDamage;
+        public int LandedHits { get; set; }
+        public int MissedHits { get; set; }
+        public int EvadedHits { get; set; }
+        public int NullifiedHits { get; set; }
 
         public List<StatusAilment> AppliedAilments { get; set; } = new List<StatusAilment>();
 
@@ -61,6 +65,9 @@ namespace BattleKing.Pipeline
 
         /// <summary>If set, attack redirects to this unit (cover)</summary>
         public BattleUnit CoverTarget { get; set; } = null;
+
+        /// <summary>Final unit that receives damage after cover is resolved</summary>
+        public BattleUnit ResolvedDefender { get; set; } = null;
 
         /// <summary>This attack cannot be covered</summary>
         public bool CannotBeCovered { get; set; } = false;

@@ -152,6 +152,166 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void AddBuff_TargetAllAllies_BuffsOnlyCasterSideAliveUnits()
+        {
+            var executor = new SkillEffectExecutor();
+            var caster = TestDataFactory.CreateUnit(str: 100, isPlayer: true);
+            var ally = TestDataFactory.CreateUnit(str: 80, isPlayer: true);
+            var defeatedAlly = TestDataFactory.CreateUnit(str: 60, isPlayer: true);
+            defeatedAlly.CurrentHp = 0;
+            var enemy = TestDataFactory.CreateUnit(str: 100, isPlayer: false);
+            var context = new BattleContext(new GameDataRepository())
+            {
+                PlayerUnits = new List<BattleUnit> { caster, ally, defeatedAlly },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "AddBuff",
+                    Parameters = new()
+                    {
+                        { "target", "AllAllies" },
+                        { "stat", "Str" },
+                        { "ratio", 0.25 },
+                        { "turns", -1 }
+                    }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { enemy }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(125, caster.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(100, ally.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(60, defeatedAlly.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(100, enemy.GetCurrentStat("Str"));
+        }
+
+        [Test]
+        public void ApDamage_TargetAllEnemies_DamagesOnlyEnemySideAliveUnits()
+        {
+            var executor = new SkillEffectExecutor();
+            var caster = TestDataFactory.CreateUnit(ap: 3, isPlayer: true);
+            var ally = TestDataFactory.CreateUnit(ap: 3, isPlayer: true);
+            var firstEnemy = TestDataFactory.CreateUnit(ap: 3, isPlayer: false);
+            var secondEnemy = TestDataFactory.CreateUnit(ap: 2, isPlayer: false);
+            var defeatedEnemy = TestDataFactory.CreateUnit(ap: 3, isPlayer: false);
+            defeatedEnemy.CurrentHp = 0;
+            var context = new BattleContext(new GameDataRepository())
+            {
+                PlayerUnits = new List<BattleUnit> { caster, ally },
+                EnemyUnits = new List<BattleUnit> { firstEnemy, secondEnemy, defeatedEnemy }
+            };
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "ApDamage",
+                    Parameters = new() { { "target", "AllEnemies" }, { "amount", 1 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { firstEnemy }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(3, caster.CurrentAp);
+            ClassicAssert.AreEqual(3, ally.CurrentAp);
+            ClassicAssert.AreEqual(2, firstEnemy.CurrentAp);
+            ClassicAssert.AreEqual(1, secondEnemy.CurrentAp);
+            ClassicAssert.AreEqual(3, defeatedEnemy.CurrentAp);
+        }
+
+        [Test]
+        public void ApDamage_TargetTarget_DamagesOnlyExplicitTarget()
+        {
+            var executor = new SkillEffectExecutor();
+            var caster = TestDataFactory.CreateUnit(ap: 3, isPlayer: true);
+            var firstEnemy = TestDataFactory.CreateUnit(ap: 3, isPlayer: false);
+            var secondEnemy = TestDataFactory.CreateUnit(ap: 3, isPlayer: false);
+            var context = new BattleContext(new GameDataRepository())
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { firstEnemy, secondEnemy }
+            };
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "ApDamage",
+                    Parameters = new() { { "target", "Target" }, { "amount", 2 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { firstEnemy }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(3, caster.CurrentAp);
+            ClassicAssert.AreEqual(1, firstEnemy.CurrentAp);
+            ClassicAssert.AreEqual(3, secondEnemy.CurrentAp);
+        }
+
+        [Test]
+        public void HealRatio_TargetLowestHpAlly_HealsOnlyLowestCurrentHpAlly()
+        {
+            var executor = new SkillEffectExecutor();
+            var caster = TestDataFactory.CreateUnit(hp: 200, isPlayer: true);
+            caster.CurrentHp = 120;
+            var lowestAlly = TestDataFactory.CreateUnit(hp: 200, isPlayer: true);
+            lowestAlly.CurrentHp = 40;
+            var otherAlly = TestDataFactory.CreateUnit(hp: 200, isPlayer: true);
+            otherAlly.CurrentHp = 80;
+            var enemy = TestDataFactory.CreateUnit(hp: 200, isPlayer: false);
+            enemy.CurrentHp = 10;
+            var context = new BattleContext(new GameDataRepository())
+            {
+                PlayerUnits = new List<BattleUnit> { caster, lowestAlly, otherAlly },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "HealRatio",
+                    Parameters = new() { { "target", "LowestHpAlly" }, { "ratio", 0.25 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { enemy }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(120, caster.CurrentHp);
+            ClassicAssert.AreEqual(90, lowestAlly.CurrentHp);
+            ClassicAssert.AreEqual(80, otherAlly.CurrentHp);
+            ClassicAssert.AreEqual(10, enemy.CurrentHp);
+        }
+
+        [Test]
+        public void UnknownTarget_FallsBackToExplicitTargets()
+        {
+            var executor = new SkillEffectExecutor();
+            var caster = TestDataFactory.CreateUnit(ap: 3, isPlayer: true);
+            var explicitTarget = TestDataFactory.CreateUnit(ap: 3, isPlayer: false);
+            var otherEnemy = TestDataFactory.CreateUnit(ap: 3, isPlayer: false);
+            var context = new BattleContext(new GameDataRepository())
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { explicitTarget, otherEnemy }
+            };
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "ApDamage",
+                    Parameters = new() { { "target", "NotARealTarget" }, { "amount", 1 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { explicitTarget }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(3, caster.CurrentAp);
+            ClassicAssert.AreEqual(2, explicitTarget.CurrentAp);
+            ClassicAssert.AreEqual(3, otherEnemy.CurrentAp);
+        }
+
+        [Test]
         public void GrantSkill_AddsTemporarySkillToAvailablePool()
         {
             var executor = new SkillEffectExecutor();
@@ -204,6 +364,31 @@ namespace BattleKing.Tests
             executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
 
             ClassicAssert.AreEqual(0, target.Buffs.Count);
+        }
+
+        [Test]
+        public void AddDebuff_ConsumesDebuffNullifyTemporalMark()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var target = TestDataFactory.CreateUnit(def: 100, isPlayer: false);
+            target.AddTemporal("DebuffNullify", 1, -1, "pas_spirit_guard");
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "AddDebuff",
+                    Parameters = new() { { "target", "Target" }, { "stat", "Def" }, { "ratio", 0.3 }, { "turns", -1 } }
+                }
+            });
+
+            var logs = executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(100, target.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(0, target.Buffs.Count);
+            ClassicAssert.IsFalse(target.TemporalStates.Any(s => s.Key == "DebuffNullify"));
+            CollectionAssert.Contains(logs, $"{target.Data.Name}.DebuffNullified");
         }
 
         [Test]
@@ -290,6 +475,150 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(PendingActionType.Pursuit, queued[1].Type);
             ClassicAssert.AreEqual(PendingActionType.Preemptive, queued[2].Type);
             ClassicAssert.AreEqual(90, queued[2].Power);
+        }
+
+        [Test]
+        public void RealPassiveJson_QuickStrike_QueuesSingleSureHitPreemptiveAttackAtBattleStart()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var queued = new List<PendingAction>();
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { }, queued.Add);
+            processor.SubscribeAll();
+            var swordsman = new BattleUnit(CreateCharacter("swordsman", null, hp: 100, str: 45, def: 10, spd: 30), repository, true);
+            swordsman.CurrentPp = 1;
+            swordsman.EquippedPassiveSkillIds.Add("pas_quick_strike");
+            var firstEnemy = new BattleUnit(CreateCharacter("enemy1", null, hp: 100, str: 10, def: 10, spd: 10), repository, false);
+            var secondEnemy = new BattleUnit(CreateCharacter("enemy2", null, hp: 100, str: 10, def: 10, spd: 9), repository, false);
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { swordsman },
+                EnemyUnits = new List<BattleUnit> { firstEnemy, secondEnemy }
+            };
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+
+            ClassicAssert.AreEqual(1, queued.Count);
+            var action = queued.Single();
+            ClassicAssert.AreEqual(PendingActionType.Preemptive, action.Type);
+            ClassicAssert.AreSame(swordsman, action.Actor);
+            ClassicAssert.AreEqual(150, action.Power);
+            ClassicAssert.AreEqual(100, action.HitRate);
+            ClassicAssert.AreEqual(SkillType.Physical, action.DamageType);
+            ClassicAssert.AreEqual(AttackType.Melee, action.AttackType);
+            CollectionAssert.AreEqual(new[] { firstEnemy }, action.Targets);
+            CollectionAssert.Contains(action.Tags, "SureHit");
+            ClassicAssert.AreEqual(0, swordsman.CurrentPp);
+        }
+
+        [Test]
+        public void BattleEndPasRampage_StructuredEffect_QueuesBattleEndAttackAndLogsDamage()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var player = new BattleUnit(CreateCharacter("player", null, hp: 200, str: 10, def: 40, spd: 20, hit: 1000), repository, true)
+            {
+                Position = 1,
+                CurrentAp = 0
+            };
+            var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 200, str: 100, def: 0, spd: 10, hit: 1000), repository, false)
+            {
+                Position = 1,
+                CurrentAp = 0,
+                CurrentPp = 2
+            };
+            enemy.EquippedPassiveSkillIds.Add("pas_rampage");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { player },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            var result = engine.StartBattle();
+
+            ClassicAssert.AreEqual(BattleResult.EnemyWin, result);
+            ClassicAssert.Less(player.CurrentHp, 200);
+            var passiveLog = engine.BattleLogEntries.Single(e => e.SkillId == "pas_rampage");
+            CollectionAssert.Contains(passiveLog.Flags, "PassiveTrigger");
+            CollectionAssert.Contains(passiveLog.Flags, "BattleEnd");
+            CollectionAssert.AreEqual(new[] { "player" }, passiveLog.TargetIds);
+            ClassicAssert.Greater(passiveLog.Damage, 0);
+            CollectionAssert.Contains(engine.BattleLogEntries.Last().Flags, "BattleEnd");
+        }
+
+        [Test]
+        public void BattleEndPasGiveAp_StructuredEffect_RecoversLowestHpAllyWithoutLegacyTags()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var passive = repository.PassiveSkills["pas_give_ap"];
+            var medic = new BattleUnit(CreateCharacter("medic", null, hp: 200, str: 10, def: 10, spd: 20), repository, true)
+            {
+                Position = 1,
+                CurrentPp = 2
+            };
+            var wounded = new BattleUnit(CreateCharacter("wounded", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
+            {
+                Position = 2,
+                CurrentHp = 50
+            };
+            medic.EquippedPassiveSkillIds.Add("pas_give_ap");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { medic, wounded }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            eventBus.Publish(new BattleEndEvent { Context = context, Result = BattleResult.Draw });
+
+            ClassicAssert.IsNotEmpty(passive.Effects);
+            CollectionAssert.IsEmpty(passive.Tags);
+            ClassicAssert.AreEqual(100, wounded.CurrentHp);
+            ClassicAssert.AreEqual(200, medic.CurrentHp);
+        }
+
+        [Test]
+        public void BattleEndPasBattleHorn_StructuredEffect_HealsCasterRowWithLowHpBonusWithoutLegacyTags()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var passive = repository.PassiveSkills["pas_battle_horn"];
+            var archer = new BattleUnit(CreateCharacter("archer", null, hp: 200, str: 10, def: 10, spd: 20), repository, true)
+            {
+                Position = 4,
+                CurrentPp = 2
+            };
+            var backRowAlly = new BattleUnit(CreateCharacter("backRowAlly", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
+            {
+                Position = 5,
+                CurrentHp = 40
+            };
+            var frontRowAlly = new BattleUnit(CreateCharacter("frontRowAlly", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
+            {
+                Position = 1,
+                CurrentHp = 40
+            };
+            archer.EquippedPassiveSkillIds.Add("pas_battle_horn");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { archer, backRowAlly, frontRowAlly }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            eventBus.Publish(new BattleEndEvent { Context = context, Result = BattleResult.Draw });
+
+            ClassicAssert.IsNotEmpty(passive.Effects);
+            CollectionAssert.IsEmpty(passive.Tags);
+            ClassicAssert.AreEqual(100, backRowAlly.CurrentHp);
+            ClassicAssert.AreEqual(40, frontRowAlly.CurrentHp);
         }
 
         [Test]
@@ -421,6 +750,192 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void BattleEngine_CoverAlly_DamagesCoverTargetAndReportsActualDefender()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_test_cover",
+                Name = "Test Cover",
+                PpCost = 0,
+                TriggerTiming = PassiveTriggerTiming.AllyBeforeHit,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "CoverAlly",
+                        Parameters = new()
+                    }
+                },
+                HasSimultaneousLimit = false
+            });
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_smash", hp: 1000, str: 200, def: 0, spd: 100, hit: 1000), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var coveredTarget = new BattleUnit(CreateCharacter("coveredTarget", null, hp: 1000, str: 10, def: 0, spd: 1), repository, false)
+            {
+                Position = 1
+            };
+            var coverTarget = new BattleUnit(CreateCharacter("coverTarget", null, hp: 1000, str: 10, def: 0, spd: 2), repository, false)
+            {
+                Position = 2
+            };
+            coverTarget.EquippedPassiveSkillIds.Add("pas_test_cover");
+            attacker.Strategies.Add(new Strategy { SkillId = "act_smash" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { coveredTarget, coverTarget }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { });
+            processor.SubscribeAll();
+            var afterHitEvents = new List<AfterHitEvent>();
+            var knockdownEvents = new List<OnKnockdownEvent>();
+            engine.EventBus.Subscribe<AfterHitEvent>(afterHitEvents.Add);
+            engine.EventBus.Subscribe<OnKnockdownEvent>(knockdownEvents.Add);
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(1000, coveredTarget.CurrentHp);
+            ClassicAssert.AreEqual(800, coverTarget.CurrentHp);
+            ClassicAssert.AreEqual(1, afterHitEvents.Count);
+            ClassicAssert.AreSame(coverTarget, afterHitEvents[0].Defender);
+            ClassicAssert.AreEqual(200, afterHitEvents[0].DamageDealt);
+            ClassicAssert.AreEqual(0, knockdownEvents.Count);
+        }
+
+        [Test]
+        public void BattleEngine_CoverAlly_KnockdownVictimIsActualDefender()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_test_cover",
+                Name = "Test Cover",
+                PpCost = 0,
+                TriggerTiming = PassiveTriggerTiming.AllyBeforeHit,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "CoverAlly",
+                        Parameters = new()
+                    }
+                },
+                HasSimultaneousLimit = false
+            });
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_smash", hp: 1000, str: 200, def: 0, spd: 100, hit: 1000), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var coveredTarget = new BattleUnit(CreateCharacter("coveredTarget", null, hp: 1000, str: 10, def: 0, spd: 1), repository, false)
+            {
+                Position = 1
+            };
+            var coverTarget = new BattleUnit(CreateCharacter("coverTarget", null, hp: 100, str: 10, def: 0, spd: 2), repository, false)
+            {
+                Position = 2
+            };
+            coverTarget.EquippedPassiveSkillIds.Add("pas_test_cover");
+            attacker.Strategies.Add(new Strategy { SkillId = "act_smash" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { coveredTarget, coverTarget }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { });
+            processor.SubscribeAll();
+            var knockdownEvents = new List<OnKnockdownEvent>();
+            engine.EventBus.Subscribe<OnKnockdownEvent>(knockdownEvents.Add);
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.IsTrue(coveredTarget.IsAlive);
+            ClassicAssert.IsFalse(coverTarget.IsAlive);
+            ClassicAssert.AreEqual(1, knockdownEvents.Count);
+            ClassicAssert.AreSame(coverTarget, knockdownEvents[0].Victim);
+            ClassicAssert.AreSame(attacker, knockdownEvents[0].Killer);
+        }
+
+        [Test]
+        public void PassiveSkillProcessor_RangedCover_OnlyTriggersForRangedPhysicalHit()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_test_ranged_cover",
+                Name = "Test Ranged Cover",
+                PpCost = 1,
+                TriggerTiming = PassiveTriggerTiming.AllyBeforeHit,
+                Tags = new List<string> { "RangedCover", "NullifyDamage" },
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "CoverAlly",
+                        Parameters = new()
+                    },
+                    new()
+                    {
+                        EffectType = "ModifyDamageCalc",
+                        Parameters = new()
+                        {
+                            { "NullifyPhysicalDamage", true }
+                        }
+                    }
+                },
+                HasSimultaneousLimit = true
+            });
+            var attacker = new BattleUnit(CreateCharacter("attacker", null, hp: 100, str: 50, def: 0, spd: 20), repository, true);
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: 100, str: 10, def: 0, spd: 10), repository, false);
+            var cover = new BattleUnit(CreateCharacter("cover", null, hp: 100, str: 10, def: 0, spd: 10), repository, false);
+            cover.CurrentPp = 1;
+            cover.EquippedPassiveSkillIds.Add("pas_test_ranged_cover");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender, cover }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            var meleeSkill = TestDataFactory.CreateSkill(type: SkillType.Physical, attackType: AttackType.Melee);
+            var meleeCalc = TestDataFactory.CreateCalc(attacker, defender, meleeSkill);
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = meleeSkill,
+                Context = context,
+                Calc = meleeCalc
+            });
+
+            ClassicAssert.IsNull(meleeCalc.CoverTarget);
+            ClassicAssert.IsFalse(meleeCalc.NullifyPhysicalDamage);
+            ClassicAssert.AreEqual(1, cover.CurrentPp);
+
+            var rangedSkill = TestDataFactory.CreateSkill(type: SkillType.Physical, attackType: AttackType.Ranged);
+            var rangedCalc = TestDataFactory.CreateCalc(attacker, defender, rangedSkill);
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = rangedSkill,
+                Context = context,
+                Calc = rangedCalc
+            });
+
+            ClassicAssert.AreSame(cover, rangedCalc.CoverTarget);
+            ClassicAssert.IsTrue(rangedCalc.NullifyPhysicalDamage);
+            ClassicAssert.AreEqual(0, cover.CurrentPp);
+        }
+
+        [Test]
         public void PassiveSkillProcessor_SharedExecutor_ExecutesBuffAndHealEffects()
         {
             var repository = LoadRepositoryWithPassive(new PassiveSkillData
@@ -518,6 +1033,145 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(0.5f, calc.IgnoreDefenseRatio);
         }
 
+        [Test]
+        public void PassiveSkillProcessor_PendingActions_ReadJsonElementParametersFromRealPassiveJson()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var queued = new List<PendingAction>();
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { }, queued.Add);
+            processor.SubscribeAll();
+            var preemptiveUser = new BattleUnit(CreateCharacter("preemptiveUser", null, hp: 100, str: 10, def: 10, spd: 20), repository, true);
+            preemptiveUser.CurrentPp = 1;
+            preemptiveUser.EquippedPassiveSkillIds.Add("pas_stealth_blade");
+            var counterUser = new BattleUnit(CreateCharacter("counterUser", null, hp: 100, str: 10, def: 10, spd: 10), repository, false);
+            counterUser.CurrentPp = 1;
+            counterUser.EquippedPassiveSkillIds.Add("pas_wide_counter");
+            var attacker = new BattleUnit(CreateCharacter("attacker", null, hp: 100, str: 10, def: 10, spd: 30), repository, true);
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { preemptiveUser, attacker },
+                EnemyUnits = new List<BattleUnit> { counterUser }
+            };
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+            eventBus.Publish(new AfterHitEvent
+            {
+                Attacker = attacker,
+                Defender = counterUser,
+                Context = context,
+                DamageDealt = 1
+            });
+
+            var preemptive = queued.Single(a => a.SourcePassiveId == "pas_stealth_blade");
+            ClassicAssert.AreEqual(PendingActionType.Preemptive, preemptive.Type);
+            ClassicAssert.AreEqual(50, preemptive.Power);
+            ClassicAssert.AreEqual(100, preemptive.HitRate);
+            CollectionAssert.AreEquivalent(
+                new[] { "SureHit", "CannotBeBlocked", "CannotBeCovered" },
+                preemptive.Tags);
+
+            var counter = queued.Single(a => a.SourcePassiveId == "pas_wide_counter");
+            ClassicAssert.AreEqual(PendingActionType.Counter, counter.Type);
+            ClassicAssert.AreEqual(100, counter.Power);
+            ClassicAssert.AreEqual(75, counter.HitRate);
+            ClassicAssert.AreEqual(TargetType.Row, counter.TargetType);
+        }
+
+        [Test]
+        public void PassiveSkillProcessor_SimultaneousLimit_IgnoresFailedConditionBeforeClaimingLimit()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_limited_recover_ap",
+                Name = "Limited Recover AP",
+                PpCost = 0,
+                TriggerTiming = PassiveTriggerTiming.BattleStart,
+                HasSimultaneousLimit = true,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "RecoverAp",
+                        Parameters = new()
+                        {
+                            { "target", "Self" },
+                            { "amount", 1 }
+                        }
+                    }
+                }
+            });
+            var fastConditionFails = new BattleUnit(CreateCharacter("fast", null, hp: 100, str: 10, def: 10, spd: 30), repository, true);
+            var slowConditionPasses = new BattleUnit(CreateCharacter("slow", null, hp: 100, str: 10, def: 10, spd: 10), repository, true);
+            fastConditionFails.CurrentAp = 0;
+            slowConditionPasses.CurrentAp = 0;
+            slowConditionPasses.CurrentHp = 40;
+            fastConditionFails.EquippedPassiveSkillIds.Add("pas_limited_recover_ap");
+            slowConditionPasses.EquippedPassiveSkillIds.Add("pas_limited_recover_ap");
+            fastConditionFails.PassiveConditions["pas_limited_recover_ap"] = LowHpCondition();
+            slowConditionPasses.PassiveConditions["pas_limited_recover_ap"] = LowHpCondition();
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { fastConditionFails, slowConditionPasses }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+
+            ClassicAssert.AreEqual(0, fastConditionFails.CurrentAp);
+            ClassicAssert.AreEqual(1, slowConditionPasses.CurrentAp);
+        }
+
+        [Test]
+        public void PassiveSkillProcessor_SimultaneousLimit_AllowsOnlyOnePassingUnitPerSideAndTiming()
+        {
+            var repository = LoadRepositoryWithPassive(new PassiveSkillData
+            {
+                Id = "pas_limited_recover_ap",
+                Name = "Limited Recover AP",
+                PpCost = 0,
+                TriggerTiming = PassiveTriggerTiming.BattleStart,
+                HasSimultaneousLimit = true,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "RecoverAp",
+                        Parameters = new()
+                        {
+                            { "target", "Self" },
+                            { "amount", 1 }
+                        }
+                    }
+                }
+            });
+            var fast = new BattleUnit(CreateCharacter("fast", null, hp: 100, str: 10, def: 10, spd: 30), repository, true);
+            var slow = new BattleUnit(CreateCharacter("slow", null, hp: 100, str: 10, def: 10, spd: 10), repository, true);
+            fast.CurrentAp = 0;
+            slow.CurrentAp = 0;
+            fast.CurrentHp = 40;
+            slow.CurrentHp = 40;
+            fast.EquippedPassiveSkillIds.Add("pas_limited_recover_ap");
+            slow.EquippedPassiveSkillIds.Add("pas_limited_recover_ap");
+            fast.PassiveConditions["pas_limited_recover_ap"] = LowHpCondition();
+            slow.PassiveConditions["pas_limited_recover_ap"] = LowHpCondition();
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { fast, slow }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+
+            ClassicAssert.AreEqual(1, fast.CurrentAp);
+            ClassicAssert.AreEqual(0, slow.CurrentAp);
+        }
+
         private static CharacterData CreateCharacter(
             string id,
             string skillId,
@@ -560,6 +1214,16 @@ namespace BattleKing.Tests
             repository.LoadAll(DataPath);
             repository.PassiveSkills[passive.Id] = passive;
             return repository;
+        }
+
+        private static Condition LowHpCondition()
+        {
+            return new Condition
+            {
+                Category = ConditionCategory.SelfHp,
+                Operator = "less_than",
+                Value = 0.5
+            };
         }
     }
 }

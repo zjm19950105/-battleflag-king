@@ -9,6 +9,7 @@ namespace BattleKing.Skills
         LowestHpAlly,
         HighestHpAlly,
         AllAllies,
+        AllEnemies,
         ColumnAllies,
         RowAllies,
         FrontRowAlly,

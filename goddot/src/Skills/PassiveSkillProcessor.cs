@@ -7,6 +7,7 @@ using BattleKing.Events;
 using BattleKing.Ai;
 using BattleKing.Equipment;
 using BattleKing.Pipeline;
+using BattleKing.Utils;
 
 namespace BattleKing.Skills
 {
@@ -31,6 +32,7 @@ namespace BattleKing.Skills
             _gameData = gameData;
             _log = log;
             _enqueueAction = enqueueAction;
+            _skillEffectExecutor = new SkillEffectExecutor(enqueueAction);
         }
 
         public void SubscribeAll()
@@ -128,31 +130,45 @@ namespace BattleKing.Skills
         {
             if (unit == null || !unit.IsAlive) return;
 
-            foreach (var skillId in unit.EquippedPassiveSkillIds)
+            foreach (var row in unit.GetPassiveStrategiesInOrder())
             {
+                var skillId = row.SkillId;
                 if (!_gameData.PassiveSkills.TryGetValue(skillId, out var skillData))
                     continue;
                 if (skillData.TriggerTiming != timing)
+                    continue;
+                if (!PassiveMatchesBattleContext(skillData, calc))
                     continue;
                 if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                     continue;
 
                 // Check player-set passive condition
-                if (!CheckPassiveCondition(unit, skillId)) continue;
+                if (!CheckPassiveConditions(unit, row)) continue;
 
                 unit.ConsumePp(skillData.PpCost);
 
-                _log?.Invoke($"  [被动] {unit.Data.Name} 触发 {skillData.Name} ({timingLabel})");
+                _log?.Invoke($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 触发 {skillData.Name} ({timingLabel})");
                 ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
             }
         }
 
-        private bool CheckPassiveCondition(BattleUnit unit, string skillId)
+        private bool CheckPassiveConditions(BattleUnit unit, PassiveStrategy row)
         {
-            if (!unit.PassiveConditions.TryGetValue(skillId, out var cond) || cond == null)
+            var conditions = new List<Condition>();
+            if (row.Condition1 != null)
+                conditions.Add(row.Condition1);
+            if (row.Condition2 != null)
+                conditions.Add(row.Condition2);
+            if (conditions.Count == 0
+                && unit.PassiveConditions.TryGetValue(row.SkillId, out var legacyCondition)
+                && legacyCondition != null)
+                conditions.Add(legacyCondition);
+
+            if (conditions.Count == 0)
                 return true;
+
             var evaluator = new ConditionEvaluator(_ctx);
-            return evaluator.Evaluate(cond, unit, null);
+            return conditions.All(condition => evaluator.Evaluate(condition, unit, null));
         }
 
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
@@ -162,20 +178,30 @@ namespace BattleKing.Skills
         {
             if (candidates == null || candidates.Count == 0) return;
 
-            var ordered = candidates.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
+            var ordered = candidates
+                .GroupBy(u => u.GetCurrentSpeed())
+                .OrderByDescending(g => g.Key)
+                .SelectMany(g => g.OrderBy(_ => RandUtil.Roll(int.MaxValue)))
+                .ToList();
 
             foreach (var unit in ordered)
             {
                 if (!unit.IsAlive) continue;
 
-                foreach (var skillId in unit.EquippedPassiveSkillIds)
+                foreach (var row in unit.GetPassiveStrategiesInOrder())
                 {
+                    var skillId = row.SkillId;
                     if (!_gameData.PassiveSkills.TryGetValue(skillId, out var skillData))
                         continue;
                     if (skillData.TriggerTiming != timing)
                         continue;
+                    if (!PassiveMatchesBattleContext(skillData, calc))
+                        continue;
                     if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                         continue;
+
+                    // Check player-set passive condition before claiming a simultaneous slot.
+                    if (!CheckPassiveConditions(unit, row)) continue;
 
                     if (limitSimultaneous && skillData.HasSimultaneousLimit && firedSet != null)
                     {
@@ -185,16 +211,25 @@ namespace BattleKing.Skills
                         sideSet.Add(timingLabel);
                     }
 
-                    // Check player-set passive condition
-                    if (!CheckPassiveCondition(unit, skillId)) continue;
-
                     unit.ConsumePp(skillData.PpCost);
 
-                    _log?.Invoke($"  [被动] {unit.Data.Name} 触发 {skillData.Name} ({timingLabel})");
+                    _log?.Invoke($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 触发 {skillData.Name} ({timingLabel})");
                     ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
                     break;
                 }
             }
+        }
+
+        private static bool PassiveMatchesBattleContext(PassiveSkillData skillData, DamageCalculation calc)
+        {
+            var tags = skillData.Tags ?? new List<string>();
+            if (tags.Contains("RangedCover"))
+            {
+                return calc?.Skill?.Data?.Type == SkillType.Physical
+                    && calc.Skill.Data.AttackType == AttackType.Ranged;
+            }
+
+            return true;
         }
 
         private void ExecuteEffect(BattleUnit unit, PassiveSkillData skillData,
@@ -220,191 +255,32 @@ namespace BattleKing.Skills
             if (effects.Count > 0)
             {
                 string summary = DumpUnitBrief(unit);
-                _log?.Invoke($"    → {string.Join(", ", effects)} | {unit.Data.Name}: {summary}");
+                _log?.Invoke($"    → {string.Join(", ", effects)} | {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)}: {summary}");
             }
         }
 
         private void ExecuteStructuredEffect(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
             DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects)
         {
-            if (CanExecuteThroughSharedExecutor(effect.EffectType))
-            {
-                var targets = SelectExecutorFallbackTargets(unit, effect, attacker, defender);
-                var state = new SkillEffectExecutionState();
-                var logs = IsCalculationEffect(effect.EffectType)
-                    ? _skillEffectExecutor.ExecuteCalculationEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id, calc, state)
-                    : _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id);
-                effects.AddRange(logs);
+            if (TryExecuteThroughSharedExecutor(unit, skillData, effect, calc, attacker, defender, effects))
                 return;
-            }
 
-            var p = effect.Parameters ?? new Dictionary<string, object>();
+            effects.Add($"{effect.EffectType}: unsupported");
+        }
 
-            switch (effect.EffectType)
-            {
-                case "RecoverAp":
-                    int apAmt = GetIntParam(p, "amount", 1);
-                    var apTarget = GetTargetType(p, "target", "Self");
-                    var apUnits = SelectPassiveTargets(unit, apTarget, attacker, defender);
-                    foreach (var t in apUnits)
-                    {
-                        t.RecoverAp(apAmt);
-                        effects.Add($"[AP] {t.Data.Name} AP+{apAmt} ({t.CurrentAp - apAmt}→{t.CurrentAp})");
-                    }
-                    break;
+        private bool TryExecuteThroughSharedExecutor(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
+            DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects)
+        {
+            if (!CanExecuteThroughSharedExecutor(effect.EffectType))
+                return false;
 
-                case "RecoverPp":
-                    int ppAmt = GetIntParam(p, "amount", 1);
-                    var ppTarget = GetTargetType(p, "target", "Self");
-                    var ppUnits = SelectPassiveTargets(unit, ppTarget, attacker, defender);
-                    foreach (var t in ppUnits)
-                    {
-                        t.RecoverPp(ppAmt);
-                        effects.Add($"[PP] {t.Data.Name} PP+{ppAmt} ({t.CurrentPp - ppAmt}→{t.CurrentPp})");
-                    }
-                    break;
-
-                case "RecoverHp":
-                    int healPct = GetIntParam(p, "amount", 25);
-                    var healTarget = GetTargetType(p, "target", "Self");
-                    var healUnits = SelectPassiveTargets(unit, healTarget, attacker, defender);
-                    foreach (var t in healUnits)
-                    {
-                        int hpBefore = t.CurrentHp;
-                        int heal = (int)(t.Data.BaseStats.GetValueOrDefault("HP", 0) * healPct / 100f);
-                        t.CurrentHp = Math.Min(t.Data.BaseStats.GetValueOrDefault("HP", 0), t.CurrentHp + Math.Max(1, heal));
-                        effects.Add($"[HP] {t.Data.Name} +{Math.Min(heal, t.CurrentHp - hpBefore)} ({hpBefore}→{t.CurrentHp})");
-                    }
-                    break;
-
-                case "AddBuff":
-                    var buffStat = GetStringParam(p, "stat", "Str");
-                    float buffRatio = GetFloatParam(p, "ratio", 0.2f);
-                    int buffTurns = GetIntParam(p, "turns", 1);
-                    var buffTarget = GetTargetType(p, "target", "Self");
-                    var buffUnits = SelectPassiveTargets(unit, buffTarget, attacker, defender);
-                    foreach (var t in buffUnits)
-                    {
-                        int before = t.GetCurrentStat(buffStat);
-                        t.Buffs.Add(new Buff { TargetStat = buffStat, Ratio = buffRatio, RemainingTurns = buffTurns });
-                        int after = t.GetCurrentStat(buffStat);
-                        string dur = buffTurns == -1 ? "[战斗]" : $"[{buffTurns}回合]";
-                        effects.Add($"[+] {buffStat}+{(int)(buffRatio * 100)}% ({before}→{after}) {dur}");
-                    }
-                    break;
-
-                case "ModifyCounter":
-                    string counterKey = GetStringParam(p, "counter", "sprite");
-                    int counterDelta = GetIntParam(p, "amount", 1);
-                    unit.ModifyCounter(counterKey, counterDelta);
-                    effects.Add($"{counterKey}+{counterDelta} (当前: {unit.GetCounter(counterKey)})");
-                    break;
-
-                case "ConsumeCounter":
-                    string consumeKey = GetStringParam(p, "counter", "sprite");
-                    int powerPer = GetIntParam(p, "powerPerCounter", 30);
-                    int consumed = unit.ConsumeCounter(consumeKey);
-                    if (calc != null)
-                    {
-                        calc.CounterPowerBonus += consumed * powerPer;
-                    }
-                    effects.Add($"消耗全部{consumeKey}({consumed}个), 威力+{consumed * powerPer}");
-                    break;
-
-                case "ModifyDamageCalc":
-                    if (calc != null)
-                    {
-                        if (p.ContainsKey("ForceHit") && (bool)p["ForceHit"])
-                        { calc.ForceHit = true; effects.Add("[!] 必中"); }
-                        if (p.ContainsKey("ForceEvasion") && (bool)p["ForceEvasion"])
-                        { calc.ForceEvasion = true; effects.Add("[!] 强制回避"); }
-                        if (p.ContainsKey("CannotBeBlocked") && (bool)p["CannotBeBlocked"])
-                        { calc.CannotBeBlocked = true; effects.Add("[!] 格挡不可"); }
-                        if (p.ContainsKey("IgnoreDefenseRatio"))
-                        { calc.IgnoreDefenseRatio = (float)(double)p["IgnoreDefenseRatio"]; effects.Add($"[!] 无视{(int)(calc.IgnoreDefenseRatio * 100)}%防御"); }
-                        if (p.ContainsKey("SkillPowerMultiplier"))
-                        { calc.SkillPowerMultiplier *= (float)(double)p["SkillPowerMultiplier"]; effects.Add($"[!] 威力×{calc.SkillPowerMultiplier}"); }
-                    }
-                    break;
-
-                case "CoverAlly":
-                    if (calc != null && !calc.CannotBeCovered)
-                    {
-                        calc.CoverTarget = unit;
-                        effects.Add($"[#] {unit.Data.Name} 掩护目标");
-                    }
-                    break;
-
-                case "TemporalMark":
-                    string markKey = GetStringParam(p, "key", "OneTimeImmunity");
-                    int markCount = GetIntParam(p, "count", 1);
-                    var markTarget = GetTargetType(p, "target", "Self");
-                    var markUnits = SelectPassiveTargets(unit, markTarget, attacker, defender);
-                    foreach (var t in markUnits)
-                    {
-                        t.AddTemporal(markKey, markCount, -1, skillData.Id);
-                        effects.Add($"[*] {t.Data.Name} {markKey}({markCount}次)");
-                    }
-                    break;
-
-                case "CounterAttack":
-                    if (attacker != null && _enqueueAction != null)
-                    {
-                        int cntPower = GetIntParam(p, "power", 75);
-                        _enqueueAction(new PendingAction
-                        {
-                            Type = PendingActionType.Counter,
-                            Actor = unit,
-                            Targets = new List<BattleUnit> { attacker },
-                            Power = cntPower,
-                            HitRate = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null,
-                            DamageType = SkillType.Physical, AttackType = AttackType.Melee,
-                            SourcePassiveId = skillData.Id, Tags = GetStringListParam(p, "tags")
-                        });
-                        effects.Add($"[>>] 反击(威力{cntPower})");
-                    }
-                    break;
-
-                case "PursuitAttack":
-                    if (attacker != null && _enqueueAction != null)
-                    {
-                        int purPower = GetIntParam(p, "power", 75);
-                        _enqueueAction(new PendingAction
-                        {
-                            Type = PendingActionType.Pursuit,
-                            Actor = unit,
-                            Targets = new List<BattleUnit> { attacker },
-                            Power = purPower,
-                            HitRate = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null,
-                            DamageType = SkillType.Physical, AttackType = AttackType.Melee,
-                            SourcePassiveId = skillData.Id, Tags = GetStringListParam(p, "tags")
-                        });
-                        effects.Add($"[>>] 追击(威力{purPower})");
-                    }
-                    break;
-
-                case "PreemptiveAttack":
-                    if (_enqueueAction != null)
-                    {
-                        int prePower = GetIntParam(p, "power", 100);
-                        var preTarget = GetTargetType(p, "target", "Attacker");
-                        var preUnits = SelectPassiveTargets(unit, preTarget, attacker, defender);
-                        _enqueueAction(new PendingAction
-                        {
-                            Type = PendingActionType.Preemptive, Actor = unit, Targets = preUnits,
-                            Power = prePower,
-                            HitRate = p.ContainsKey("hitRate") ? GetIntParam(p, "hitRate", 100) : null,
-                            DamageType = SkillType.Physical, AttackType = AttackType.Melee,
-                            SourcePassiveId = skillData.Id, Tags = GetStringListParam(p, "tags")
-                        });
-                        effects.Add($"[>>] 先制攻击(威力{prePower})");
-                    }
-                    break;
-
-                default:
-                    effects.Add($"{effect.EffectType}(待实现)");
-                    break;
-            }
+            var targets = SelectExecutorFallbackTargets(unit, effect, attacker, defender);
+            var state = new SkillEffectExecutionState();
+            var logs = IsCalculationEffect(effect.EffectType)
+                ? _skillEffectExecutor.ExecuteCalculationEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id, calc, state)
+                : _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id);
+            effects.AddRange(logs);
+            return true;
         }
 
         private void ExecuteLegacyTags(BattleUnit unit, PassiveSkillData skillData,
@@ -532,18 +408,35 @@ namespace BattleKing.Skills
         private static bool CanExecuteThroughSharedExecutor(string effectType)
         {
             return effectType == "RecoverAp"
+                || effectType == "ApDamage"
                 || effectType == "RecoverPp"
+                || effectType == "PpDamage"
                 || effectType == "RecoverHp"
+                || effectType == "Heal"
+                || effectType == "HealRatio"
                 || effectType == "AddBuff"
+                || effectType == "AddDebuff"
+                || effectType == "RemoveBuff"
+                || effectType == "RemoveDebuff"
+                || effectType == "CleanseDebuff"
                 || effectType == "ModifyCounter"
                 || effectType == "ConsumeCounter"
                 || effectType == "ModifyDamageCalc"
-                || effectType == "StatusAilment";
+                || effectType == "CoverAlly"
+                || effectType == "StatusAilment"
+                || effectType == "TemporalMark"
+                || effectType == "CounterAttack"
+                || effectType == "PursuitAttack"
+                || effectType == "PreemptiveAttack"
+                || effectType == "BattleEndAttack"
+                || effectType == "PendingAttack";
         }
 
         private static bool IsCalculationEffect(string effectType)
         {
-            return effectType == "ModifyDamageCalc" || effectType == "ConsumeCounter";
+            return effectType == "ModifyDamageCalc"
+                || effectType == "ConsumeCounter"
+                || effectType == "CoverAlly";
         }
 
         private List<BattleUnit> SelectExecutorFallbackTargets(
@@ -552,8 +445,20 @@ namespace BattleKing.Skills
             BattleUnit attacker,
             BattleUnit defender)
         {
-            var targetType = GetTargetType(effect.Parameters ?? new Dictionary<string, object>(), "target", "Self");
-            return SelectPassiveTargets(owner, targetType, attacker, defender);
+            var defaultTarget = effect.EffectType switch
+            {
+                "CounterAttack" => "Attacker",
+                "PursuitAttack" => "Attacker",
+                "PreemptiveAttack" => "AllEnemies",
+                "BattleEndAttack" => "AllEnemies",
+                "PendingAttack" => "AllEnemies",
+                _ => "Self"
+            };
+            var targetType = GetTargetType(effect.Parameters ?? new Dictionary<string, object>(), "target", defaultTarget);
+            var selected = SelectPassiveTargets(owner, targetType, attacker, defender);
+            if (effect.Parameters != null && TryGetIntParam(effect.Parameters, "maxTargets", out int maxTargets))
+                selected = selected.Take(Math.Max(0, maxTargets)).ToList();
+            return selected;
         }
 
         // === Module 4: Target selection helpers ===
@@ -570,15 +475,25 @@ namespace BattleKing.Skills
                 case PassiveTargetType.Defender:
                     return defender != null ? new List<BattleUnit> { defender } : new List<BattleUnit>();
                 case PassiveTargetType.LowestHpAlly:
-                    var allies = GetAllies(owner, null);
+                    var allies = GetAllies(owner, _ctx);
                     return allies.Any() ? new List<BattleUnit> { allies.OrderBy(u => u.CurrentHp).First() } : new List<BattleUnit>();
                 case PassiveTargetType.HighestHpAlly:
-                    var alliesH = GetAllies(owner, null);
+                    var alliesH = GetAllies(owner, _ctx);
                     return alliesH.Any() ? new List<BattleUnit> { alliesH.OrderByDescending(u => u.CurrentHp).First() } : new List<BattleUnit>();
                 case PassiveTargetType.AllAllies:
-                    return GetAllies(owner, null);
+                    return GetAllies(owner, _ctx);
+                case PassiveTargetType.AllEnemies:
+                    return _ctx?.GetAliveUnits(!owner.IsPlayer) ?? new List<BattleUnit>();
+                case PassiveTargetType.RowAllies:
+                    return GetAllies(owner, _ctx).Where(u => u.IsFrontRow == owner.IsFrontRow).ToList();
+                case PassiveTargetType.FrontRowAlly:
+                    return GetAllies(owner, _ctx).Where(u => u.IsFrontRow).ToList();
+                case PassiveTargetType.BackRowAlly:
+                    return GetAllies(owner, _ctx).Where(u => !u.IsFrontRow).ToList();
+                case PassiveTargetType.ColumnAllies:
+                    return GetAllies(owner, _ctx).Where(u => IsSameColumn(u.Position, owner.Position)).ToList();
                 case PassiveTargetType.RandomAlly:
-                    var alliesR = GetAllies(owner, null);
+                    var alliesR = GetAllies(owner, _ctx);
                     return alliesR.Any() ? new List<BattleUnit> { alliesR[new Random().Next(alliesR.Count)] } : new List<BattleUnit>();
                 default:
                     return new List<BattleUnit> { owner };
@@ -608,41 +523,50 @@ namespace BattleKing.Skills
             return new List<BattleUnit> { unit };
         }
 
+        private static bool IsSameColumn(int a, int b)
+        {
+            if (a <= 0 || b <= 0)
+                return false;
+            return (a - 1) % 3 == (b - 1) % 3;
+        }
+
         // === Parameter helpers ===
 
         private int GetIntParam(Dictionary<string, object> p, string key, int defaultVal)
         {
-            if (p.TryGetValue(key, out var val))
+            return SkillEffectExecutor.GetInt(p, key, defaultVal);
+        }
+
+        private bool TryGetIntParam(Dictionary<string, object> p, string key, out int value)
+        {
+            if (p != null && p.ContainsKey(key))
             {
-                if (val is int i) return i;
-                if (val is long l) return (int)l;
-                if (val is double d) return (int)d;
+                value = SkillEffectExecutor.GetInt(p, key, 0);
+                return true;
             }
-            return defaultVal;
+
+            value = 0;
+            return false;
         }
 
         private float GetFloatParam(Dictionary<string, object> p, string key, float defaultVal)
         {
-            if (p.TryGetValue(key, out var val))
-            {
-                if (val is float f) return f;
-                if (val is double d) return (float)d;
-            }
-            return defaultVal;
+            return SkillEffectExecutor.GetFloat(p, key, defaultVal);
         }
 
         private string GetStringParam(Dictionary<string, object> p, string key, string defaultVal)
         {
-            if (p.TryGetValue(key, out var val) && val is string s)
-                return s;
-            return defaultVal;
+            return SkillEffectExecutor.GetString(p, key, defaultVal);
         }
 
         private List<string> GetStringListParam(Dictionary<string, object> p, string key)
         {
-            if (p.TryGetValue(key, out var val) && val is List<string> list)
-                return list;
-            return new List<string>();
+            return SkillEffectExecutor.GetStringList(p, key);
+        }
+
+        private TEnum GetEnumParam<TEnum>(Dictionary<string, object> p, string key, TEnum defaultVal) where TEnum : struct
+        {
+            return SkillEffectExecutor.ParseEnum(GetStringParam(p, key, defaultVal.ToString()), defaultVal);
         }
 
         private PassiveTargetType GetTargetType(Dictionary<string, object> p, string key, string defaultVal)
@@ -657,7 +581,15 @@ namespace BattleKing.Skills
                 "LowestHpAlly" => PassiveTargetType.LowestHpAlly,
                 "HighestHpAlly" => PassiveTargetType.HighestHpAlly,
                 "AllAllies" => PassiveTargetType.AllAllies,
+                "Allies" => PassiveTargetType.AllAllies,
+                "AllEnemies" => PassiveTargetType.AllEnemies,
+                "Enemies" => PassiveTargetType.AllEnemies,
                 "ColumnAllies" => PassiveTargetType.ColumnAllies,
+                "RowAllies" => PassiveTargetType.RowAllies,
+                "FrontRowAllies" => PassiveTargetType.FrontRowAlly,
+                "FrontRowAlly" => PassiveTargetType.FrontRowAlly,
+                "BackRowAllies" => PassiveTargetType.BackRowAlly,
+                "BackRowAlly" => PassiveTargetType.BackRowAlly,
                 _ => PassiveTargetType.Self
             };
         }

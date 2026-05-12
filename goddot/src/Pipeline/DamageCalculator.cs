@@ -16,13 +16,17 @@ namespace BattleKing.Pipeline
             var attacker = calc.Attacker;
             var defender = calc.Defender;
             var skill = calc.Skill;
+            var resolvedDefender = calc.CoverTarget != null && !calc.CannotBeCovered
+                ? calc.CoverTarget
+                : defender;
+            calc.ResolvedDefender = resolvedDefender;
 
             // Stage 1: Attack power
             calc.FinalAttackPower = attacker.GetCurrentAttackPower(skill.Type);
 
             // Stage 2: Defense (with ignore-defense ratio)
             float defMult = 1.0f - calc.IgnoreDefenseRatio;
-            calc.FinalDefense = (int)(defender.GetCurrentDefense(skill.Type) * defMult);
+            calc.FinalDefense = (int)(resolvedDefender.GetCurrentDefense(skill.Type) * defMult);
 
             // Stage 3-6: Base difference * effective power * traits
             float effectivePower = calc.EffectivePower;  // includes CounterPowerBonus
@@ -30,7 +34,7 @@ namespace BattleKing.Pipeline
             calc.SkillPowerRatio = effectivePower / 100f;
             baseDmgPerHit *= calc.SkillPowerMultiplier;
 
-            calc.ClassTraitMultiplier = GetClassTraitMultiplier(attacker, defender);
+            calc.ClassTraitMultiplier = GetClassTraitMultiplier(attacker, resolvedDefender);
             Equipment.TraitApplier.ApplyTraitsToDamage(calc);  // CC traits (PhysAtkVsInfantry2x, BowVsFlying, etc.)
 
             baseDmgPerHit *= calc.ClassTraitMultiplier;
@@ -44,6 +48,9 @@ namespace BattleKing.Pipeline
             bool anyBlocked = false;
             bool anyEvaded = false;
             int hitsLanded = 0;
+            int hitsMissed = 0;
+            int hitsEvaded = 0;
+            int hitsNullified = 0;
 
             for (int hit = 0; hit < calc.HitCount; hit++)
             {
@@ -65,25 +72,18 @@ namespace BattleKing.Pipeline
                     if (!RollHit(attacker, defender, skill))
                     {
                         calc.IsHit = false;
+                        hitsMissed++;
                         continue;  // this hit missed, try next hit
                     }
                 }
 
-                // Stage 7.5: Evasion check (ForceEvasion always evades)
-                if (calc.ForceEvasion || RollEvasion(attacker, defender, skill))
+                // Stage 7.5: Evasion check (ForceEvasion evades the first hit only)
+                if ((calc.ForceEvasion && hit == 0) || RollEvasion(attacker, defender, skill))
                 {
                     calc.IsEvaded = true;
                     anyEvaded = true;
+                    hitsEvaded++;
                     continue;  // this hit evaded, try next hit
-                }
-
-                // === Cover processing (before damage) ===
-                var hitDefender = defender;
-                if (calc.CoverTarget != null && !calc.CannotBeCovered)
-                {
-                    hitDefender = calc.CoverTarget;
-                    // Recalculate defense for cover target
-                    calc.FinalDefense = (int)(hitDefender.GetCurrentDefense(skill.Type) * defMult);
                 }
 
                 // Stage 9: Critical hit
@@ -100,11 +100,11 @@ namespace BattleKing.Pipeline
                 bool blockThisHit = false;
                 if (skill.HasPhysicalComponent && !calc.CannotBeBlocked && calc.ForceBlock != false)
                 {
-                    if (calc.ForceBlock == true || RollBlock(hitDefender, skill))
+                    if (calc.ForceBlock == true || RollBlock(resolvedDefender, skill))
                     {
                         blockThisHit = true;
                         anyBlocked = true;
-                        calc.BlockReduction = hitDefender.GetBlockReduction();
+                        calc.BlockReduction = resolvedDefender.GetBlockReduction();
                         hitPhysical *= (1f - calc.BlockReduction);
                     }
                 }
@@ -115,6 +115,13 @@ namespace BattleKing.Pipeline
                 // Damage immunity
                 if (calc.NullifyPhysicalDamage) hitPhysical = 0f;
                 if (calc.NullifyMagicalDamage) hitMagical = 0f;
+                if (skill.AttackType == AttackType.Melee
+                    && skill.HasPhysicalComponent
+                    && resolvedDefender.TryConsumeTemporal("MeleeHitNullify"))
+                {
+                    hitPhysical = 0f;
+                    hitsNullified++;
+                }
 
                 totalPhysical += hitPhysical;
                 totalMagical += hitMagical;
@@ -131,6 +138,10 @@ namespace BattleKing.Pipeline
             calc.MagicalDamage = (int)Math.Round((double)totalMagical);
             calc.IsHit = anyHit;
             calc.IsCritical = anyCritical;
+            calc.LandedHits = hitsLanded;
+            calc.MissedHits = hitsMissed;
+            calc.EvadedHits = hitsEvaded;
+            calc.NullifiedHits = hitsNullified;
             if (!anyBlocked && calc.HitCount == 1)
                 calc.IsBlocked = false;
             // For multi-hit: IsBlocked = first hit was blocked (set above)
@@ -142,7 +153,8 @@ namespace BattleKing.Pipeline
                 calc.IsCritical,
                 calc.IsBlocked || anyBlocked,
                 anyEvaded,
-                calc.AppliedAilments
+                calc.AppliedAilments,
+                resolvedDefender
             );
         }
 

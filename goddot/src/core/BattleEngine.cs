@@ -6,6 +6,7 @@ using BattleKing.Data;
 using BattleKing.Events;
 using BattleKing.Pipeline;
 using BattleKing.Skills;
+using BattleKing.Utils;
 
 namespace BattleKing.Core
 {
@@ -18,6 +19,8 @@ namespace BattleKing.Core
         private EventBus _eventBus = new EventBus();
 
         public Action<string> OnLog { get; set; }
+        public Action<BattleLogEntry> OnBattleLogEntry { get; set; }
+        public List<BattleLogEntry> BattleLogEntries { get; } = new List<BattleLogEntry>();
         public EventBus EventBus => _eventBus;
 
         // Module 2: Pending action queue
@@ -27,6 +30,9 @@ namespace BattleKing.Core
         // Per-action stepping
         private Queue<BattleUnit> _turnQueue = new Queue<BattleUnit>();
         private int _actionsThisTurn = 0;
+        private bool _battleEnded = false;
+        private bool _battleEndPhaseStarted = false;
+        private BattleResult _finalResult;
 
         public BattleEngine(BattleContext ctx)
         {
@@ -44,6 +50,12 @@ namespace BattleKing.Core
                 System.Console.WriteLine(message);
         }
 
+        private void EmitBattleLogEntry(BattleLogEntry entry)
+        {
+            BattleLogEntries.Add(entry);
+            OnBattleLogEntry?.Invoke(entry);
+        }
+
         public BattleResult StartBattle()
         {
             InitBattle();
@@ -51,14 +63,17 @@ namespace BattleKing.Core
             {
                 var r = StepBattle();
                 if (r != BattleStepResult.Continue)
-                    return EndBattle(r == BattleStepResult.PlayerWin ? BattleResult.PlayerWin
-                        : r == BattleStepResult.EnemyWin ? BattleResult.EnemyWin : BattleResult.Draw);
+                    return ToBattleResult(r);
             }
         }
 
         /// <summary>Initialize battle — call once before stepping</summary>
         public void InitBattle()
         {
+            _battleEnded = false;
+            _battleEndPhaseStarted = false;
+            _turnQueue.Clear();
+            _actionsThisTurn = 0;
             Log("=== 战斗开始 ===");
             PrintTeamStatus();
             _eventBus.Publish(new BattleStartEvent { Context = _ctx });
@@ -68,128 +83,239 @@ namespace BattleKing.Core
         /// <summary>Execute ONE turn. Returns Continue if battle still ongoing.</summary>
         public BattleStepResult StepBattle()
         {
-            _ctx.TurnCount++;
-            Log($"--- 第 {_ctx.TurnCount} 回合 ---");
+            if (_battleEnded)
+                return ToBattleStepResult(_finalResult);
 
-            var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
-            if (aliveUnits.Count == 0)
+            while (true)
             {
-                Log("双方全灭，平局！");
-                return BattleStepResult.Draw;
+                var result = StepOneAction();
+                if (result == SingleActionResult.ActionDone)
+                    continue;
+                if (result == SingleActionResult.TurnDone)
+                    return BattleStepResult.Continue;
+                return ToBattleStepResult(ToBattleResult(result));
             }
-
-            var turnOrder = aliveUnits.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
-
-            foreach (var unit in turnOrder)
-            {
-                if (!unit.IsAlive) continue;
-
-                var preCheck = CheckBattleEnd();
-                if (preCheck.HasValue)
-                    return preCheck.Value == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
-                        : preCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
-
-                ExecuteUnitTurn(unit);
-                ProcessPendingActions();
-            }
-
-            var postCheck = CheckBattleEnd();
-            if (postCheck.HasValue)
-                return postCheck.Value == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
-                    : postCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
-
-            var apCheck = CheckApExhaustion();
-            if (apCheck.HasValue)
-                return apCheck.Value == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
-                    : apCheck.Value == BattleResult.EnemyWin ? BattleStepResult.EnemyWin : BattleStepResult.Draw;
-
-            return BattleStepResult.Continue;
         }
 
         /// <summary>Execute ONE action (one unit's turn). Returns ActionDone/TurnDone/Win/Lose/Draw.</summary>
         public SingleActionResult StepOneAction()
         {
+            if (_battleEnded)
+                return ToSingleActionResult(_finalResult);
+
             // If queue is empty, start a new turn
             if (_turnQueue.Count == 0)
             {
-                _ctx.TurnCount++;
-                Log($"--- 第 {_ctx.TurnCount} 回合 ---");
-                _actionsThisTurn = 0;
-
-                var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
-                if (aliveUnits.Count == 0)
-                {
-                    Log("双方全灭，平局！");
-                    return SingleActionResult.Draw;
-                }
-
-                var ordered = aliveUnits.OrderByDescending(u => u.GetCurrentSpeed()).ToList();
-                foreach (var u in ordered) _turnQueue.Enqueue(u);
+                var turnStartResult = BeginNextTurn();
+                if (turnStartResult.HasValue)
+                    return EndBattleAction(turnStartResult.Value);
             }
 
             // Pop next alive unit
-            BattleUnit unit = null;
-            while (_turnQueue.Count > 0)
-            {
-                unit = _turnQueue.Dequeue();
-                if (unit.IsAlive) break;
-                unit = null;
-            }
+            var unit = DequeueNextActor();
             if (unit == null || !unit.IsAlive) { _turnQueue.Clear(); return StepOneAction(); }
 
             // Pre-check
             var preCheck = CheckBattleEnd();
             if (preCheck.HasValue)
-                return preCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
-                    : preCheck.Value == BattleResult.EnemyWin ? SingleActionResult.EnemyWin : SingleActionResult.Draw;
+                return EndBattleAction(preCheck.Value);
 
             _actionsThisTurn++;
             ExecuteUnitTurn(unit);
             ProcessPendingActions();
-
-            // Cleanup one-time buffs after this unit acted
-            BattleKing.Equipment.BuffManager.CleanupAfterAction(unit);
+            CompleteAction(unit);
+            Log("");
 
             // Post-check
             var postCheck = CheckBattleEnd();
             if (postCheck.HasValue)
-                return postCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
-                    : postCheck.Value == BattleResult.EnemyWin ? SingleActionResult.EnemyWin : SingleActionResult.Draw;
+                return EndBattleAction(postCheck.Value);
 
             if (_turnQueue.Count == 0)
             {
-                // End of turn: cleanup turn-duration buffs
-                foreach (var u in _ctx.AllUnits.Where(u => u != null && u.IsAlive))
-                    BattleKing.Equipment.BuffManager.CleanupEndOfTurn(u);
-
-                var apCheck = CheckApExhaustion();
-                if (apCheck.HasValue)
-                    return apCheck.Value == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
-                        : apCheck.Value == BattleResult.EnemyWin ? SingleActionResult.EnemyWin : SingleActionResult.Draw;
+                var turnEndResult = CompleteTurn();
+                if (turnEndResult.HasValue)
+                    return EndBattleAction(turnEndResult.Value);
                 return SingleActionResult.TurnDone;
             }
 
             return SingleActionResult.ActionDone;
         }
 
+        private BattleResult? BeginNextTurn()
+        {
+            _ctx.TurnCount++;
+            Log($"--- 第 {_ctx.TurnCount} 回合 ---");
+            _actionsThisTurn = 0;
+
+            var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
+            if (aliveUnits.Count == 0)
+            {
+                Log("双方全灭，平局！");
+                return BattleResult.Draw;
+            }
+
+            var ordered = OrderBySpeedWithRandomTies(aliveUnits);
+            foreach (var u in ordered)
+                _turnQueue.Enqueue(u);
+
+            return null;
+        }
+
+        private BattleUnit DequeueNextActor()
+        {
+            while (_turnQueue.Count > 0)
+            {
+                var unit = _turnQueue.Dequeue();
+                if (unit.IsAlive)
+                    return unit;
+            }
+            return null;
+        }
+
+        private static void CompleteAction(BattleUnit unit)
+        {
+            unit.ActionCount++;
+            BattleKing.Equipment.BuffManager.CleanupAfterAction(unit);
+        }
+
+        private BattleResult? CompleteTurn()
+        {
+            foreach (var u in _ctx.AllUnits.Where(u => u != null && u.IsAlive))
+                BattleKing.Equipment.BuffManager.CleanupEndOfTurn(u);
+
+            return CheckApExhaustion();
+        }
+
         private BattleResult EndBattle(BattleResult result)
         {
-            // Process BattleEnd pending actions (e.g. Finishing Strike) BEFORE judging winner
+            if (_battleEnded)
+                return _finalResult;
+
+            var finalResult = EnterBattleEndPhase(result);
+            return FinalizeBattle(finalResult);
+        }
+
+        private BattleResult EnterBattleEndPhase(BattleResult preliminaryResult)
+        {
+            if (_battleEndPhaseStarted)
+                return ResolveFinalBattleResult(preliminaryResult);
+
+            _battleEndPhaseStarted = true;
+            _turnQueue.Clear();
+
+            _eventBus.Publish(new BattleEndEvent { Context = _ctx, Result = preliminaryResult });
             ProcessPendingActions();
 
-            _eventBus.Publish(new BattleEndEvent { Context = _ctx, Result = result });
+            return ResolveFinalBattleResult(preliminaryResult);
+        }
+
+        private BattleResult FinalizeBattle(BattleResult result)
+        {
+            if (_battleEnded)
+                return _finalResult;
+
+            _battleEnded = true;
+            _finalResult = result;
+            _turnQueue.Clear();
+
+            EmitBattleLogEntry(new BattleLogEntry
+            {
+                Turn = _ctx.TurnCount,
+                Damage = 0,
+                Flags = new List<string> { "BattleEnd", result.ToString() },
+                Text = $"BattleEnd:{result}"
+            });
             return result;
+        }
+
+        private BattleResult ResolveFinalBattleResult(BattleResult fallbackResult)
+        {
+            bool playerAlive = _ctx.PlayerUnits.Any(u => u != null && u.IsAlive);
+            bool enemyAlive = _ctx.EnemyUnits.Any(u => u != null && u.IsAlive);
+
+            if (playerAlive && !enemyAlive)
+                return BattleResult.PlayerWin;
+            if (!playerAlive && enemyAlive)
+                return BattleResult.EnemyWin;
+            if (!playerAlive && !enemyAlive)
+                return BattleResult.Draw;
+
+            bool playerHasAp = _ctx.PlayerUnits.Any(u => u != null && u.IsAlive && u.CurrentAp > 0);
+            bool enemyHasAp = _ctx.EnemyUnits.Any(u => u != null && u.IsAlive && u.CurrentAp > 0);
+            if (!playerHasAp && !enemyHasAp)
+                return CompareHpRatio();
+
+            return fallbackResult;
+        }
+
+        private BattleResult CompareHpRatio()
+        {
+            double playerHpRatio = GetHpRatio(_ctx.PlayerUnits);
+            double enemyHpRatio = GetHpRatio(_ctx.EnemyUnits);
+
+            if (playerHpRatio > enemyHpRatio)
+                return BattleResult.PlayerWin;
+            if (enemyHpRatio > playerHpRatio)
+                return BattleResult.EnemyWin;
+            return BattleResult.Draw;
+        }
+
+        private BattleStepResult EndBattleStep(BattleResult result)
+        {
+            return ToBattleStepResult(EndBattle(result));
+        }
+
+        private SingleActionResult EndBattleAction(BattleResult result)
+        {
+            return ToSingleActionResult(EndBattle(result));
+        }
+
+        private static BattleResult ToBattleResult(BattleStepResult result)
+        {
+            return result == BattleStepResult.PlayerWin ? BattleResult.PlayerWin
+                : result == BattleStepResult.EnemyWin ? BattleResult.EnemyWin
+                : BattleResult.Draw;
+        }
+
+        private static BattleResult ToBattleResult(SingleActionResult result)
+        {
+            return result == SingleActionResult.PlayerWin ? BattleResult.PlayerWin
+                : result == SingleActionResult.EnemyWin ? BattleResult.EnemyWin
+                : BattleResult.Draw;
+        }
+
+        private static BattleStepResult ToBattleStepResult(BattleResult result)
+        {
+            return result == BattleResult.PlayerWin ? BattleStepResult.PlayerWin
+                : result == BattleResult.EnemyWin ? BattleStepResult.EnemyWin
+                : BattleStepResult.Draw;
+        }
+
+        private static SingleActionResult ToSingleActionResult(BattleResult result)
+        {
+            return result == BattleResult.PlayerWin ? SingleActionResult.PlayerWin
+                : result == BattleResult.EnemyWin ? SingleActionResult.EnemyWin
+                : SingleActionResult.Draw;
         }
 
         private void ExecuteUnitTurn(BattleUnit unit)
         {
+            if (unit.State == UnitState.Stunned)
+            {
+                Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 气绝中，跳过本次行动");
+                unit.State = UnitState.Normal;
+                unit.ConsecutiveWaitCount = 0;
+                return;
+            }
+
             // Module 6: Charge state machine
             // If charging, execute the charged skill this turn
             if (unit.State == UnitState.Charging)
             {
                 if (unit.ConsecutiveWaitCount >= 3)
                 {
-                    Log($"{unit.Data.Name} 蓄力超时（连续3回待机），蓄力解除");
+                    Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 蓄力超时（连续3回待机），蓄力解除");
                     unit.State = UnitState.Normal;
                     unit.ChargedSkillId = null;
                     unit.ConsecutiveWaitCount = 0;
@@ -205,7 +331,7 @@ namespace BattleKing.Core
                     return;
                 }
 
-                Log($"{unit.Data.Name} 蓄力发动！→ {chargeSkill.Name}");
+                Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 蓄力发动！→ {chargeSkill.Name}");
                 unit.State = UnitState.Normal;
                 unit.ChargedSkillId = null;
 
@@ -222,22 +348,22 @@ namespace BattleKing.Core
                 unit.ConsecutiveWaitCount++;
                 // If charging state somehow without skill, count as wait
                 if (unit.State == UnitState.Charging)
-                    Log($"{unit.Data.Name} 蓄力中，无法行动（第{unit.ConsecutiveWaitCount}次待机）");
+                    Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 蓄力中，无法行动（第{unit.ConsecutiveWaitCount}次待机）");
                 else
-                    Log($"{unit.Data.Name} 无法行动，跳过");
+                    Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 无法行动，跳过");
                 return;
             }
 
             if (!unit.CanUseActiveSkill(skill))
             {
-                Log($"{unit.Data.Name} AP不足，无法行动，跳过");
+                Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} AP不足，无法行动，跳过");
                 return;
             }
 
             // Check if skill has Charge tag → enter charging state, skip this turn
             if (skill.Data.Tags != null && skill.Data.Tags.Contains("Charge"))
             {
-                Log($"{unit.Data.Name} 开始蓄力：{skill.Data.Name}（下次行动时发动）");
+                Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 开始蓄力：{skill.Data.Name}（下次行动时发动）");
                 unit.State = UnitState.Charging;
                 unit.ChargedSkillId = skill.Data.Id;
                 unit.ConsecutiveWaitCount = 0;
@@ -256,7 +382,7 @@ namespace BattleKing.Core
             if (unit.State != UnitState.Charging)
                 unit.ConsumeAp(skill.ApCost);
 
-            Log($"--- {unit.Data.Name} 发动 {skill.Data.Name} (AP{skill.ApCost} 威力{skill.Power}) [{DumpUnitBrief(unit)}] ---");
+            Log($"--- {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 发动 {skill.Data.Name} (AP{skill.ApCost} 威力{skill.Power}) [{DumpUnitBrief(unit)}] ---");
 
             var effectState = new SkillEffectExecutionState();
             var actionEffectLogs = _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, skill.Data.Effects, skill.Data.Id);
@@ -299,23 +425,25 @@ namespace BattleKing.Core
                 });
 
                 var result = _damageCalculator.Calculate(calc);
+                var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
 
 				bool killed = false;
-				if (result.IsHit && !result.IsEvaded)
+				if (result.IsHit && result.TotalDamage > 0)
 				{
-					int hpBefore = target.CurrentHp;
-					target.TakeDamage(result.TotalDamage);
-					killed = !target.IsAlive;
+					int hpBefore = damageReceiver.CurrentHp;
+					damageReceiver.TakeDamage(result.TotalDamage);
+					killed = !damageReceiver.IsAlive;
 				}
 
 				var logLines = BattleKing.Ui.BattleLogHelper.FormatAttack(unit, target, skill, calc, result, killed, result.AppliedAilments.ToList());
 				foreach (var l in logLines) Log(l);
+                EmitBattleLogEntry(CreateAttackLogEntry(unit, skill.Data.Id, damageReceiver, result, killed, "ActiveAttack", logLines.LastOrDefault() ?? ""));
 
 				if (killed)
 				{
 					_eventBus.Publish(new OnKnockdownEvent
 					{
-						Victim = target,
+						Victim = damageReceiver,
 						Killer = unit,
 						Context = _ctx
 					});
@@ -324,7 +452,7 @@ namespace BattleKing.Core
 				_eventBus.Publish(new AfterHitEvent
 				{
 					Attacker = unit,
-					Defender = target,
+					Defender = damageReceiver,
 					Skill = skill,
 					DamageDealt = result.TotalDamage,
 					IsHit = result.IsHit,
@@ -335,7 +463,7 @@ namespace BattleKing.Core
 
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
 
-            Log($"  {unit.Data.Name} 行动结束: {DumpUnitBrief(unit)}");
+            Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 行动结束: {DumpUnitBrief(unit)}");
         }
 
         private void ProcessPendingActions()
@@ -346,7 +474,7 @@ namespace BattleKing.Core
                 if (!action.Actor.IsAlive)
                     continue;
 
-                foreach (var target in action.Targets)
+                foreach (var target in ExpandPendingActionTargets(action))
                 {
                     if (!target.IsAlive)
                         continue;
@@ -367,6 +495,10 @@ namespace BattleKing.Core
                         calc.ForceHit = true;
                     if (action.Tags.Contains("CannotBeBlocked"))
                         calc.CannotBeBlocked = true;
+                    if (action.Tags.Contains("CannotBeCovered"))
+                        calc.CannotBeCovered = true;
+                    if (ShouldApplyPendingIgnoreDefense(action, target))
+                        calc.IgnoreDefenseRatio = Math.Clamp(action.IgnoreDefenseRatio, 0f, 1f);
 
                     _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                     _eventBus.Publish(new BeforeHitEvent
@@ -379,33 +511,48 @@ namespace BattleKing.Core
                     });
 
                     var result = _damageCalculator.Calculate(calc);
+                    var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
+                    bool killed = false;
 
-                    if (result.IsHit && !result.IsEvaded)
+                    if (result.IsHit && result.TotalDamage > 0)
                     {
-                        target.TakeDamage(result.TotalDamage);
+                        damageReceiver.TakeDamage(result.TotalDamage);
+                        killed = !damageReceiver.IsAlive;
 
-                        if (!target.IsAlive)
+                        if (killed)
                         {
                             _eventBus.Publish(new OnKnockdownEvent
                             {
-                                Victim = target,
+                                Victim = damageReceiver,
                                 Killer = action.Actor,
                                 Context = _ctx
                             });
                         }
                     }
 
+                    var pendingLogText = BuildPendingActionLogText(action, target, damageReceiver, calc, result, killed);
+                    EmitBattleLogEntry(CreateAttackLogEntry(
+                        action.Actor,
+                        action.SourcePassiveId,
+                        damageReceiver,
+                        result,
+                        killed,
+                        "PassiveTrigger",
+                        pendingLogText,
+                        action.Type.ToString(),
+                        BuildPendingActionFlags(action, calc)));
+
                     _eventBus.Publish(new AfterHitEvent
                     {
                         Attacker = action.Actor,
-                        Defender = target,
+                        Defender = damageReceiver,
                         Skill = tempSkill,
                         DamageDealt = result.TotalDamage,
                         IsHit = result.IsHit,
                         Context = _ctx
                     });
 
-                    Log($"[{action.Type}] {action.Actor.Data.Name} → {target.Data.Name} {result.TotalDamage}伤害 [{action.SourcePassiveId}]");
+                    Log(pendingLogText);
                 }
             }
         }
@@ -415,7 +562,7 @@ namespace BattleKing.Core
             var data = new ActiveSkillData
             {
                 Id = $"temp_{action.SourcePassiveId}",
-                Name = action.SourcePassiveId,
+                Name = GetPassiveDisplayName(action.SourcePassiveId),
                 ApCost = 0,
                 Type = action.DamageType,
                 AttackType = action.AttackType,
@@ -424,6 +571,48 @@ namespace BattleKing.Core
                 TargetType = action.TargetType
             };
             return new ActiveSkill(data, _ctx.PlayerUnits.FirstOrDefault()?.GameData);
+        }
+
+        private List<BattleUnit> ExpandPendingActionTargets(PendingAction action)
+        {
+            var anchors = action.Targets?
+                .Where(t => t != null && t.IsAlive)
+                .ToList() ?? new List<BattleUnit>();
+
+            if (anchors.Count == 0)
+                return anchors;
+
+            return action.TargetType switch
+            {
+                TargetType.Row => anchors
+                    .SelectMany(anchor => _ctx.GetAliveUnits(anchor.IsPlayer)
+                        .Where(unit => unit.IsFrontRow == anchor.IsFrontRow))
+                    .Distinct()
+                    .ToList(),
+                TargetType.Column => anchors
+                    .SelectMany(anchor => _ctx.GetAliveUnits(anchor.IsPlayer)
+                        .Where(unit => IsSameColumn(unit.Position, anchor.Position)))
+                    .Distinct()
+                    .ToList(),
+                _ => anchors
+            };
+        }
+
+        private static bool ShouldApplyPendingIgnoreDefense(PendingAction action, BattleUnit target)
+        {
+            if (action.IgnoreDefenseRatio <= 0f || target == null)
+                return false;
+
+            return !action.IgnoreDefenseTargetClass.HasValue
+                || target.GetEffectiveClasses().Contains(action.IgnoreDefenseTargetClass.Value);
+        }
+
+        private static bool IsSameColumn(int a, int b)
+        {
+            if (a <= 0 || b <= 0)
+                return false;
+
+            return (a - 1) % 3 == (b - 1) % 3;
         }
 
         private BattleResult? CheckBattleEnd()
@@ -496,10 +685,19 @@ namespace BattleKing.Core
         {
             Log("玩家队伍:");
             foreach (var u in _ctx.PlayerUnits.Where(u => u != null))
-                Log($"  {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
+                Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(u)} HP:{u.CurrentHp} AP:{u.CurrentAp}");
             Log("敌方队伍:");
             foreach (var u in _ctx.EnemyUnits.Where(u => u != null))
-                Log($"  {u.Data.Name} HP:{u.CurrentHp} AP:{u.CurrentAp}");
+                Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(u)} HP:{u.CurrentHp} AP:{u.CurrentAp}");
+        }
+
+        private static List<BattleUnit> OrderBySpeedWithRandomTies(IEnumerable<BattleUnit> units)
+        {
+            return units
+                .GroupBy(u => u.GetCurrentSpeed())
+                .OrderByDescending(g => g.Key)
+                .SelectMany(g => g.OrderBy(_ => RandUtil.Roll(int.MaxValue)))
+                .ToList();
         }
 
         /// <summary>One-line unit summary: HP, AP, active buffs</summary>
@@ -514,6 +712,122 @@ namespace BattleKing.Core
             if (buffs.Count > 0) s += " [" + string.Join(",", buffs) + "]";
             if (u.State != UnitState.Normal) s += $" [{u.State}]";
             return s;
+        }
+
+        private BattleLogEntry CreateAttackLogEntry(
+            BattleUnit actor,
+            string skillId,
+            BattleUnit damageReceiver,
+            DamageResult result,
+            bool killed,
+            string primaryFlag,
+            string text,
+            string secondaryFlag = null,
+            IEnumerable<string> extraFlags = null)
+        {
+            var flags = new List<string> { primaryFlag };
+            if (!string.IsNullOrWhiteSpace(secondaryFlag))
+                flags.Add(secondaryFlag);
+            if (result.IsHit)
+                flags.Add("Hit");
+            if (!result.IsHit)
+                flags.Add("Miss");
+            if (result.IsEvaded)
+                flags.Add("Evade");
+            if (result.IsCritical)
+                flags.Add("Critical");
+            if (result.IsBlocked)
+                flags.Add("Blocked");
+            if (killed)
+                flags.Add("Knockdown");
+            flags.AddRange(result.AppliedAilments.Select(a => a.ToString()));
+            if (extraFlags != null)
+                flags.AddRange(extraFlags.Where(f => !string.IsNullOrWhiteSpace(f)));
+
+            return new BattleLogEntry
+            {
+                Turn = _ctx.TurnCount,
+                ActorId = actor?.Data?.Id ?? "",
+                SkillId = skillId ?? "",
+                TargetIds = damageReceiver == null ? new List<string>() : new List<string> { damageReceiver.Data.Id },
+                Damage = result.TotalDamage,
+                Flags = flags.Distinct().ToList(),
+                Text = text ?? ""
+            };
+        }
+
+        private string BuildPendingActionLogText(
+            PendingAction action,
+            BattleUnit declaredTarget,
+            BattleUnit damageReceiver,
+            DamageCalculation calc,
+            DamageResult result,
+            bool killed)
+        {
+            return $"[{action.Type}] actor={BattleKing.Ui.BattleLogHelper.FormatUnitName(action.Actor)}"
+                + $" passive={GetPassiveDisplayName(action.SourcePassiveId)}"
+                + $" target={BattleKing.Ui.BattleLogHelper.FormatUnitName(declaredTarget)}"
+                + $" receiver={BattleKing.Ui.BattleLogHelper.FormatUnitName(damageReceiver)}"
+                + $" damage={result.TotalDamage}"
+                + $" hit={result.IsHit}"
+                + $" blocked={result.IsBlocked}"
+                + $" critical={result.IsCritical}"
+                + $" evaded={result.IsEvaded}"
+                + $" killed={killed}"
+                + $" sureHit={calc.ForceHit}"
+                + $" ignoreDefense={calc.IgnoreDefenseRatio:0.##}"
+                + $" ailments={FormatAilments(result.AppliedAilments)}"
+                + $" temporary=actor:{FormatTemporalStates(action.Actor)};receiver:{FormatTemporalStates(damageReceiver)}"
+                + $" tags={FormatTags(action.Tags)}";
+        }
+
+        private string GetPassiveDisplayName(string passiveId)
+        {
+            if (!string.IsNullOrWhiteSpace(passiveId)
+                && _ctx?.GameData?.PassiveSkills?.TryGetValue(passiveId, out var passive) == true
+                && !string.IsNullOrWhiteSpace(passive.Name))
+            {
+                return $"{passive.Name} ({passiveId})";
+            }
+
+            return passiveId ?? "";
+        }
+
+        private static IEnumerable<string> BuildPendingActionFlags(PendingAction action, DamageCalculation calc)
+        {
+            var flags = new List<string>();
+            if (calc.ForceHit)
+                flags.Add("ForceHit");
+            if (calc.CannotBeBlocked)
+                flags.Add("CannotBeBlocked");
+            if (calc.CannotBeCovered)
+                flags.Add("CannotBeCovered");
+            if (calc.IgnoreDefenseRatio > 0f)
+                flags.Add($"IgnoreDefense={calc.IgnoreDefenseRatio:0.##}");
+            flags.AddRange(action.Tags ?? new List<string>());
+            return flags;
+        }
+
+        private static string FormatAilments(IEnumerable<StatusAilment> ailments)
+        {
+            var values = ailments?.Select(a => a.ToString()).Where(a => !string.IsNullOrWhiteSpace(a)).ToList()
+                ?? new List<string>();
+            return values.Count == 0 ? "None" : string.Join("|", values);
+        }
+
+        private static string FormatTemporalStates(BattleUnit unit)
+        {
+            var states = unit?.TemporalStates?
+                .Select(s => $"{s.Key}:{s.RemainingCount}")
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList() ?? new List<string>();
+            return states.Count == 0 ? "None" : string.Join("|", states);
+        }
+
+        private static string FormatTags(IEnumerable<string> tags)
+        {
+            var values = tags?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? new List<string>();
+            return values.Count == 0 ? "None" : string.Join("|", values);
         }
     }
 }

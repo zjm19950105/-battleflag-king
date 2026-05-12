@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using System.Linq;
 using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Pipeline;
@@ -72,7 +73,7 @@ namespace BattleKing.Tests
         [Test]
         public void 格挡_物理部分减25percent()
         {
-            var a = TestDataFactory.CreateUnit(str: 60);
+            var a = TestDataFactory.CreateUnit(str: 60, crit: 0);
             var d = TestDataFactory.CreateUnit(def: 10, block: 100);
             var skill = TestDataFactory.CreateSkill(power: 100);
             var c = TestDataFactory.CreateCalc(a, d, skill);
@@ -154,6 +155,40 @@ namespace BattleKing.Tests
             var result = _calc.Calculate(c);
             ClassicAssert.IsTrue(result.IsEvaded);
             ClassicAssert.AreEqual(0, result.TotalDamage);
+        }
+
+        [Test]
+        public void ForceEvasion_多段攻击_只回避第一段()
+        {
+            var a = TestDataFactory.CreateUnit(str: 100, hit: 1000, crit: 0);
+            var d = TestDataFactory.CreateUnit(def: 0, eva: 0, block: 0);
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var c = new DamageCalculation { Attacker = a, Defender = d, Skill = skill, ForceEvasion = true, HitCount = 4 };
+
+            var result = _calc.Calculate(c);
+
+            ClassicAssert.IsTrue(result.IsHit);
+            ClassicAssert.IsTrue(result.IsEvaded);
+            ClassicAssert.AreEqual(1, c.EvadedHits);
+            ClassicAssert.AreEqual(3, c.LandedHits);
+            ClassicAssert.AreEqual(300, result.TotalDamage);
+        }
+
+        [Test]
+        public void MeleeHitNullify_只无效下一段近战物理伤害()
+        {
+            var a = TestDataFactory.CreateUnit(str: 100, hit: 1000, crit: 0);
+            var d = TestDataFactory.CreateUnit(def: 0, eva: 0, block: 0);
+            d.AddTemporal("MeleeHitNullify", 1);
+            var skill = TestDataFactory.CreateSkill(power: 100, attackType: AttackType.Melee);
+            var c = new DamageCalculation { Attacker = a, Defender = d, Skill = skill, HitCount = 3 };
+
+            var result = _calc.Calculate(c);
+
+            ClassicAssert.AreEqual(1, c.NullifiedHits);
+            ClassicAssert.AreEqual(3, c.LandedHits);
+            ClassicAssert.AreEqual(200, result.TotalDamage);
+            ClassicAssert.IsFalse(d.TemporalStates.Any(s => s.Key == "MeleeHitNullify"));
         }
 
         // ────────── 魔法伤害 ──────────

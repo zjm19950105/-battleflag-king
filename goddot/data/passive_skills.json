@@ -14,9 +14,18 @@
     ],
     "effects": [
       {
-        "effectType": "ModifyDamageCalc",
+        "effectType": "PreemptiveAttack",
         "parameters": {
-          "ForceHit": true
+          "target": "AllEnemies",
+          "maxTargets": 1,
+          "power": 150,
+          "hitRate": 100,
+          "damageType": "Physical",
+          "attackType": "Melee",
+          "targetType": "SingleEnemy",
+          "tags": [
+            "SureHit"
+          ]
         }
       }
     ],
@@ -287,7 +296,18 @@
       "NullifyDamage",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CoverAlly",
+        "parameters": {}
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "NullifyPhysicalDamage": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "战士/先锋 Lv1",
     "unlockLevel": 1
@@ -344,11 +364,16 @@
     "power": 1,
     "hitRate": null,
     "effectDescription": "战斗结束时，友方单体HP回复25%",
-    "tags": [
-      "Heal25",
-      "BattleEnd"
+    "tags": [],
+    "effects": [
+      {
+        "effectType": "RecoverHp",
+        "parameters": {
+          "target": "LowestHpAlly",
+          "amount": 25
+        }
+      }
     ],
-    "effects": [],
     "hasSimultaneousLimit": false,
     "learnCondition": "士兵/军士 Lv1",
     "unlockLevel": 1
@@ -397,10 +422,21 @@
     "power": 75,
     "hitRate": 100,
     "effectDescription": "战斗结束时，敌单体攻击",
-    "tags": [
-      "BattleEndAttack"
+    "tags": [],
+    "effects": [
+      {
+        "effectType": "BattleEndAttack",
+        "parameters": {
+          "target": "AllEnemies",
+          "maxTargets": 1,
+          "power": 75,
+          "hitRate": 100,
+          "damageType": "Physical",
+          "attackType": "Melee",
+          "targetType": "SingleEnemy"
+        }
+      }
     ],
-    "effects": [],
     "hasSimultaneousLimit": false,
     "learnCondition": "家臣/维京 Lv1",
     "unlockLevel": 1
@@ -584,9 +620,15 @@
     ],
     "effects": [
       {
-        "effectType": "ModifyDamageCalc",
+        "effectType": "CounterAttack",
         "parameters": {
-          "CannotBeBlocked": true
+          "target": "Attacker",
+          "power": 150,
+          "damageType": "Physical",
+          "attackType": "Melee",
+          "targetType": "SingleEnemy",
+          "ignoreDefenseRatio": 1,
+          "ignoreDefenseTargetClass": "Heavy"
         }
       }
     ],
@@ -662,12 +704,18 @@
     "power": null,
     "hitRate": null,
     "effectDescription": "战斗结束时，友方一列HP回复15%，HP50%以下2倍",
-    "tags": [
-      "HealRow15",
-      "BattleEnd",
-      "SimultaneousLimit"
+    "tags": [],
+    "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "RowAllies",
+          "ratio": 0.15,
+          "lowHpThreshold": 0.5,
+          "lowHpMultiplier": 2
+        }
+      }
     ],
-    "effects": [],
     "hasSimultaneousLimit": true,
     "learnCondition": "射手/盾射手 Lv1",
     "unlockLevel": 1
@@ -792,9 +840,11 @@
       {
         "effectType": "CounterAttack",
         "parameters": {
+          "target": "Attacker",
           "power": 150,
           "hitRate": 100,
-          "attackType": "Magical"
+          "damageType": "Magical",
+          "attackType": "Magic"
         }
       }
     ],
@@ -1013,11 +1063,27 @@
     "tags": [
       "AtkDown20",
       "CritSeal",
-      "SureHit",
       "Ranged",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Attacker",
+          "stat": "Str",
+          "ratio": 0.2,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "StatusAilment",
+        "parameters": {
+          "target": "Attacker",
+          "ailment": "CritSeal"
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "萨满/德鲁伊 Lv1",
     "unlockLevel": 1
@@ -1056,7 +1122,21 @@
       "Heal",
       "CleanseDebuff"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "Defender",
+          "ratio": 0.25
+        }
+      },
+      {
+        "effectType": "CleanseDebuff",
+        "parameters": {
+          "target": "Defender"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "精灵女先知 Lv1",
     "unlockLevel": 1
@@ -1077,6 +1157,21 @@
       "SimultaneousLimit"
     ],
     "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "RowAllies",
+          "ratio": 0.5
+        }
+      },
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "RowAllies",
+          "key": "DebuffNullify",
+          "count": 1
+        }
+      },
       {
         "effectType": "ModifyCounter",
         "parameters": {
@@ -1158,6 +1253,7 @@
       {
         "effectType": "CounterAttack",
         "parameters": {
+          "target": "Attacker",
           "power": 100,
           "hitRate": 75,
           "targetType": "Row"
