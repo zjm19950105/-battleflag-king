@@ -68,7 +68,7 @@ namespace BattleKing.Skills
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeAttack, "友方攻击前",
                 limitSimultaneous: true, _allyBuffFired);
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnActiveUse, "友方主动时",
-                limitSimultaneous: false);
+                limitSimultaneous: false, attacker: evt.Caster);
         }
 
         private void OnBeforeHit(BeforeHitEvent evt)
@@ -411,6 +411,7 @@ namespace BattleKing.Skills
                 || effectType == "ApDamage"
                 || effectType == "RecoverPp"
                 || effectType == "PpDamage"
+                || effectType == "TransferResource"
                 || effectType == "RecoverHp"
                 || effectType == "Heal"
                 || effectType == "HealRatio"
@@ -429,7 +430,9 @@ namespace BattleKing.Skills
                 || effectType == "PursuitAttack"
                 || effectType == "PreemptiveAttack"
                 || effectType == "BattleEndAttack"
-                || effectType == "PendingAttack";
+                || effectType == "PendingAttack"
+                || effectType == "OnHitEffect"
+                || effectType == "OnKillEffect";
         }
 
         private static bool IsCalculationEffect(string effectType)

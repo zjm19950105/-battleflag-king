@@ -195,7 +195,7 @@ namespace BattleKing.Pipeline
 
         private bool RollCrit(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
         {
-            if (defender.Ailments.Contains(StatusAilment.CritSeal))
+            if (attacker.Ailments.Contains(StatusAilment.CritSeal))
                 return false;
 
             int critRate = attacker.GetCurrentCritRate();

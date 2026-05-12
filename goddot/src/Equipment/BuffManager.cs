@@ -7,9 +7,11 @@ namespace BattleKing.Equipment
     {
         public static void ApplyBuff(BattleUnit target, Buff newBuff)
         {
-            var existing = target.Buffs.FirstOrDefault(b => b.SkillId == newBuff.SkillId);
+            var existing = target.Buffs.FirstOrDefault(b =>
+                b.SkillId == newBuff.SkillId && b.TargetStat == newBuff.TargetStat);
 
-            // Same skill pure buff/debuff → skip duplicate
+            // Same skill and same stat pure buff/debuff -> skip duplicate.
+            // Different stats from one skill, such as SpdDown + EvaDown, must coexist.
             if (existing != null && newBuff.IsPureBuffOrDebuff)
                 return;
 

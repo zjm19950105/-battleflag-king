@@ -7,6 +7,7 @@ using BattleKing.Pipeline;
 using BattleKing.Skills;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using System.Text.Json;
 
 namespace BattleKing.Tests
 {
@@ -685,7 +686,7 @@ namespace BattleKing.Tests
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
-            var attacker = new BattleUnit(CreateCharacter("attacker", "act_smash", hp: 1000, str: 100, def: 0, spd: 100, hit: 0), repository, true)
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_smash", hp: 1000, str: 120, def: 0, spd: 100, hit: 1000), repository, true)
             {
                 Position = 1,
                 CurrentLevel = 20
@@ -700,13 +701,503 @@ namespace BattleKing.Tests
                 PlayerUnits = new List<BattleUnit> { attacker },
                 EnemyUnits = new List<BattleUnit> { defender }
             };
-            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
 
             var result = engine.StepOneAction();
 
             ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
             ClassicAssert.AreEqual(80, defender.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(980, defender.CurrentHp);
+            Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("defender.Def"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonSmash_DoesNotDebuffOrPolluteDamageOnMiss()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_smash", hp: 1000, str: 120, def: 0, spd: 100, hit: 0), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: 1000, str: 10, def: 100, spd: 1, eva: 1000), repository, false)
+            {
+                Position = 1
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_smash" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(100, defender.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(1000, defender.CurrentHp);
+            Assert.That(logs, Has.None.Contains("post effects:"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonFireball_BurnsOnlyAfterHit()
+        {
+            var hitScenario = RunFireballScenario(attackerHit: 1000, defenderEva: 0);
+            var missScenario = RunFireballScenario(attackerHit: 0, defenderEva: 1000);
+
+            CollectionAssert.Contains(hitScenario.Defender.Ailments, StatusAilment.Burn);
+            Assert.That(hitScenario.Logs, Has.Some.Contains("post effects:").And.Contains("Burn"));
+            CollectionAssert.DoesNotContain(missScenario.Defender.Ailments, StatusAilment.Burn);
+            ClassicAssert.AreEqual(1000, missScenario.Defender.CurrentHp);
+            Assert.That(missScenario.Logs, Has.None.Contains("post effects:"));
+        }
+
+        [TestCase("act_poison_bolt", StatusAilment.Poison)]
+        [TestCase("act_poison_throw", StatusAilment.Poison)]
+        [TestCase("act_ice_arrow", StatusAilment.Freeze)]
+        public void BattleEngine_RealActiveJsonG2SingleAilments_ApplyOnlyAfterHit(string skillId, StatusAilment ailment)
+        {
+            var hitScenario = RunSingleTargetSkillScenario(skillId, attackerHit: 1000, defenderEva: 0);
+            var missScenario = RunSingleTargetSkillScenario(skillId, attackerHit: 0, defenderEva: 1000);
+
+            CollectionAssert.Contains(hitScenario.Defender.Ailments, ailment);
+            Assert.That(hitScenario.Logs, Has.Some.Contains("post effects:").And.Contains(ailment.ToString()));
+            CollectionAssert.DoesNotContain(missScenario.Defender.Ailments, ailment);
+            Assert.That(missScenario.Logs, Has.None.Contains("post effects:"));
+        }
+
+        [TestCase("act_thunderstorm", StatusAilment.Stun)]
+        [TestCase("act_volcano", StatusAilment.Burn)]
+        [TestCase("act_ice_coffin", StatusAilment.Freeze)]
+        public void BattleEngine_RealActiveJsonG2RowAilments_ApplyOnlyAfterHit(string skillId, StatusAilment ailment)
+        {
+            var hitScenario = RunRowSkillScenario(skillId, attackerHit: 1000, defenderEva: 0);
+            var missScenario = RunRowSkillScenario(skillId, attackerHit: 0, defenderEva: 1000);
+
+            CollectionAssert.Contains(hitScenario.FrontA.Ailments, ailment);
+            CollectionAssert.Contains(hitScenario.FrontB.Ailments, ailment);
+            CollectionAssert.DoesNotContain(hitScenario.Back.Ailments, ailment);
+            if (ailment == StatusAilment.Stun)
+            {
+                ClassicAssert.AreEqual(UnitState.Stunned, hitScenario.FrontA.State);
+                ClassicAssert.AreEqual(UnitState.Stunned, hitScenario.FrontB.State);
+            }
+            Assert.That(hitScenario.Logs, Has.Some.Contains("post effects:").And.Contains(ailment.ToString()));
+
+            CollectionAssert.DoesNotContain(missScenario.FrontA.Ailments, ailment);
+            CollectionAssert.DoesNotContain(missScenario.FrontB.Ailments, ailment);
+            CollectionAssert.DoesNotContain(missScenario.Back.Ailments, ailment);
+            Assert.That(missScenario.Logs, Has.None.Contains("post effects:"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonShadowBite_DarknessAndDebuffsOnlyAfterHit()
+        {
+            var hitScenario = RunRowSkillScenario("act_shadow_bite", attackerHit: 1000, defenderEva: 100);
+            var missScenario = RunRowSkillScenario("act_shadow_bite", attackerHit: 0, defenderEva: 1000);
+
+            CollectionAssert.Contains(hitScenario.FrontA.Ailments, StatusAilment.Darkness);
+            CollectionAssert.Contains(hitScenario.FrontB.Ailments, StatusAilment.Darkness);
+            ClassicAssert.AreEqual(80, hitScenario.FrontA.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(80, hitScenario.FrontA.GetCurrentStat("Eva"));
+            ClassicAssert.AreEqual(80, hitScenario.FrontB.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(80, hitScenario.FrontB.GetCurrentStat("Eva"));
+            CollectionAssert.DoesNotContain(hitScenario.Back.Ailments, StatusAilment.Darkness);
+            ClassicAssert.AreEqual(100, hitScenario.Back.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(100, hitScenario.Back.GetCurrentStat("Eva"));
+            Assert.That(hitScenario.Logs, Has.Some.Contains("post effects:").And.Contains("Darkness"));
+
+            CollectionAssert.DoesNotContain(missScenario.FrontA.Ailments, StatusAilment.Darkness);
+            CollectionAssert.DoesNotContain(missScenario.FrontB.Ailments, StatusAilment.Darkness);
+            ClassicAssert.AreEqual(100, missScenario.FrontA.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(1000, missScenario.FrontA.GetCurrentStat("Eva"));
+            ClassicAssert.AreEqual(100, missScenario.FrontB.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(1000, missScenario.FrontB.GetCurrentStat("Eva"));
+            Assert.That(missScenario.Logs, Has.None.Contains("post effects:"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonPassiveCurse_DirectRowEffectsIgnoreHitCheck()
+        {
+            var scenario = RunRowSkillScenario(
+                "act_passive_curse",
+                attackerHit: 0,
+                defenderEva: 1000,
+                defenderPp: 2);
+
+            ClassicAssert.AreEqual(1, scenario.FrontA.CurrentPp);
+            ClassicAssert.AreEqual(1, scenario.FrontB.CurrentPp);
+            ClassicAssert.AreEqual(2, scenario.Back.CurrentPp);
+            ClassicAssert.AreEqual(90, scenario.FrontA.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(90, scenario.FrontB.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(100, scenario.Back.GetCurrentStat("Spd"));
+            Assert.That(scenario.Logs, Has.Some.Contains("effects:").And.Contains("PP").And.Contains("Spd"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonAttackCurse_AppliesBothAttackDebuffsToRow()
+        {
+            var scenario = RunRowSkillScenario(
+                "act_attack_curse",
+                attackerHit: 0,
+                defenderEva: 1000,
+                defenderStr: 100,
+                defenderMag: 120);
+
+            ClassicAssert.AreEqual(50, scenario.FrontA.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(60, scenario.FrontA.GetCurrentStat("Mag"));
+            ClassicAssert.AreEqual(50, scenario.FrontB.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(60, scenario.FrontB.GetCurrentStat("Mag"));
+            ClassicAssert.AreEqual(100, scenario.Back.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(120, scenario.Back.GetCurrentStat("Mag"));
+            ClassicAssert.AreEqual(2, scenario.FrontA.Buffs.Count(buff =>
+                buff.SkillId == "act_attack_curse"
+                && (buff.TargetStat == "Str" || buff.TargetStat == "Mag")
+                && buff.Ratio == -0.5f
+                && buff.IsPureBuffOrDebuff));
+            Assert.That(scenario.Logs, Has.Some.Contains("effects:").And.Contains("Str").And.Contains("Mag"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonDefenseCurse_AppliesDefenseDebuffsAndBlockSealToRow()
+        {
+            var scenario = RunRowSkillScenario(
+                "act_defense_curse",
+                attackerHit: 0,
+                defenderEva: 1000,
+                defenderDef: 100,
+                defenderMDef: 80);
+
+            ClassicAssert.AreEqual(50, scenario.FrontA.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(40, scenario.FrontA.GetCurrentStat("MDef"));
+            ClassicAssert.AreEqual(50, scenario.FrontB.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(40, scenario.FrontB.GetCurrentStat("MDef"));
+            ClassicAssert.AreEqual(100, scenario.Back.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(80, scenario.Back.GetCurrentStat("MDef"));
+            CollectionAssert.Contains(scenario.FrontA.Ailments, StatusAilment.BlockSeal);
+            CollectionAssert.Contains(scenario.FrontB.Ailments, StatusAilment.BlockSeal);
+            CollectionAssert.DoesNotContain(scenario.Back.Ailments, StatusAilment.BlockSeal);
+            ClassicAssert.AreEqual(2, scenario.FrontA.Buffs.Count(buff =>
+                buff.SkillId == "act_defense_curse"
+                && (buff.TargetStat == "Def" || buff.TargetStat == "MDef")
+                && buff.Ratio == -0.5f
+                && buff.IsPureBuffOrDebuff));
+            Assert.That(scenario.Logs, Has.Some.Contains("effects:").And.Contains("BlockSeal"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonCavalryBane_PostHitEffectsOnlyApplyToCavalryTargets()
+        {
+            var cavalryScenario = RunSingleTargetSkillScenario(
+                "act_cavalry_bane",
+                attackerHit: 1000,
+                defenderEva: 0,
+                defenderClasses: new List<UnitClass> { UnitClass.Cavalry },
+                defenderAp: 2,
+                defenderPp: 2);
+            var infantryScenario = RunSingleTargetSkillScenario(
+                "act_cavalry_bane",
+                attackerHit: 1000,
+                defenderEva: 0,
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry },
+                defenderAp: 2,
+                defenderPp: 2);
+
+            ClassicAssert.AreEqual(1, cavalryScenario.Defender.CurrentAp);
+            ClassicAssert.AreEqual(1, cavalryScenario.Defender.CurrentPp);
+            CollectionAssert.Contains(cavalryScenario.Defender.Ailments, StatusAilment.BlockSeal);
+            Assert.That(cavalryScenario.Logs, Has.Some.Contains("post effects:").And.Contains("BlockSeal"));
+            ClassicAssert.AreEqual(2, infantryScenario.Defender.CurrentAp);
+            ClassicAssert.AreEqual(2, infantryScenario.Defender.CurrentPp);
+            CollectionAssert.DoesNotContain(infantryScenario.Defender.Ailments, StatusAilment.BlockSeal);
+            Assert.That(infantryScenario.Logs, Has.None.Contains("post effects:"));
+        }
+
+        [Test]
+        public void RealActiveJsonShieldBash_UsesChanceGatedOnHitStun()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var shieldBash = repository.ActiveSkills["act_shield_bash"];
+            var onHit = shieldBash.Effects.Single();
+            var effectsElement = (JsonElement)onHit.Parameters["effects"];
+            var nested = JsonSerializer.Deserialize<List<SkillEffectData>>(
+                effectsElement.GetRawText(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            ClassicAssert.AreEqual("OnHitEffect", onHit.EffectType);
+            ClassicAssert.AreEqual(25, ((JsonElement)onHit.Parameters["chance"]).GetInt32());
+            ClassicAssert.AreEqual("StatusAilment", nested.Single().EffectType);
+            ClassicAssert.AreEqual("Stun", ((JsonElement)nested.Single().Parameters["ailment"]).GetString());
+        }
+
+        [Test]
+        public void OnHitEffect_ChanceGate_ControlsNestedEffectsAndStunSetsUnitState()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var target = TestDataFactory.CreateUnit(isPlayer: false);
+            var skill = TestDataFactory.CreateSkill();
+            var calc = TestDataFactory.CreateCalc(caster, target, skill);
+            calc.ResolvedDefender = target;
+            var hit = new DamageResult(1, 0, true, false, false, false, new List<StatusAilment>(), target);
+            var effects = new List<SkillEffectData>
+            {
+                new()
+                {
+                    EffectType = "OnHitEffect",
+                    Parameters = new()
+                    {
+                        { "chance", 0 },
+                        { "effects", new List<SkillEffectData>
+                            {
+                                new()
+                                {
+                                    EffectType = "StatusAilment",
+                                    Parameters = new() { { "target", "Target" }, { "ailment", "Stun" } }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var missByChanceLogs = executor.ExecutePostDamageEffects(
+                context, caster, target, effects, skill.Data.Id, calc, hit, killed: false);
+            effects.Single().Parameters["chance"] = 100;
+            var applyLogs = executor.ExecutePostDamageEffects(
+                context, caster, target, effects, skill.Data.Id, calc, hit, killed: false);
+
+            ClassicAssert.IsEmpty(missByChanceLogs);
+            CollectionAssert.Contains(target.Ailments, StatusAilment.Stun);
+            ClassicAssert.AreEqual(UnitState.Stunned, target.State);
+            Assert.That(applyLogs, Has.Some.Contains("Stun"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonBreakFormation_BonusesOnlyFromPreexistingDebuffAndDebuffsAfterHit()
+        {
+            var clean = RunSingleTargetDamageScenario("act_break_formation");
+            var preDebuffed = RunSingleTargetDamageScenario("act_break_formation", defenderHasDebuff: true);
+
+            ClassicAssert.AreEqual(20, clean.Damage);
+            ClassicAssert.AreEqual(30, preDebuffed.Damage);
+            ClassicAssert.AreEqual(70, clean.Defender.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(70, preDebuffed.Defender.GetCurrentStat("Def"));
+            Assert.That(preDebuffed.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+            Assert.That(preDebuffed.Logs, Has.Some.Contains("post effects:").And.Contains("Def"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonSpike_BonusesOnlyWhenCasterHpIsHalfOrBelow()
+        {
+            var healthy = RunSingleTargetDamageScenario("act_spike", attackerCurrentHp: 600);
+            var lowHp = RunSingleTargetDamageScenario("act_spike", attackerCurrentHp: 500);
+
+            ClassicAssert.AreEqual(20, healthy.Damage);
+            ClassicAssert.AreEqual(30, lowHp.Damage);
+            Assert.That(lowHp.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+        }
+
+        [TestCase("act_accumulate", 20, 30)]
+        [TestCase("act_full_assault", 30, 45)]
+        public void BattleEngine_RealActiveJsonFullHpDamageSkills_BonusOnlyAtFullHp(
+            string skillId,
+            int normalDamage,
+            int fullHpDamage)
+        {
+            var wounded = RunSingleTargetDamageScenario(skillId, attackerCurrentHp: 999);
+            var fullHp = RunSingleTargetDamageScenario(skillId, attackerCurrentHp: 1000);
+
+            ClassicAssert.AreEqual(normalDamage, wounded.Damage);
+            ClassicAssert.AreEqual(fullHpDamage, fullHp.Damage);
+            Assert.That(fullHp.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonHeavySlayer_IgnoresHeavyDefenseAndCannotBeBlocked()
+        {
+            var heavy = RunSingleTargetDamageScenario(
+                "act_heavy_slayer",
+                defenderClasses: new List<UnitClass> { UnitClass.Heavy },
+                defenderBlock: 100);
+            var infantry = RunSingleTargetDamageScenario(
+                "act_heavy_slayer",
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry },
+                defenderBlock: 100);
+
+            ClassicAssert.AreEqual(120, heavy.Damage);
+            ClassicAssert.AreEqual(20, infantry.Damage);
+            Assert.That(heavy.Logs, Has.Some.Contains("CannotBeBlocked"));
+            Assert.That(heavy.Logs, Has.Some.Contains("IgnoreDefense=1"));
+            Assert.That(infantry.Logs, Has.Some.Contains("CannotBeBlocked"));
+            Assert.That(infantry.Logs, Has.None.Contains("IgnoreDefense=1"));
+        }
+
+        [TestCase("act_enhanced_spear", UnitClass.Cavalry, 30, true)]
+        [TestCase("act_spear_pierce", UnitClass.Flying, 30, false)]
+        [TestCase("act_dive_strike", UnitClass.Cavalry, 30, true)]
+        [TestCase("act_wing_gust", UnitClass.Cavalry, 20, true)]
+        public void BattleEngine_RealActiveJsonClassBonusSkills_ApplyOnlyToMatchingClass(
+            string skillId,
+            UnitClass matchingClass,
+            int matchingDamage,
+            bool matchingCannotBeBlocked)
+        {
+            var matching = RunSingleTargetDamageScenario(
+                skillId,
+                defenderClasses: new List<UnitClass> { matchingClass },
+                defenderBlock: matchingCannotBeBlocked ? 100 : 0);
+            var infantry = RunSingleTargetDamageScenario(
+                skillId,
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry },
+                defenderBlock: matchingCannotBeBlocked ? 100 : 0);
+
+            ClassicAssert.AreEqual(matchingDamage, matching.Damage);
+            ClassicAssert.AreEqual(matchingCannotBeBlocked ? 15 : 20, infantry.Damage);
+            if (matchingCannotBeBlocked)
+                Assert.That(matching.Logs, Has.Some.Contains("CannotBeBlocked"));
+            else
+                Assert.That(matching.Logs, Has.None.Contains("CannotBeBlocked"));
+            Assert.That(infantry.Logs, Has.None.Contains("PowerMultiplier=1.5"));
+            Assert.That(infantry.Logs, Has.None.Contains("CannotBeBlocked"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonLineDestruction_IgnoresOnlyHeavyDefenseButCannotBeBlockedGlobally()
+        {
+            var heavy = RunSingleTargetDamageScenario(
+                "act_line_destruction",
+                defenderClasses: new List<UnitClass> { UnitClass.Heavy },
+                defenderBlock: 100);
+            var infantry = RunSingleTargetDamageScenario(
+                "act_line_destruction",
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry },
+                defenderBlock: 100);
+
+            ClassicAssert.AreEqual(120, heavy.Damage);
+            ClassicAssert.AreEqual(20, infantry.Damage);
+            Assert.That(heavy.Logs, Has.Some.Contains("CannotBeBlocked"));
+            Assert.That(heavy.Logs, Has.Some.Contains("CannotBeCovered"));
+            Assert.That(heavy.Logs, Has.Some.Contains("IgnoreDefense=1"));
+            Assert.That(infantry.Logs, Has.Some.Contains("CannotBeBlocked"));
+            Assert.That(infantry.Logs, Has.Some.Contains("CannotBeCovered"));
+            Assert.That(infantry.Logs, Has.None.Contains("IgnoreDefense=1"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonThrowingSpear_BuffsOnlyWhenCasterAlreadyBuffedAndSealsCavalryBlock()
+        {
+            var unbuffedInfantry = RunSingleTargetDamageScenario(
+                "act_throwing_spear",
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry });
+            var buffedInfantry = RunSingleTargetDamageScenario(
+                "act_throwing_spear",
+                casterHasBuff: true,
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry });
+            var cavalry = RunSingleTargetDamageScenario(
+                "act_throwing_spear",
+                defenderClasses: new List<UnitClass> { UnitClass.Cavalry },
+                defenderBlock: 100);
+
+            ClassicAssert.AreEqual(26, unbuffedInfantry.Damage);
+            ClassicAssert.AreEqual(39, buffedInfantry.Damage);
+            ClassicAssert.AreEqual(26, cavalry.Damage);
+            Assert.That(buffedInfantry.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+            Assert.That(cavalry.Logs, Has.Some.Contains("CannotBeBlocked"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonChargeStrike_CannotBeBlockedAndRecoversApOnKill()
+        {
+            var scenario = RunSingleTargetDamageScenario(
+                "act_charge_strike",
+                attackerCurrentAp: 1,
+                defenderHp: 10,
+                defenderBlock: 100);
+
+            ClassicAssert.AreEqual(1, scenario.Attacker.CurrentAp);
+            ClassicAssert.IsFalse(scenario.Defender.IsAlive);
+            Assert.That(scenario.Logs, Has.Some.Contains("CannotBeBlocked"));
+            Assert.That(scenario.Logs, Has.Some.Contains("post effects:").And.Contains(".AP 0->1"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonGreatShield_BuffsSelfAndRecoversPpWithoutEnemyDamage()
+        {
+            var scenario = RunSelfAssistSkillScenario(
+                "act_great_shield",
+                casterDef: 100,
+                casterAp: 3,
+                casterPp: 4,
+                casterCurrentPp: 1);
+
+            ClassicAssert.AreEqual(150, scenario.Caster.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(3, scenario.Caster.CurrentPp);
+            ClassicAssert.AreEqual(2, scenario.Caster.CurrentAp);
+            ClassicAssert.AreEqual(1000, scenario.Caster.CurrentHp);
+            ClassicAssert.AreEqual(1000, scenario.Enemy.CurrentHp);
+            ClassicAssert.AreEqual(3, scenario.Enemy.CurrentAp);
+            ClassicAssert.AreEqual(2, scenario.Enemy.CurrentPp);
+            ClassicAssert.IsEmpty(scenario.Enemy.Buffs);
+            ClassicAssert.IsEmpty(scenario.Enemy.Ailments);
+            ClassicAssert.AreEqual(1, scenario.Caster.Buffs.Count(buff =>
+                buff.SkillId == "act_great_shield"
+                && buff.TargetStat == "Def"
+                && buff.Ratio == 0.5f
+                && buff.IsPureBuffOrDebuff));
+            Assert.That(scenario.Logs, Has.Some.Contains("effects:").And.Contains("Def").And.Contains("PP"));
+            Assert.That(scenario.Logs, Has.None.Contains("post effects:"));
+
+            var capped = RunSelfAssistSkillScenario(
+                "act_great_shield",
+                casterDef: 100,
+                casterAp: 3,
+                casterPp: 4,
+                casterCurrentPp: 3);
+
+            ClassicAssert.AreEqual(4, capped.Caster.CurrentPp);
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonFormationBreaker_HealsAndBuffsSelfWithoutEnemyDamage()
+        {
+            var scenario = RunSelfAssistSkillScenario(
+                "act_formation_breaker",
+                casterHp: 200,
+                casterCurrentHp: 100,
+                casterStr: 100,
+                casterAp: 3);
+
+            ClassicAssert.AreEqual(160, scenario.Caster.CurrentHp);
+            ClassicAssert.AreEqual(130, scenario.Caster.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(1, scenario.Caster.CurrentAp);
+            ClassicAssert.AreEqual(1000, scenario.Enemy.CurrentHp);
+            ClassicAssert.AreEqual(3, scenario.Enemy.CurrentAp);
+            ClassicAssert.AreEqual(2, scenario.Enemy.CurrentPp);
+            ClassicAssert.IsEmpty(scenario.Enemy.Buffs);
+            ClassicAssert.IsEmpty(scenario.Enemy.Ailments);
+            ClassicAssert.AreEqual(1, scenario.Caster.Buffs.Count(buff =>
+                buff.SkillId == "act_formation_breaker"
+                && buff.TargetStat == "Str"
+                && buff.Ratio == 0.3f
+                && buff.IsPureBuffOrDebuff));
+            Assert.That(scenario.Logs, Has.Some.Contains("effects:").And.Contains("HP").And.Contains("Str"));
+            Assert.That(scenario.Logs, Has.None.Contains("post effects:"));
+
+            var capped = RunSelfAssistSkillScenario(
+                "act_formation_breaker",
+                casterHp: 200,
+                casterCurrentHp: 180,
+                casterStr: 100,
+                casterAp: 3);
+
+            ClassicAssert.AreEqual(200, capped.Caster.CurrentHp);
         }
 
         [Test]
@@ -1080,6 +1571,41 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void BattleEngine_RealPassiveJsonStealthBlade_AppliesBlockSealAfterPendingHit()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var stealthBlade = repository.PassiveSkills["pas_stealth_blade"];
+            var preemptiveUser = new BattleUnit(CreateCharacter("preemptiveUser", null, hp: 200, str: 100, def: 10, spd: 20, hit: 1000), repository, true)
+            {
+                Position = 1,
+                CurrentPp = 1
+            };
+            var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 200, str: 10, def: 0, spd: 10), repository, false)
+            {
+                Position = 1
+            };
+            preemptiveUser.EquippedPassiveSkillIds.Add("pas_stealth_blade");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { preemptiveUser },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+
+            CollectionAssert.AreEqual(
+                new[] { "PreemptiveAttack", "OnHitEffect" },
+                stealthBlade.Effects.Select(effect => effect.EffectType).ToList());
+            CollectionAssert.Contains(enemy.Ailments, StatusAilment.BlockSeal);
+            Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("BlockSeal"));
+        }
+
+        [Test]
         public void PassiveSkillProcessor_SimultaneousLimit_IgnoresFailedConditionBeforeClaimingLimit()
         {
             var repository = LoadRepositoryWithPassive(new PassiveSkillData
@@ -1172,6 +1698,237 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(0, slow.CurrentAp);
         }
 
+        private static (BattleUnit Defender, List<string> Logs) RunFireballScenario(int attackerHit, int defenderEva)
+        {
+            return RunSingleTargetSkillScenario("act_fireball", attackerHit, defenderEva);
+        }
+
+        private static (BattleUnit Defender, List<string> Logs) RunSingleTargetSkillScenario(
+            string skillId,
+            int attackerHit,
+            int defenderEva,
+            List<UnitClass> defenderClasses = null,
+            int defenderAp = 3,
+            int defenderPp = 2)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateCharacter("attacker", skillId, hp: 1000, str: 120, def: 0, spd: 200, hit: attackerHit), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 30
+            };
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: 1000, str: 10, def: 100, spd: 1, eva: defenderEva, classes: defenderClasses), repository, false)
+            {
+                Position = 1,
+                CurrentAp = defenderAp,
+                CurrentPp = defenderPp
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = skillId });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            return (defender, logs);
+        }
+
+        private static (BattleUnit FrontA, BattleUnit FrontB, BattleUnit Back, List<string> Logs) RunRowSkillScenario(
+            string skillId,
+            int attackerHit,
+            int defenderEva,
+            int defenderPp = 0,
+            int defenderStr = 10,
+            int defenderDef = 100,
+            int defenderSpd = 100,
+            int defenderMag = 0,
+            int defenderMDef = 0)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateCharacter("attacker", skillId, hp: 1000, str: 120, def: 0, spd: 200, hit: attackerHit), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 30
+            };
+            var frontA = new BattleUnit(CreateCharacter(
+                "frontA",
+                null,
+                hp: 1000,
+                str: defenderStr,
+                def: defenderDef,
+                spd: defenderSpd,
+                eva: defenderEva,
+                mag: defenderMag,
+                mdef: defenderMDef,
+                pp: defenderPp), repository, false)
+            {
+                Position = 1
+            };
+            var frontB = new BattleUnit(CreateCharacter(
+                "frontB",
+                null,
+                hp: 1000,
+                str: defenderStr,
+                def: defenderDef,
+                spd: defenderSpd,
+                eva: defenderEva,
+                mag: defenderMag,
+                mdef: defenderMDef,
+                pp: defenderPp), repository, false)
+            {
+                Position = 2
+            };
+            var back = new BattleUnit(CreateCharacter(
+                "back",
+                null,
+                hp: 1000,
+                str: defenderStr,
+                def: defenderDef,
+                spd: defenderSpd,
+                eva: defenderEva,
+                mag: defenderMag,
+                mdef: defenderMDef,
+                pp: defenderPp), repository, false)
+            {
+                Position = 4
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = skillId });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { frontA, frontB, back }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            return (frontA, frontB, back, logs);
+        }
+
+        private static (BattleUnit Attacker, BattleUnit Defender, int Damage, List<string> Logs) RunSingleTargetDamageScenario(
+            string skillId,
+            int attackerCurrentHp = 1000,
+            int attackerCurrentAp = 3,
+            int defenderHp = 1000,
+            bool casterHasBuff = false,
+            bool defenderHasDebuff = false,
+            List<UnitClass> defenderClasses = null,
+            int defenderBlock = 0)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateCharacter("attacker", skillId, hp: 1000, str: 120, def: 0, spd: 100, hit: 1000), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 30,
+                CurrentHp = attackerCurrentHp,
+                CurrentAp = attackerCurrentAp
+            };
+            if (casterHasBuff)
+            {
+                attacker.Buffs.Add(new Buff
+                {
+                    SkillId = "preexisting_buff",
+                    TargetStat = "Def",
+                    Ratio = 0.1f,
+                    RemainingTurns = -1,
+                    IsPureBuffOrDebuff = true
+                });
+            }
+            var defender = new BattleUnit(CreateCharacter("defender", null, hp: defenderHp, str: 10, def: 100, spd: 1, block: defenderBlock, classes: defenderClasses), repository, false)
+            {
+                Position = 1
+            };
+            if (defenderHasDebuff)
+            {
+                defender.Buffs.Add(new Buff
+                {
+                    SkillId = "preexisting_debuff",
+                    TargetStat = "Str",
+                    Ratio = -0.1f,
+                    RemainingTurns = -1,
+                    IsPureBuffOrDebuff = true
+                });
+            }
+            attacker.Strategies.Add(new Strategy { SkillId = skillId });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.IsTrue(
+                result == SingleActionResult.ActionDone || result == SingleActionResult.PlayerWin,
+                $"Unexpected action result: {result}");
+            return (attacker, defender, defenderHp - defender.CurrentHp, logs);
+        }
+
+        private static (BattleUnit Caster, BattleUnit Enemy, List<string> Logs) RunSelfAssistSkillScenario(
+            string skillId,
+            int casterHp = 1000,
+            int casterCurrentHp = 1000,
+            int casterStr = 100,
+            int casterDef = 100,
+            int casterAp = 3,
+            int casterPp = 2,
+            int casterCurrentPp = 0)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var caster = new BattleUnit(
+                CreateCharacter(
+                    "caster",
+                    skillId,
+                    hp: casterHp,
+                    str: casterStr,
+                    def: casterDef,
+                    spd: 100,
+                    hit: 1000,
+                    ap: casterAp,
+                    pp: casterPp),
+                repository,
+                true)
+            {
+                Position = 1,
+                CurrentLevel = 30,
+                CurrentHp = casterCurrentHp,
+                CurrentPp = casterCurrentPp
+            };
+            var enemy = new BattleUnit(
+                CreateCharacter("enemy", null, hp: 1000, str: 10, def: 100, spd: 1, ap: 3, pp: 2),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = skillId });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            return (caster, enemy, logs);
+        }
+
         private static CharacterData CreateCharacter(
             string id,
             string skillId,
@@ -1182,28 +1939,33 @@ namespace BattleKing.Tests
             int hit = 1000,
             int eva = 0,
             int crit = 0,
-            int block = 0)
+            int block = 0,
+            List<UnitClass> classes = null,
+            int mag = 0,
+            int mdef = 0,
+            int ap = 3,
+            int pp = 0)
         {
             return new CharacterData
             {
                 Id = id,
                 Name = id,
-                Classes = new List<UnitClass> { UnitClass.Infantry },
+                Classes = classes ?? new List<UnitClass> { UnitClass.Infantry },
                 InnateActiveSkillIds = skillId == null ? new List<string>() : new List<string> { skillId },
                 BaseStats = new Dictionary<string, int>
                 {
                     { "HP", hp },
                     { "Str", str },
                     { "Def", def },
-                    { "Mag", 0 },
-                    { "MDef", 0 },
+                    { "Mag", mag },
+                    { "MDef", mdef },
                     { "Hit", hit },
                     { "Eva", eva },
                     { "Crit", crit },
                     { "Block", block },
                     { "Spd", spd },
-                    { "AP", 3 },
-                    { "PP", 0 }
+                    { "AP", ap },
+                    { "PP", pp }
                 }
             };
         }

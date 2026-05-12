@@ -122,6 +122,20 @@
           "power": 75,
           "hitRate": 90
         }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverPp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
       }
     ],
     "hasSimultaneousLimit": false,
@@ -277,7 +291,17 @@
       "SpdUpAll",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "AllAllies",
+          "stat": "Spd",
+          "amount": 20,
+          "turns": -1
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "君主 Lv25",
     "unlockLevel": 25
@@ -408,7 +432,15 @@
     "tags": [
       "ApPlus1Ally"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "target": "Attacker",
+          "amount": 1
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "军士 Lv25",
     "unlockLevel": 25
@@ -752,7 +784,25 @@
       "HealAlly",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CoverAlly",
+        "parameters": {}
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true
+        }
+      },
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "Defender",
+          "ratio": 0.25
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "盾射手 Lv25",
     "unlockLevel": 25
@@ -815,6 +865,20 @@
             "SureHit",
             "CannotBeBlocked",
             "CannotBeCovered"
+          ]
+        }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "BlockSeal"
+              }
+            }
           ]
         }
       }
@@ -883,7 +947,24 @@
       "ApPlus1",
       "HitUp40"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "target": "Self",
+          "amount": 1
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Hit",
+          "amount": 40,
+          "oneTime": true
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "术士 Lv25",
     "unlockLevel": 25
@@ -1104,7 +1185,34 @@
       "SureHit",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "AllEnemies",
+          "stat": "Spd",
+          "amount": 10,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "AllEnemies",
+          "stat": "Eva",
+          "amount": 30,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "PpDamage",
+        "parameters": {
+          "target": "AllEnemies",
+          "targetClass": "Cavalry",
+          "amount": 1
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "德鲁伊 Lv25",
     "unlockLevel": 25
@@ -1230,7 +1338,15 @@
       "Heal40",
       "Self"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "Self",
+          "ratio": 0.4
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "角斗士/狂战士 Lv1",
     "unlockLevel": 1

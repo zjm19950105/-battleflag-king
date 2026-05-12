@@ -6,6 +6,7 @@ using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Equipment;
 using BattleKing.Pipeline;
+using BattleKing.Utils;
 
 namespace BattleKing.Skills
 {
@@ -13,6 +14,10 @@ namespace BattleKing.Skills
     public class SkillEffectExecutor
     {
         private readonly Action<PendingAction> _enqueueAction;
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
 
         public SkillEffectExecutor(Action<PendingAction> enqueueAction = null)
         {
@@ -29,7 +34,7 @@ namespace BattleKing.Skills
             var logs = new List<string>();
             foreach (var effect in effects ?? Array.Empty<SkillEffectData>())
             {
-                if (IsCalculationEffect(effect.EffectType))
+                if (IsCalculationEffect(effect.EffectType) || IsPostDamageEffect(effect.EffectType))
                     continue;
 
                 ExecuteEffect(context, caster, targets, effect, sourceSkillId, null, null, logs);
@@ -57,11 +62,57 @@ namespace BattleKing.Skills
             return logs;
         }
 
+        public List<string> ExecutePostDamageEffects(
+            BattleContext context,
+            BattleUnit caster,
+            BattleUnit damageTarget,
+            IReadOnlyList<SkillEffectData> effects,
+            string sourceSkillId,
+            DamageCalculation calculation,
+            DamageResult result,
+            bool killed)
+        {
+            var logs = new List<string>();
+            foreach (var effect in effects ?? Array.Empty<SkillEffectData>())
+            {
+                if (!IsPostDamageEffect(effect.EffectType))
+                    continue;
+
+                var parameters = effect.Parameters ?? new Dictionary<string, object>();
+                if (!PostDamageConditionMatches(effect.EffectType, parameters, result, killed))
+                    continue;
+
+                var nestedEffects = GetNestedEffects(parameters);
+                foreach (var nested in nestedEffects)
+                {
+                    if (IsPostDamageEffect(nested.EffectType))
+                        continue;
+
+                    ExecuteEffect(
+                        context,
+                        caster,
+                        damageTarget == null ? Array.Empty<BattleUnit>() : new List<BattleUnit> { damageTarget },
+                        nested,
+                        sourceSkillId,
+                        calculation,
+                        new SkillEffectExecutionState(),
+                        logs);
+                }
+            }
+            return logs;
+        }
+
         private static bool IsCalculationEffect(string effectType)
         {
             return effectType == "ModifyDamageCalc"
                 || effectType == "ConsumeCounter"
                 || effectType == "CoverAlly";
+        }
+
+        private static bool IsPostDamageEffect(string effectType)
+        {
+            return effectType == "OnHitEffect"
+                || effectType == "OnKillEffect";
         }
 
         private void ExecuteEffect(
@@ -94,6 +145,9 @@ namespace BattleKing.Skills
                 case "PpDamage":
                     ApplyResourceEffect(context, caster, targets, parameters, calculation, effect.EffectType, logs);
                     break;
+                case "TransferResource":
+                    ApplyTransferResource(context, caster, targets, parameters, calculation, logs);
+                    break;
                 case "RecoverHp":
                 case "Heal":
                 case "HealRatio":
@@ -121,6 +175,9 @@ namespace BattleKing.Skills
                 case "BattleEndAttack":
                 case "PendingAttack":
                     ApplyPendingActionEffect(caster, targets, parameters, sourceSkillId, effect.EffectType, logs);
+                    break;
+                case "OnHitEffect":
+                case "OnKillEffect":
                     break;
                 default:
                     logs.Add($"{effect.EffectType}: unsupported");
@@ -158,6 +215,9 @@ namespace BattleKing.Skills
             List<string> logs)
         {
             if (calculation == null)
+                return;
+
+            if (!DamageCalculationConditionsMatch(parameters, caster, calculation))
                 return;
 
             if (GetBool(parameters, "ForceHit", false))
@@ -235,6 +295,59 @@ namespace BattleKing.Skills
                 calculation.CounterPowerBonus += current * powerPerCounter;
                 logs.Add($"{counterKey}Power+{current * powerPerCounter}");
             }
+        }
+
+        private static bool DamageCalculationConditionsMatch(
+            Dictionary<string, object> parameters,
+            BattleUnit caster,
+            DamageCalculation calculation)
+        {
+            if (GetBool(parameters, "targetHasDebuff", false) && !HasDebuff(calculation.Defender))
+                return false;
+
+            if (GetBool(parameters, "casterHasBuff", false) && !HasBuff(caster))
+                return false;
+
+            if (!TargetClassConditionMatches(parameters, calculation.Defender))
+                return false;
+
+            if (TryGetFloat(parameters, "casterHpRatioMin", out float casterHpRatioMin)
+                && GetHpRatio(caster) < casterHpRatioMin)
+                return false;
+
+            if (TryGetFloat(parameters, "casterHpRatioMax", out float casterHpRatioMax)
+                && GetHpRatio(caster) > casterHpRatioMax)
+                return false;
+
+            return true;
+        }
+
+        private static bool HasDebuff(BattleUnit unit)
+        {
+            return unit?.Buffs.Any(buff => buff.Ratio < 0f && buff.IsPureBuffOrDebuff) == true;
+        }
+
+        private static bool HasBuff(BattleUnit unit)
+        {
+            return unit?.Buffs.Any(buff => buff.Ratio > 0f && buff.IsPureBuffOrDebuff) == true;
+        }
+
+        private static bool TargetClassConditionMatches(
+            Dictionary<string, object> parameters,
+            BattleUnit target)
+        {
+            var targetClasses = GetStringList(parameters, "targetClasses");
+            if (TryGetString(parameters, "targetClass", out string targetClass))
+                targetClasses.Add(targetClass);
+
+            var requiredClasses = targetClasses
+                .Select(value => ParseNullableUnitClass(value))
+                .Where(value => value.HasValue)
+                .Select(value => value.Value)
+                .ToHashSet();
+
+            return requiredClasses.Count == 0
+                || target?.GetEffectiveClasses().Any(requiredClasses.Contains) == true;
         }
 
         private static void ApplyBuffEffect(
@@ -400,6 +513,50 @@ namespace BattleKing.Skills
             }
         }
 
+        private static void ApplyTransferResource(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            List<string> logs)
+        {
+            string resource = GetString(parameters, "resource", "PP").ToUpperInvariant();
+            var fromParameters = new Dictionary<string, object>(parameters)
+            {
+                ["target"] = GetString(parameters, "from", "Target")
+            };
+            var toParameters = new Dictionary<string, object>(parameters)
+            {
+                ["target"] = GetString(parameters, "to", "Self")
+            };
+
+            var sources = SelectTargets(context, caster, targets, fromParameters, calculation, "Target");
+            var destinations = SelectTargets(context, caster, targets, toParameters, calculation, "Self");
+            if (sources.Count == 0 || destinations.Count == 0)
+                return;
+
+            foreach (var source in sources)
+            {
+                int sourceBefore = GetResource(source, resource);
+                int requested = GetResourceAmount(parameters, sourceBefore);
+                int moved = Math.Clamp(requested, 0, sourceBefore);
+                if (moved <= 0)
+                {
+                    logs.Add($"{source.Data.Name}.{resource} {sourceBefore}->{sourceBefore}");
+                    continue;
+                }
+
+                ConsumeResource(source, resource, moved);
+                foreach (var destination in destinations)
+                {
+                    int destinationBefore = GetResource(destination, resource);
+                    RecoverResource(destination, resource, moved);
+                    logs.Add($"{resource} {source.Data.Name} {sourceBefore}->{GetResource(source, resource)} => {destination.Data.Name} {destinationBefore}->{GetResource(destination, resource)}");
+                }
+            }
+        }
+
         private static void ApplyHpEffect(
             BattleContext context,
             BattleUnit caster,
@@ -511,6 +668,8 @@ namespace BattleKing.Skills
             {
                 if (!target.Ailments.Contains(ailment))
                     target.Ailments.Add(ailment);
+                if (ailment == StatusAilment.Stun)
+                    target.State = UnitState.Stunned;
                 calculation?.AppliedAilments.Add(ailment);
                 logs.Add($"{target.Data.Name}.{ailment}");
             }
@@ -712,8 +871,8 @@ namespace BattleKing.Skills
             {
                 "self" => new List<BattleUnit> { caster },
                 "caster" => new List<BattleUnit> { caster },
-                "target" => calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
-                "defender" => calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
+                "target" => calculation?.ResolvedDefender != null ? new List<BattleUnit> { calculation.ResolvedDefender } : calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
+                "defender" => calculation?.ResolvedDefender != null ? new List<BattleUnit> { calculation.ResolvedDefender } : calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
                 "attacker" => calculation?.Attacker != null ? new List<BattleUnit> { calculation.Attacker } : targets.Where(t => t != null).ToList(),
                 "alltargets" => targets.Where(t => t != null).ToList(),
                 "allallies" => context.GetAliveUnits(caster.IsPlayer),
@@ -730,10 +889,32 @@ namespace BattleKing.Skills
                 _ => targets.Where(t => t != null).ToList()
             };
 
+            selected = ApplyTargetFilters(selected, parameters);
+
             if (TryGetInt(parameters, "maxTargets", out int maxTargets))
                 selected = selected.Take(Math.Max(0, maxTargets)).ToList();
 
             return selected;
+        }
+
+        private static List<BattleUnit> ApplyTargetFilters(List<BattleUnit> selected, Dictionary<string, object> parameters)
+        {
+            var targetClasses = GetStringList(parameters, "targetClasses");
+            if (TryGetString(parameters, "targetClass", out string targetClass))
+                targetClasses.Add(targetClass);
+
+            var requiredClasses = targetClasses
+                .Select(value => ParseNullableUnitClass(value))
+                .Where(value => value.HasValue)
+                .Select(value => value.Value)
+                .ToHashSet();
+
+            if (requiredClasses.Count == 0)
+                return selected;
+
+            return selected
+                .Where(unit => unit.GetEffectiveClasses().Any(requiredClasses.Contains))
+                .ToList();
         }
 
         private static bool MatchesBuffRemoval(Buff buff, string kind, string stat)
@@ -776,6 +957,109 @@ namespace BattleKing.Skills
             return units.Count == 0
                 ? new List<BattleUnit>()
                 : new List<BattleUnit> { units[Random.Shared.Next(units.Count)] };
+        }
+
+        private static bool PostDamageConditionMatches(
+            string effectType,
+            Dictionary<string, object> parameters,
+            DamageResult result,
+            bool killed)
+        {
+            if (effectType == "OnKillEffect")
+                return killed;
+
+            if (effectType != "OnHitEffect" || result?.IsHit != true)
+                return false;
+
+            bool requireDamage = GetBool(parameters, "requireDamage", false);
+            bool requireUnblocked = GetBool(parameters, "requireUnblocked", false)
+                || GetBool(parameters, "requireNotBlocked", false);
+            return (!requireDamage || result.TotalDamage > 0)
+                && (!requireUnblocked || !result.IsBlocked)
+                && ChanceMatches(parameters);
+        }
+
+        private static bool ChanceMatches(Dictionary<string, object> parameters)
+        {
+            if (!TryGetFloat(parameters, "chance", out float chance))
+                return true;
+
+            if (chance <= 1f)
+                chance *= 100f;
+
+            chance = Math.Clamp(chance, 0f, 100f);
+            if (chance <= 0f)
+                return false;
+            if (chance >= 100f)
+                return true;
+
+            return RandUtil.Roll100() < chance;
+        }
+
+        private static List<SkillEffectData> GetNestedEffects(Dictionary<string, object> parameters)
+        {
+            var nested = new List<SkillEffectData>();
+            AddNestedEffects(parameters, "effects", nested);
+            AddNestedEffects(parameters, "effect", nested);
+            return nested;
+        }
+
+        private static void AddNestedEffects(Dictionary<string, object> parameters, string key, List<SkillEffectData> nested)
+        {
+            if (!parameters.TryGetValue(key, out var raw) || raw == null)
+                return;
+
+            switch (raw)
+            {
+                case SkillEffectData effect:
+                    nested.Add(effect);
+                    return;
+                case List<SkillEffectData> effects:
+                    nested.AddRange(effects.Where(effect => effect != null));
+                    return;
+                case SkillEffectData[] effects:
+                    nested.AddRange(effects.Where(effect => effect != null));
+                    return;
+                case JsonElement element when element.ValueKind == JsonValueKind.Object:
+                    nested.Add(JsonSerializer.Deserialize<SkillEffectData>(element.GetRawText(), JsonOptions));
+                    return;
+                case JsonElement element when element.ValueKind == JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object))
+                        nested.Add(JsonSerializer.Deserialize<SkillEffectData>(item.GetRawText(), JsonOptions));
+                    return;
+            }
+        }
+
+        private static int GetResourceAmount(Dictionary<string, object> parameters, int allAmount)
+        {
+            if (TryGetString(parameters, "amount", out string amountText)
+                && string.Equals(amountText, "All", StringComparison.OrdinalIgnoreCase))
+            {
+                return allAmount;
+            }
+
+            return GetInt(parameters, "amount", 1);
+        }
+
+        private static int GetResource(BattleUnit unit, string resource)
+        {
+            return resource == "AP" ? unit.CurrentAp : unit.CurrentPp;
+        }
+
+        private static void ConsumeResource(BattleUnit unit, string resource, int amount)
+        {
+            if (resource == "AP")
+                unit.ConsumeAp(amount);
+            else
+                unit.ConsumePp(amount);
+        }
+
+        private static void RecoverResource(BattleUnit unit, string resource, int amount)
+        {
+            if (resource == "AP")
+                unit.RecoverAp(amount);
+            else
+                unit.RecoverPp(amount);
         }
 
         private static bool TryGetInt(Dictionary<string, object> parameters, string key, out int value)

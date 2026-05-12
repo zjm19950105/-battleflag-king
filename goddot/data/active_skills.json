@@ -47,7 +47,22 @@
     "tags": [
       "KillPpPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnKillEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverPp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "剑士/剑圣 Lv15",
     "unlockLevel": 15
   },
@@ -96,7 +111,39 @@
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击",
     "tags": [],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "ApDamage",
+              "parameters": {
+                "target": "Target",
+                "targetClass": "Cavalry",
+                "amount": 1
+              }
+            },
+            {
+              "effectType": "PpDamage",
+              "parameters": {
+                "target": "Target",
+                "targetClass": "Cavalry",
+                "amount": 1
+              }
+            },
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "targetClass": "Cavalry",
+                "ailment": "BlockSeal"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "佣兵/兰茨克内希特 Lv1，无畏舰 Lv1",
     "unlockLevel": 1
   },
@@ -113,7 +160,22 @@
     "tags": [
       "KillApPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnKillEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverAp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "佣兵/兰茨克内希特 Lv10",
     "unlockLevel": 10
   },
@@ -184,7 +246,39 @@
       "CavalryPpMinus1",
       "BlockSeal"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "ApDamage",
+              "parameters": {
+                "target": "Target",
+                "targetClass": "Cavalry",
+                "amount": 1
+              }
+            },
+            {
+              "effectType": "PpDamage",
+              "parameters": {
+                "target": "Target",
+                "targetClass": "Cavalry",
+                "amount": 1
+              }
+            },
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "targetClass": "Cavalry",
+                "ailment": "BlockSeal"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "领主/君主 Lv10",
     "unlockLevel": 10
   },
@@ -218,16 +312,26 @@
     "id": "act_arrow_cover",
     "name": "格挡斩",
     "apCost": 1,
-    "type": "Assist",
+    "type": "Physical",
     "attackType": "Melee",
     "power": 100,
     "hitRate": 100,
-    "targetType": "SingleAlly",
+    "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击，自身物防+20%",
     "tags": [
       "DefUpSelf"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Def",
+          "ratio": 0.2,
+          "turns": -1
+        }
+      }
+    ],
     "learnCondition": "斗士/先锋 Lv1",
     "unlockLevel": 1
   },
@@ -244,7 +348,23 @@
     "tags": [
       "StunLowChance"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "chance": 25,
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Stun"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "斗士/先锋 Lv10",
     "unlockLevel": 10
   },
@@ -252,18 +372,48 @@
     "id": "act_attract_attention",
     "name": "防御者",
     "apCost": 1,
-    "type": "Assist",
+    "type": "Physical",
     "attackType": "Melee",
     "power": 75,
     "hitRate": 100,
-    "targetType": "AllEnemies",
+    "targetType": "SingleEnemy",
     "effectDescription": "敌单体2连击，自身物防+50%，命中时PP+1",
     "tags": [
       "MultiHit2",
       "DefUpSelf50",
       "HitPpPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 2
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Def",
+          "ratio": 0.5,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverPp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "先锋 Lv20",
     "unlockLevel": 20
   },
@@ -280,7 +430,16 @@
     "tags": [
       "CavalryBonus"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Cavalry",
+          "CannotBeBlocked": true,
+          "SkillPowerMultiplier": 1.5
+        }
+      }
+    ],
     "learnCondition": "兵士/士官 Lv1",
     "unlockLevel": 1
   },
@@ -298,7 +457,15 @@
       "FlyingBonus",
       "Ranged"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Flying",
+          "SkillPowerMultiplier": 1.5
+        }
+      }
+    ],
     "learnCondition": "兵士/士官 Lv10",
     "unlockLevel": 10
   },
@@ -315,7 +482,22 @@
     "tags": [
       "CavalryBonus"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "casterHasBuff": true,
+          "SkillPowerMultiplier": 1.5
+        }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Cavalry",
+          "CannotBeBlocked": true
+        }
+      }
+    ],
     "learnCondition": "军士 Lv20",
     "unlockLevel": 20
   },
@@ -334,12 +516,19 @@
     ],
     "effects": [
       {
-        "effectType": "AddDebuff",
+        "effectType": "OnHitEffect",
         "parameters": {
-          "target": "Target",
-          "stat": "Def",
-          "ratio": 0.2,
-          "turns": -1
+          "effects": [
+            {
+              "effectType": "AddDebuff",
+              "parameters": {
+                "target": "Target",
+                "stat": "Def",
+                "ratio": 0.2,
+                "turns": -1
+              }
+            }
+          ]
         }
       }
     ],
@@ -354,13 +543,36 @@
     "attackType": "Melee",
     "power": 40,
     "hitRate": 75,
-    "targetType": "AllEnemies",
+    "targetType": "Column",
     "effectDescription": "敌一列多段攻击（3hit），对象物防-15%",
     "tags": [
       "AoE",
       "DefDown"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "HitCount": 3
+        }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "AddDebuff",
+              "parameters": {
+                "target": "Target",
+                "stat": "Def",
+                "ratio": 0.15,
+                "turns": -1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "近卫/维京 Lv10",
     "unlockLevel": 10
   },
@@ -378,7 +590,31 @@
       "DefDown30",
       "DebuffBonusDamage"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetHasDebuff": true,
+          "SkillPowerMultiplier": 1.5
+        }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "AddDebuff",
+              "parameters": {
+                "target": "Target",
+                "stat": "Def",
+                "ratio": 0.3,
+                "turns": -1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "维京 Lv20",
     "unlockLevel": 20
   },
@@ -395,7 +631,15 @@
     "tags": [
       "HpBelow50DamageUp"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "casterHpRatioMax": 0.5,
+          "SkillPowerMultiplier": 1.5
+        }
+      }
+    ],
     "learnCondition": "重装步兵/铁甲卫士 Lv1",
     "unlockLevel": 1
   },
@@ -430,7 +674,24 @@
       "DefUpSelf",
       "PpPlus2"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Def",
+          "ratio": 0.5,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "RecoverPp",
+        "parameters": {
+          "target": "Self",
+          "amount": 2
+        }
+      }
+    ],
     "learnCondition": "铁甲卫士 Lv30",
     "unlockLevel": 30
   },
@@ -448,7 +709,15 @@
       "AoE",
       "FullHpDamageUp50"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "casterHpRatioMin": 1.0,
+          "SkillPowerMultiplier": 1.5
+        }
+      }
+    ],
     "learnCondition": "角斗士/狂战士 Lv1",
     "unlockLevel": 1
   },
@@ -466,7 +735,24 @@
       "Heal30",
       "AtkUp"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "Self",
+          "ratio": 0.3
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Str",
+          "ratio": 0.3,
+          "turns": -1
+        }
+      }
+    ],
     "learnCondition": "角斗士/狂战士 Lv10",
     "unlockLevel": 10
   },
@@ -484,7 +770,15 @@
       "FullHpDamageUp50",
       "AoE"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "casterHpRatioMin": 1.0,
+          "SkillPowerMultiplier": 1.5
+        }
+      }
+    ],
     "learnCondition": "狂战士 Lv20",
     "unlockLevel": 20
   },
@@ -502,7 +796,21 @@
       "IgnoreDef100VsHeavy",
       "Unblockable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "CannotBeBlocked": true
+        }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Heavy",
+          "IgnoreDefenseRatio": 1.0
+        }
+      }
+    ],
     "learnCondition": "战士/扫荡者 Lv1",
     "unlockLevel": 1
   },
@@ -519,7 +827,28 @@
     "tags": [
       "Unblockable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "CannotBeBlocked": true
+        }
+      },
+      {
+        "effectType": "OnKillEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverAp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "战士/扫荡者 Lv10",
     "unlockLevel": 10
   },
@@ -537,7 +866,22 @@
       "Unblockable",
       "Uncoverable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "CannotBeBlocked": true,
+          "CannotBeCovered": true
+        }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Heavy",
+          "IgnoreDefenseRatio": 1.0
+        }
+      }
+    ],
     "learnCondition": "扫荡者 Lv30",
     "unlockLevel": 30
   },
@@ -551,10 +895,7 @@
     "hitRate": 100,
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击",
-    "tags": [
-      "Ranged",
-      "FlyingNoEvaPenalty"
-    ],
+    "tags": [],
     "effects": [],
     "learnCondition": "猎人/神射手 Lv1",
     "unlockLevel": 1
@@ -569,10 +910,7 @@
     "hitRate": 100,
     "targetType": "TwoEnemies",
     "effectDescription": "敌2体攻击",
-    "tags": [
-      "Ranged",
-      "MultiTarget2"
-    ],
+    "tags": [],
     "effects": [],
     "learnCondition": "猎人/神射手 Lv10",
     "unlockLevel": 10
@@ -587,9 +925,7 @@
     "hitRate": 100,
     "targetType": "Row",
     "effectDescription": "敌一列攻击",
-    "tags": [
-      "Ranged"
-    ],
+    "tags": [],
     "effects": [],
     "learnCondition": "神射手 Lv20",
     "unlockLevel": 20
@@ -604,9 +940,7 @@
     "hitRate": 100,
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击",
-    "tags": [
-      "Ranged"
-    ],
+    "tags": [],
     "effects": [],
     "learnCondition": "射手/盾射手 Lv1",
     "unlockLevel": 1
@@ -625,7 +959,22 @@
       "Ranged",
       "Poison"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Poison"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "射手/盾射手 Lv10",
     "unlockLevel": 10
   },
@@ -660,7 +1009,25 @@
     "tags": [
       "StealAllPp"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "requireUnblocked": true,
+          "effects": [
+            {
+              "effectType": "TransferResource",
+              "parameters": {
+                "resource": "PP",
+                "from": "Target",
+                "to": "Self",
+                "amount": "All"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "盗贼/恶棍 Lv1",
     "unlockLevel": 1
   },
@@ -679,7 +1046,22 @@
       "Poison",
       "FlyingNoHitPenalty"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Poison"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "盗贼/恶棍 Lv10",
     "unlockLevel": 10
   },
@@ -698,7 +1080,40 @@
       "SpdDown20",
       "EvaDown20"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Darkness"
+              }
+            },
+            {
+              "effectType": "AddDebuff",
+              "parameters": {
+                "target": "Target",
+                "stat": "Spd",
+                "ratio": 0.2,
+                "turns": -1
+              }
+            },
+            {
+              "effectType": "AddDebuff",
+              "parameters": {
+                "target": "Target",
+                "stat": "Eva",
+                "ratio": 0.2,
+                "turns": -1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "恶棍 Lv20",
     "unlockLevel": 20
   },
@@ -747,6 +1162,20 @@
         "parameters": {
           "HitCount": 3
         }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Burn"
+              }
+            }
+          ]
+        }
       }
     ],
     "learnCondition": "巫师/术士 Lv1",
@@ -767,7 +1196,22 @@
       "Ranged",
       "Row"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Stun"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "巫师/术士 Lv10",
     "unlockLevel": 10
   },
@@ -786,7 +1230,22 @@
       "Ranged",
       "FrontAndBack"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Burn"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "术士 Lv25",
     "unlockLevel": 25
   },
@@ -804,7 +1263,22 @@
       "Freeze",
       "Ranged"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Freeze"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "女巫/魔女 Lv1",
     "unlockLevel": 1
   },
@@ -818,10 +1292,7 @@
     "hitRate": 100,
     "targetType": "TwoEnemies",
     "effectDescription": "敌2体魔法攻击",
-    "tags": [
-      "Ranged",
-      "MultiTarget2"
-    ],
+    "tags": [],
     "effects": [],
     "learnCondition": "女巫/魔女 Lv10",
     "unlockLevel": 10
@@ -841,7 +1312,22 @@
       "Ranged",
       "Row"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Freeze"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "魔女 Lv25",
     "unlockLevel": 25
   },
@@ -858,7 +1344,22 @@
     "tags": [
       "HitPpPlus1"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverPp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "learnCondition": "白骑士/圣骑士 Lv1",
     "unlockLevel": 1
   },
@@ -909,6 +1410,20 @@
         "parameters": {
           "HitCount": 2
         }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "RecoverPp",
+              "parameters": {
+                "target": "Self",
+                "amount": 1
+              }
+            }
+          ]
+        }
       }
     ],
     "learnCondition": "圣骑士 Lv25",
@@ -928,7 +1443,16 @@
       "CavalryBonus",
       "Unblockable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Cavalry",
+          "CannotBeBlocked": true,
+          "SkillPowerMultiplier": 1.5
+        }
+      }
+    ],
     "learnCondition": "狮鹫骑士 Lv1",
     "unlockLevel": 1
   },
@@ -947,7 +1471,15 @@
       "Unblockable",
       "Row"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Cavalry",
+          "CannotBeBlocked": true
+        }
+      }
+    ],
     "learnCondition": "狮鹫骑士 Lv15",
     "unlockLevel": 15
   },
@@ -967,7 +1499,24 @@
       "SureHit",
       "Ranged"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "PpDamage",
+        "parameters": {
+          "target": "Target",
+          "amount": 1
+        }
+      },
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Target",
+          "stat": "Spd",
+          "ratio": 0.1,
+          "turns": -1
+        }
+      }
+    ],
     "learnCondition": "萨满/德鲁伊 Lv1",
     "unlockLevel": 1
   },
@@ -987,7 +1536,26 @@
       "SureHit",
       "Ranged"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Target",
+          "stat": "Str",
+          "ratio": 0.5,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Target",
+          "stat": "Mag",
+          "ratio": 0.5,
+          "turns": -1
+        }
+      }
+    ],
     "learnCondition": "萨满/德鲁伊 Lv10",
     "unlockLevel": 10
   },
@@ -1008,7 +1576,33 @@
       "SureHit",
       "Ranged"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Target",
+          "stat": "Def",
+          "ratio": 0.5,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Target",
+          "stat": "MDef",
+          "ratio": 0.5,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "StatusAilment",
+        "parameters": {
+          "target": "Target",
+          "ailment": "BlockSeal"
+        }
+      }
+    ],
     "learnCondition": "德鲁伊 Lv25",
     "unlockLevel": 25
   },

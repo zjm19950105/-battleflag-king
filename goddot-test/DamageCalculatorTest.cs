@@ -68,6 +68,38 @@ namespace BattleKing.Tests
                 ClassicAssert.AreEqual((int)(50 * 1.5f), result.TotalDamage);
         }
 
+        [Test]
+        public void CritSeal_OnAttacker_PreventsCriticalHits()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 60, hit: 1000, crit: 100);
+            var defender = TestDataFactory.CreateUnit(def: 10, block: 0);
+            attacker.Ailments.Add(StatusAilment.CritSeal);
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsHit);
+            ClassicAssert.IsFalse(result.IsCritical);
+            ClassicAssert.AreEqual(50, result.TotalDamage);
+        }
+
+        [Test]
+        public void CritSeal_OnDefender_DoesNotPreventIncomingCriticalHits()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 60, hit: 1000, crit: 100);
+            var defender = TestDataFactory.CreateUnit(def: 10, block: 0);
+            defender.Ailments.Add(StatusAilment.CritSeal);
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsHit);
+            ClassicAssert.IsTrue(result.IsCritical);
+            ClassicAssert.AreEqual(75, result.TotalDamage);
+        }
+
         // ────────── 格挡 ──────────
 
         [Test]

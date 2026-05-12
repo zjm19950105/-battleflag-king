@@ -426,6 +426,7 @@ namespace BattleKing.Core
 
                 var result = _damageCalculator.Calculate(calc);
                 var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
+                calc.ResolvedDefender = damageReceiver;
 
 				bool killed = false;
 				if (result.IsHit && result.TotalDamage > 0)
@@ -448,6 +449,11 @@ namespace BattleKing.Core
 						Context = _ctx
 					});
 				}
+
+                var postEffectLogs = _skillEffectExecutor.ExecutePostDamageEffects(
+                    _ctx, unit, damageReceiver, skill.Data.Effects, skill.Data.Id, calc, result, killed);
+                if (postEffectLogs.Count > 0)
+                    Log($"  post effects: {string.Join(", ", postEffectLogs)}");
 
 				_eventBus.Publish(new AfterHitEvent
 				{
@@ -512,6 +518,7 @@ namespace BattleKing.Core
 
                     var result = _damageCalculator.Calculate(calc);
                     var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
+                    calc.ResolvedDefender = damageReceiver;
                     bool killed = false;
 
                     if (result.IsHit && result.TotalDamage > 0)
@@ -529,6 +536,11 @@ namespace BattleKing.Core
                             });
                         }
                     }
+
+                    var postEffectLogs = _skillEffectExecutor.ExecutePostDamageEffects(
+                        _ctx, action.Actor, damageReceiver, tempSkill.Data.Effects, action.SourcePassiveId, calc, result, killed);
+                    if (postEffectLogs.Count > 0)
+                        Log($"  post effects: {string.Join(", ", postEffectLogs)}");
 
                     var pendingLogText = BuildPendingActionLogText(action, target, damageReceiver, calc, result, killed);
                     EmitBattleLogEntry(CreateAttackLogEntry(
@@ -568,9 +580,24 @@ namespace BattleKing.Core
                 AttackType = action.AttackType,
                 Power = action.Power,
                 HitRate = action.HitRate,
-                TargetType = action.TargetType
+                TargetType = action.TargetType,
+                Effects = GetPendingActionEffects(action.SourcePassiveId)
             };
             return new ActiveSkill(data, _ctx.PlayerUnits.FirstOrDefault()?.GameData);
+        }
+
+        private List<SkillEffectData> GetPendingActionEffects(string sourceSkillId)
+        {
+            if (string.IsNullOrWhiteSpace(sourceSkillId) || _ctx?.GameData == null)
+                return new List<SkillEffectData>();
+
+            if (_ctx.GameData.PassiveSkills.TryGetValue(sourceSkillId, out var passive))
+                return passive.Effects ?? new List<SkillEffectData>();
+
+            if (_ctx.GameData.ActiveSkills.TryGetValue(sourceSkillId, out var active))
+                return active.Effects ?? new List<SkillEffectData>();
+
+            return new List<SkillEffectData>();
         }
 
         private List<BattleUnit> ExpandPendingActionTargets(PendingAction action)

@@ -1,7 +1,7 @@
 # 战旗之王 - Codex 接手指南
 
-最后更新：2026-05-09  
-状态：Phase 1.4-A / A01-A16 与 BattleEnd 追加修复已完成，当前测试 135/135 通过。
+最后更新：2026-05-12  
+状态：Phase 1.4-A / A01-A16、BattleEnd 追加修复、测试沙盒热插拔调试、队列・状况“排”语义修正已完成，当前测试 203/203 通过。
 
 本文件给 Codex 使用；内容与 `CLAUDE.md` 保持同一套接手规则。不要把 `docs/next-ai-task-prompts.md` 当作新的待办清单，它现在只是 A01-A16 完成归档。
 
@@ -48,6 +48,8 @@ JSON 数据
 | 技能效果执行 | `goddot/src/Skills/SkillEffectExecutor.cs` |
 | 被动触发仲裁 | `goddot/src/Skills/PassiveSkillProcessor.cs` |
 | 结构化战斗日志 | `goddot/src/core/BattleLogEntry.cs` |
+| 测试沙盒 | `goddot/src/ui/TestSandboxView.cs` |
+| 沙盒装备/策略表 | `goddot/src/ui/SandboxEquipmentPanel.cs`, `goddot/src/ui/SandboxStrategyTableView.cs` |
 | 测试 | `goddot-test/*Test.cs` |
 
 ## 已完成的 A01-A16 加固
@@ -62,6 +64,10 @@ JSON 数据
 - 删除空的 `ISkillEffect` 双轨。
 - 增加金样例、数据契约、结构化日志、合规扫描测试。
 - 追加修复：`EnemyClassExists=无`、`TeamSize` 相对阵营和包含边界、`ApPp highest PP`。
+- 测试沙盒已支持战斗中/战前热插拔：阵容槽可清空、拖回角色池退下，右键可扣 10 HP、扣 50% HP、恢复 50% HP、设置气绝。
+- `UnitState.Stunned` 已有真实战斗语义：轮到行动时跳过一次并恢复 `Normal`。
+- 队列・状况条件已按原版语义修正：`前后排一列` 是纵列 1-4 / 2-5 / 3-6；`人数最多/最少一排`、`2/3体以上一排` 是前排/后排人数，不是纵列人数。
+- 新增 `QueueStatusStrategyManualPlanTest`，把队列・状况手动测试方案自动化；后续其它策略分类建议照这个模式写验收测试。
 
 ## 当前真实风险
 
@@ -70,6 +76,7 @@ JSON 数据
 - BattleEnd 语义已完成追加修复；当前剩余风险主要是继续收敛其它 legacy tag-only 技能，而不是 BattleEnd 关键被动。
 - 仍有 legacy tag-only 技能白名单；新增战斗语义必须写 structured `effects`。
 - 测试项目有 nullable/Godot source generator 警告；游戏项目 build 应保持 0 警告。
+- `StrategyConditionCatalog` 里部分历史 ID 仍叫 `queue-most-column` / `queue-only-column-at-least-*`；这是兼容旧数据，代码注释已说明实际语义是“排”。不要把它们改回纵列。
 
 ## 编程方向
 

@@ -1,7 +1,7 @@
 # 战旗之王 - AI 接手指南
 
-最后更新：2026-05-09  
-状态：Phase 1.4-A / A01-A16 与 BattleEnd 追加修复已完成，当前测试 135/135 通过。
+最后更新：2026-05-12  
+状态：Phase 1.4-A / A01-A16、BattleEnd 追加修复、测试沙盒热插拔调试、队列・状况“排”语义修正已完成，当前测试 203/203 通过。
 
 这是新 AI 的唯一必读入口。不要先读完整历史文档；先用本文建立地图，再按任务读代码和测试。
 
@@ -59,6 +59,8 @@ JSON 数据
 | 技能效果执行 | `goddot/src/Skills/SkillEffectExecutor.cs` |
 | 被动触发仲裁 | `goddot/src/Skills/PassiveSkillProcessor.cs` |
 | 结构化战斗日志 | `goddot/src/core/BattleLogEntry.cs` |
+| 测试沙盒 | `goddot/src/ui/TestSandboxView.cs` |
+| 沙盒装备/策略表 | `goddot/src/ui/SandboxEquipmentPanel.cs`, `goddot/src/ui/SandboxStrategyTableView.cs` |
 | 核心回归测试 | `goddot-test/*Test.cs` |
 
 ## 已完成的规则加固
@@ -74,6 +76,8 @@ JSON 数据
 - 空的 `ISkillEffect` / `SkillEffectFactory` / `Skills/Effects/*` 双轨已删除。
 - 已建立金样例职业组、数据契约、结构化日志、合规扫描测试。
 - 2026-05-08 追加修复：`EnemyClassExists=无`、`TeamSize` 相对阵营与“以上/以下”包含边界、`ApPp highest PP` 排序。
+- 2026-05-12：测试沙盒支持战斗中/战前热插拔：阵容槽清空、拖回角色池退下、右键扣 10 HP、扣 50% HP、恢复 50% HP、设置气绝。`UnitState.Stunned` 现在会跳过一次行动后恢复 `Normal`。
+- 2026-05-12：队列・状况条件已按原版语义修正：`前后排一列` 是纵列 1-4 / 2-5 / 3-6；`人数最多/最少一排`、`2/3体以上一排` 是前排/后排人数。`QueueStatusStrategyManualPlanTest` 覆盖对应手动方案。
 
 ## 当前真实风险
 
@@ -83,6 +87,7 @@ JSON 数据
 - 主动/被动技能仍有一批 legacy tag-only 白名单；新增战斗语义必须写 structured `effects`。
 - `dotnet test` 当前会显示测试项目 nullable/Godot source generator 警告；游戏项目 `dotnet build goddot\goddot.csproj --no-restore` 应保持 0 警告。
 - Godot UI 缺少自动化截图/冒烟测试，UI 改动要人工 F5。
+- `StrategyConditionCatalog` 中保留了历史 ID `queue-most-column` / `queue-only-column-at-least-*` 以兼容旧数据；显示和实际语义已经是“排”。不要因 ID 名称把逻辑改回纵列。
 
 ## 编程范式
 

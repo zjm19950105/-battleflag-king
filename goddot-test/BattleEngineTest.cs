@@ -270,6 +270,121 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void StepOneAction_RealActiveJsonResourcePostDamageEffects_ApplyOnHitAndOnKillBenefits()
+        {
+            var pierce = RunRealActiveSkillScenario("act_pierce", enemyHp: 10, casterAp: 1, casterPp: 1, currentPp: 0);
+            ClassicAssert.AreEqual(1, pierce.Caster.CurrentPp);
+            ClassicAssert.IsFalse(pierce.Enemy.IsAlive);
+            Assert.That(pierce.Logs, Has.Some.Contains("post effects:").And.Contains(".PP 0->1"));
+
+            var killChain = RunRealActiveSkillScenario("act_kill_chain", enemyHp: 10, casterAp: 2, currentAp: 1);
+            ClassicAssert.AreEqual(1, killChain.Caster.CurrentAp);
+            ClassicAssert.IsFalse(killChain.Enemy.IsAlive);
+            Assert.That(killChain.Logs, Has.Some.Contains("post effects:").And.Contains(".AP 0->1"));
+
+            var hache = RunRealActiveSkillScenario("act_hache", enemyHp: 300, casterAp: 1, casterPp: 1, currentPp: 0);
+            ClassicAssert.AreEqual(1, hache.Caster.CurrentPp);
+            ClassicAssert.IsTrue(hache.Enemy.IsAlive);
+
+            var holyBlade = RunRealActiveSkillScenario("act_holy_blade", enemyHp: 300, casterAp: 1, casterPp: 1, currentPp: 0);
+            ClassicAssert.AreEqual(1, holyBlade.Caster.CurrentPp);
+            ClassicAssert.IsTrue(holyBlade.Enemy.IsAlive);
+        }
+
+        [Test]
+        public void StepOneAction_RealActiveJsonPassiveSteal_TransfersAllTargetPpOnUnblockedHit()
+        {
+            var scenario = RunRealActiveSkillScenario(
+                "act_passive_steal",
+                enemyHp: 300,
+                casterAp: 1,
+                casterPp: 2,
+                currentPp: 0,
+                enemyPp: 2);
+
+            ClassicAssert.AreEqual(2, scenario.Caster.CurrentPp);
+            ClassicAssert.AreEqual(0, scenario.Enemy.CurrentPp);
+            Assert.That(scenario.Logs, Has.Some.Contains("post effects:").And.Contains("PP enemy 2->0 => caster 0->2"));
+        }
+
+        [Test]
+        public void StepOneAction_RealPassiveJsonFormationCounter_RecoversActiveAllyAp()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_touch"] = CreateTouchSkill();
+            var activeUser = new BattleUnit(CreateStructuredLogCharacter("active_user", "act_touch", hp: 300, str: 20, def: 0, spd: 30, ap: 3, pp: 0), repository, true)
+            {
+                Position = 1,
+                CurrentAp = 1
+            };
+            var giftUser = new BattleUnit(CreateStructuredLogCharacter("gift_user", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 1), repository, true)
+            {
+                Position = 2
+            };
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            activeUser.Strategies.Add(new Strategy { SkillId = "act_touch" });
+            giftUser.EquippedPassiveSkillIds.Add("pas_formation_counter");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { activeUser, giftUser },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            ClassicAssert.AreEqual(1, activeUser.CurrentAp);
+            ClassicAssert.AreEqual(0, giftUser.CurrentPp);
+            ClassicAssert.AreEqual("RecoverAp", repository.PassiveSkills["pas_formation_counter"].Effects.Single().EffectType);
+        }
+
+        [Test]
+        public void StepOneAction_RealPassiveJsonPursuitSlash_RecoversPpAfterPendingCounterHits()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_touch"] = CreateTouchSkill();
+            var attacker = new BattleUnit(CreateStructuredLogCharacter("attacker", "act_touch", hp: 300, str: 20, def: 0, spd: 30, ap: 1, pp: 0), repository, true)
+            {
+                Position = 1
+            };
+            var attackedAlly = new BattleUnit(CreateStructuredLogCharacter("attacked_ally", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            var pursuitUser = new BattleUnit(CreateStructuredLogCharacter("pursuit_user", null, hp: 300, str: 80, def: 0, spd: 5, ap: 0, pp: 1), repository, false)
+            {
+                Position = 2
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_touch" });
+            pursuitUser.EquippedPassiveSkillIds.Add("pas_pursuit_slash");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { attackedAlly, pursuitUser }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            ClassicAssert.AreEqual(1, pursuitUser.CurrentPp);
+            var passiveLog = engine.BattleLogEntries.Single(entry => entry.SkillId == "pas_pursuit_slash");
+            CollectionAssert.Contains(passiveLog.Flags, "PassiveTrigger");
+            CollectionAssert.Contains(passiveLog.Flags, "Counter");
+            CollectionAssert.Contains(passiveLog.Flags, "Hit");
+        }
+
+        [Test]
         public void StepOneAction_SameSpeedActors_RandomizesFirstActorAcrossBattles()
         {
             int playerFirst = 0;
@@ -377,6 +492,47 @@ namespace BattleKing.Tests
                 EnemyUnits = new List<BattleUnit> { enemy }
             };
         }
+
+        private static ActiveScenarioResult RunRealActiveSkillScenario(
+            string skillId,
+            int enemyHp,
+            int casterAp,
+            int casterPp = 0,
+            int? currentAp = null,
+            int? currentPp = null,
+            int enemyPp = 0)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var caster = new BattleUnit(CreateStructuredLogCharacter("caster", skillId, hp: 300, str: 250, def: 0, spd: 30, ap: casterAp, pp: casterPp), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 30
+            };
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: enemyHp, str: 10, def: 0, spd: 1, ap: 0, pp: enemyPp), repository, false)
+            {
+                Position = 1
+            };
+            if (currentAp.HasValue)
+                caster.CurrentAp = currentAp.Value;
+            if (currentPp.HasValue)
+                caster.CurrentPp = currentPp.Value;
+            caster.Strategies.Add(new Strategy { SkillId = skillId });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            return new ActiveScenarioResult(caster, enemy, logs);
+        }
+
+        private sealed record ActiveScenarioResult(BattleUnit Caster, BattleUnit Enemy, List<string> Logs);
 
         private static GameDataRepository CreateStructuredLogRepository()
         {
