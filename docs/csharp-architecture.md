@@ -1,6 +1,6 @@
 # C# 架构速查
 
-最后更新：2026-05-12
+最后更新：2026-05-13
 用途：给新 AI 快速定位代码边界。这里不复述历史方案；以当前代码为准。
 
 ## 当前状态
@@ -8,7 +8,7 @@
 - Godot 4 + C# / .NET 8。
 - NUnit 测试项目：`goddot-test/goddot-test.csproj`。
 - Phase 1.4-A / A01-A16 已完成。
-- 当前测试基线：`dotnet test goddot-test\goddot-test.csproj --no-restore` 为 346/346 通过；游戏项目 `dotnet build goddot\goddot.csproj --no-restore` 应保持 0 警告。
+- 当前测试基线：`dotnet test goddot-test\goddot-test.csproj --no-restore` 为 358/358 通过；游戏项目 `dotnet build goddot\goddot.csproj --no-restore` 应保持 0 警告。
 - 当前核心目标：规则可信后再扩 6v6。
 
 ## 模块边界
@@ -282,7 +282,9 @@ BattleEnd 常用 structured effects：
 
 ## 当前风险
 
-- `pas_rampage`、`pas_give_ap`、`pas_battle_horn`、`pas_concentration`、`pas_curse_swamp`、`pas_rapid_order` 已迁移到 structured effects，不再依赖 legacy tags；其它 legacy tag-only 技能仍需按优先级逐步迁移。
+- active legacy tag-only allowlist 已清空；`act_line_defense`、`act_frontline_heavy_bolt`、`act_curse_disaster` 也已迁移到 structured effects。
+- `pas_rampage`、`pas_give_ap`、`pas_battle_horn`、`pas_concentration`、`pas_curse_swamp`、`pas_rapid_order` 已迁移到 structured effects，不再依赖 legacy tags；剩余 legacy tag-only 技能集中在 passive allowlist，仍需按优先级逐步迁移。
+- `pas_rapid_reload` 不要做 skill-id 特判；下一步建议实现通用 `AugmentCurrentAction`，把 `SelfBeforeAttack` / `AllyBeforeAttack` 被动的 calculation effects / on-hit effects 附着到当前主动行动。
 - Godot UI 尚无自动化冒烟；当前已修正战斗日志初始化后被清空、返回按钮重复添加两个手测前风险点，仍需要人工 F5 覆盖启动、选队、进战斗、下一步、结果页。
 - `Main.cs` 已抽出阶段导航、通用面板/按钮流程和拖拽布阵视图，但具体装备、被动、策略 UI 仍偏大；后续拆分要继续保持不改变流程顺序。
 - `SkillEffectExecutor.cs`、`PassiveSkillProcessor.cs` 偏大，下一步是有测试地拆分。

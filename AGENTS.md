@@ -1,7 +1,7 @@
 # 战旗之王 - Codex 接手指南
 
-最后更新：2026-05-12  
-状态：Phase 1.4-A / A01-A16、BattleEnd 追加修复、测试沙盒热插拔调试、队列・状况“排”语义修正已完成，当前测试 203/203 通过。
+最后更新：2026-05-13  
+状态：Phase 1.4-A / A01-A16、策略系统、G1/G2/G3 技能 structured effects、剩余 active 技能迁移已完成；当前测试 358/358 通过，游戏项目 build 0 警告。
 
 本文件给 Codex 使用；内容与 `CLAUDE.md` 保持同一套接手规则。不要把 `docs/next-ai-task-prompts.md` 当作新的待办清单，它现在只是 A01-A16 完成归档。
 
@@ -69,12 +69,30 @@ JSON 数据
 - 队列・状况条件已按原版语义修正：`前后排一列` 是纵列 1-4 / 2-5 / 3-6；`人数最多/最少一排`、`2/3体以上一排` 是前排/后排人数，不是纵列人数。
 - 新增 `QueueStatusStrategyManualPlanTest`，把队列・状况手动测试方案自动化；后续其它策略分类建议照这个模式写验收测试。
 
+## 已完成的技能系统迁移
+
+- 主动技能 allowlist 已清空；`goddot-test/DataContractTest.cs` 里当前只剩 passive legacy tag-only allowlist。
+- G1 资源/命中/击杀收益已落地：`OnHitEffect`、`OnKillEffect`、`TransferResource`，覆盖 `act_pierce`、`act_kill_chain`、`act_hache`、`act_holy_blade`、`act_passive_steal`、`pas_formation_counter`、`pas_pursuit_slash`。
+- G2/G3 异常、debuff、诅咒和常见 ranged/assist active 已迁移；`OnHitEffect` 支持 `chance`，主动攻击附带异常/debuff 必须命中后触发时要包在 `OnHitEffect`。
+- `CritSeal` 方向已修正：攻击者身上有 `CritSeal` 时禁止暴击；防守者身上的 `CritSeal` 不保护自己。
+- `StatusAilment.Stun` 会同步 `UnitState.Stunned`，轮到行动时跳过一次并恢复 `Normal`。
+- `BuffManager` 已允许同一技能的不同属性纯 buff/debuff 共存；仍会去重同一技能 + 同一属性。
+- 新增/确认的 active 收尾机制：
+  - `ColumnAlliesOfTarget`：以选中目标为锚点，选其同阵营同纵列存活单位；当前用于 `act_line_defense`。
+  - `SkillPowerBonus` + `casterRow` / `requiresCasterFrontRow`：结构化固定威力加算和施法者前后排条件；当前用于 `act_frontline_heavy_bolt`。
+  - `AmplifyDebuffs`：只放大已有负向纯 debuff，不影响 buff、不创建新 debuff；当前用于 `act_curse_disaster`。
+- 最近提交：
+  - `a9ef9b2` `Migrate structured skill effects baseline`
+  - `d8b637c` `Migrate remaining active structured effects`
+
 ## 当前真实风险
 
 - `Main.cs` 仍偏大，UI 和阶段流仍集中。
-- `SkillEffectExecutor`、`PassiveSkillProcessor` 偏大，新增 effect 前先复用已有原子。
-- BattleEnd 语义已完成追加修复；当前剩余风险主要是继续收敛其它 legacy tag-only 技能，而不是 BattleEnd 关键被动。
-- 仍有 legacy tag-only 技能白名单；新增战斗语义必须写 structured `effects`。
+- `SkillEffectExecutor`、`PassiveSkillProcessor` 偏大，新增 effect 前先复用已有原子；新增通用机制必须补真实 JSON 测试。
+- BattleEnd 语义已完成追加修复；当前剩余风险主要是继续收敛 passive legacy tag-only 技能，而不是 BattleEnd 关键被动。
+- active legacy tag-only 白名单已清空；仍有 passive legacy tag-only 技能白名单。新增战斗语义必须写 structured `effects`。
+- 剩余 passive 重点包括：`pas_hundred_crit`、`pas_muscle_swelling`、`pas_calm_cover`、`pas_hawk_eye`、`pas_rapid_reload`、`pas_emergency_cover`、`pas_cut_grass`、`pas_fervor`、`pas_quick_reload`、`pas_pursuit_magic`、`pas_magic_blade`、`pas_quick_cast`、`pas_magic_barrier`、`pas_row_barrier`、`pas_berserk`。
+- `pas_rapid_reload` 不要硬编码；审计建议新增通用 `AugmentCurrentAction`，让 `SelfBeforeAttack` / `AllyBeforeAttack` 被动把 calculation effects / on-hit effects 附着到当前主动行动。
 - 测试项目有 nullable/Godot source generator 警告；游戏项目 build 应保持 0 警告。
 - `StrategyConditionCatalog` 里部分历史 ID 仍叫 `queue-most-column` / `queue-only-column-at-least-*`；这是兼容旧数据，代码注释已说明实际语义是“排”。不要把它们改回纵列。
 
