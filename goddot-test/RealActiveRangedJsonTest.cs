@@ -3,12 +3,15 @@ using BattleKing.Core;
 using BattleKing.Data;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using System.Text.Json;
 
 namespace BattleKing.Tests
 {
     [TestFixture]
     public class RealActiveRangedJsonTest
     {
+        private const string FrontlineHeavyBoltSkillId = "act_frontline_heavy_bolt";
+
         private static string DataPath => Path.GetFullPath(Path.Combine(
             TestContext.CurrentContext.TestDirectory,
             "..", "..", "..", "..",
@@ -127,11 +130,79 @@ namespace BattleKing.Tests
             AssertAttackTargets(engine, skillId, "enemy");
         }
 
+        [Test]
+        public void StepOneAction_RealJsonFrontlineHeavyBolt_FrontRowAdds100PowerOnly()
+        {
+            int frontDamage = RunFrontlineHeavyBoltDamage(casterPosition: 1, out var skill, out var frontLogs);
+            int backDamage = RunFrontlineHeavyBoltDamage(casterPosition: 4, out _, out var backLogs);
+
+            AssertFrontlineHeavyBoltShape(skill);
+            ClassicAssert.AreEqual(360, frontDamage);
+            ClassicAssert.AreEqual(180, backDamage);
+            ClassicAssert.AreEqual(180, frontDamage - backDamage);
+            Assert.That(frontLogs, Has.Some.Contains("calc effects:").And.Contains("PowerBonus=100"));
+            Assert.That(backLogs, Has.None.Contains("calc effects:"));
+        }
+
         private static GameDataRepository LoadRepository()
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
             return repository;
+        }
+
+        private static int RunFrontlineHeavyBoltDamage(
+            int casterPosition,
+            out ActiveSkillData skill,
+            out List<string> logs)
+        {
+            var repository = LoadRepository();
+            skill = repository.ActiveSkills[FrontlineHeavyBoltSkillId];
+            var caster = CreateUnit(
+                repository,
+                "caster",
+                true,
+                casterPosition,
+                FrontlineHeavyBoltSkillId,
+                SkillType.Physical,
+                hp: 1000,
+                spd: 100);
+            var enemy = CreateUnit(
+                repository,
+                "enemy",
+                false,
+                1,
+                null,
+                SkillType.Physical,
+                hp: 1000,
+                spd: 1);
+            caster.Strategies.Add(new Strategy { SkillId = FrontlineHeavyBoltSkillId });
+            logs = new List<string>();
+            var engine = new BattleEngine(new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            }) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            AssertAttackTargets(engine, FrontlineHeavyBoltSkillId, "enemy");
+            return enemy.Data.BaseStats["HP"] - enemy.CurrentHp;
+        }
+
+        private static void AssertFrontlineHeavyBoltShape(ActiveSkillData skill)
+        {
+            ClassicAssert.AreEqual(SkillType.Physical, skill.Type);
+            ClassicAssert.AreEqual(AttackType.Ranged, skill.AttackType);
+            ClassicAssert.AreEqual(100, skill.Power);
+            CollectionAssert.AreEqual(
+                new[] { "ModifyDamageCalc" },
+                skill.Effects.Select(effect => effect.EffectType).ToArray());
+
+            var parameters = skill.Effects.Single().Parameters;
+            ClassicAssert.AreEqual("Front", ((JsonElement)parameters["casterRow"]).GetString());
+            ClassicAssert.AreEqual(100, ((JsonElement)parameters["SkillPowerBonus"]).GetInt32());
         }
 
         private static BattleUnit CreateUnit(

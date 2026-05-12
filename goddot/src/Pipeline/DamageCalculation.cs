@@ -83,7 +83,10 @@ namespace BattleKing.Pipeline
         /// <summary>Bonus power from custom counters (e.g. sprite counter × 30)</summary>
         public float CounterPowerBonus { get; set; } = 0f;
 
-        /// <summary>Effective skill power = base power + counter bonus</summary>
-        public float EffectivePower => Skill.Power + CounterPowerBonus;
+        /// <summary>Bonus power from structured calculation effects.</summary>
+        public float SkillPowerBonus { get; set; } = 0f;
+
+        /// <summary>Effective skill power = base power + structured/counter bonuses.</summary>
+        public float EffectivePower => Skill.Power + SkillPowerBonus + CounterPowerBonus;
     }
 }

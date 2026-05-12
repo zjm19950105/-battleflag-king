@@ -61,9 +61,6 @@ namespace BattleKing.Tests
         private const string LegacyTagOnlyReason = "Legacy tag-only skill pending structured effects migration.";
         private static readonly Dictionary<string, string> LegacyTagOnlySkillAllowlist = new()
         {
-            ["active:act_line_defense"] = LegacyTagOnlyReason,
-            ["active:act_frontline_heavy_bolt"] = LegacyTagOnlyReason,
-            ["active:act_curse_disaster"] = LegacyTagOnlyReason,
             ["passive:pas_hundred_crit"] = LegacyTagOnlyReason,
             ["passive:pas_muscle_swelling"] = LegacyTagOnlyReason,
             ["passive:pas_calm_cover"] = LegacyTagOnlyReason,

@@ -134,6 +134,7 @@ namespace BattleKing.Skills
                     break;
                 case "AddBuff":
                 case "AddDebuff":
+                case "AmplifyDebuffs":
                 case "RemoveBuff":
                 case "RemoveDebuff":
                 case "CleanseDebuff":
@@ -268,6 +269,12 @@ namespace BattleKing.Skills
                 logs.Add($"PowerMultiplier={calculation.SkillPowerMultiplier:0.##}");
             }
 
+            if (TryGetFloat(parameters, "SkillPowerBonus", out float skillPowerBonus))
+            {
+                calculation.SkillPowerBonus += skillPowerBonus;
+                logs.Add($"PowerBonus={skillPowerBonus:0.##}");
+            }
+
             if (TryGetFloat(parameters, "DamageMultiplier", out float damageMultiplier))
             {
                 calculation.DamageMultiplier *= damageMultiplier;
@@ -308,6 +315,13 @@ namespace BattleKing.Skills
             if (GetBool(parameters, "casterHasBuff", false) && !HasBuff(caster))
                 return false;
 
+            if (GetBool(parameters, "requiresCasterFrontRow", false) && caster?.IsFrontRow != true)
+                return false;
+
+            if (TryGetString(parameters, "casterRow", out string casterRow)
+                && !CasterRowMatches(caster, casterRow))
+                return false;
+
             if (!TargetClassConditionMatches(parameters, calculation.Defender))
                 return false;
 
@@ -320,6 +334,21 @@ namespace BattleKing.Skills
                 return false;
 
             return true;
+        }
+
+        private static bool CasterRowMatches(BattleUnit caster, string row)
+        {
+            if (caster == null)
+                return false;
+
+            return row.Trim().ToLowerInvariant() switch
+            {
+                "front" => caster.IsFrontRow,
+                "frontrow" => caster.IsFrontRow,
+                "back" => !caster.IsFrontRow,
+                "backrow" => !caster.IsFrontRow,
+                _ => false
+            };
         }
 
         private static bool HasDebuff(BattleUnit unit)
@@ -367,6 +396,9 @@ namespace BattleKing.Skills
                     break;
                 case "AddDebuff":
                     ApplyBuff(context, caster, targets, parameters, sourceSkillId, calculation, logs, forceDebuff: true);
+                    break;
+                case "AmplifyDebuffs":
+                    ApplyAmplifyDebuffs(context, caster, targets, parameters, calculation, logs);
                     break;
                 case "RemoveBuff":
                 case "RemoveDebuff":
@@ -417,6 +449,40 @@ namespace BattleKing.Skills
                 });
                 logs.Add($"{target.Data.Name}.{stat} {before}->{target.GetCurrentStat(stat)}");
             }
+        }
+
+        private static void ApplyAmplifyDebuffs(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            List<string> logs)
+        {
+            float multiplier = GetFloat(parameters, "multiplier", 1.5f);
+            if (multiplier <= 0f)
+                return;
+
+            foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Target"))
+            {
+                foreach (var buff in target.Buffs.Where(IsAmplifiableDebuff))
+                {
+                    int before = target.GetCurrentStat(buff.TargetStat);
+                    if (buff.Ratio < 0f)
+                        buff.Ratio *= multiplier;
+                    if (buff.FlatAmount < 0)
+                        buff.FlatAmount = (int)Math.Round(buff.FlatAmount * multiplier, MidpointRounding.AwayFromZero);
+                    logs.Add($"{target.Data.Name}.{buff.TargetStat} {before}->{target.GetCurrentStat(buff.TargetStat)}");
+                }
+            }
+        }
+
+        private static bool IsAmplifiableDebuff(Buff buff)
+        {
+            return buff != null
+                && buff.IsPureBuffOrDebuff
+                && !string.IsNullOrWhiteSpace(buff.TargetStat)
+                && (buff.Ratio < 0f || buff.FlatAmount < 0);
         }
 
         private static void ApplyResourceEffect(
@@ -883,6 +949,7 @@ namespace BattleKing.Skills
                 "frontrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => u.IsFrontRow).ToList(),
                 "backrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => !u.IsFrontRow).ToList(),
                 "columnallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => IsSameColumn(u.Position, caster.Position)).ToList(),
+                "columnalliesoftarget" => SelectColumnAlliesOfTarget(context, targets, calculation),
                 "lowesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderBy(u => u.CurrentHp).Take(1).ToList(),
                 "highesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderByDescending(u => u.CurrentHp).Take(1).ToList(),
                 "randomally" => SelectRandomUnit(context.GetAliveUnits(caster.IsPlayer)),
@@ -914,6 +981,23 @@ namespace BattleKing.Skills
 
             return selected
                 .Where(unit => unit.GetEffectiveClasses().Any(requiredClasses.Contains))
+                .ToList();
+        }
+
+        private static List<BattleUnit> SelectColumnAlliesOfTarget(
+            BattleContext context,
+            IReadOnlyList<BattleUnit> targets,
+            DamageCalculation calculation)
+        {
+            var anchors = calculation?.Defender != null
+                ? new List<BattleUnit> { calculation.Defender }
+                : targets?.Where(t => t != null).ToList() ?? new List<BattleUnit>();
+
+            return anchors
+                .SelectMany(anchor => context.GetAliveUnits(anchor.IsPlayer)
+                    .Where(unit => IsSameColumn(unit.Position, anchor.Position)))
+                .Distinct()
+                .OrderBy(unit => unit.Position)
                 .ToList();
         }
 

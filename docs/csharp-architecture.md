@@ -208,7 +208,7 @@ Operator 约定：
 带 `RangedCover` tag 的被动是额外上下文限制：只允许在远程物理 `BeforeHit` 中触发；结构化效果仍用 `CoverAlly` + `ModifyDamageCalc.NullifyPhysicalDamage` 表达实际掩护/无效化。
 同一技能可以同时挂多个不同属性的纯 buff/debuff；`BuffManager` 只把“同一技能 + 同一属性”的纯 buff/debuff 视作重复。
 
-`ModifyDamageCalc` 可带条件参数限制本条伤害修正是否生效：`targetClass` / `targetClasses` 按当前声明目标兵种过滤，`targetHasDebuff` 要求目标已有纯 debuff，`casterHasBuff` 要求施法者已有纯 buff，`casterHpRatioMin` / `casterHpRatioMax` 按施法者当前 HP 比例过滤。条件不满足时整条 calculation effect 跳过；这用于满血威力提升、低血威力提升、目标已有 debuff 伤害提升、自身有 buff 伤害提升、兵种特攻无视防御/不可格挡等 structured effects。
+`ModifyDamageCalc` 可带条件参数限制本条伤害修正是否生效：`targetClass` / `targetClasses` 按当前声明目标兵种过滤，`targetHasDebuff` 要求目标已有纯 debuff，`casterHasBuff` 要求施法者已有纯 buff，`casterHpRatioMin` / `casterHpRatioMax` 按施法者当前 HP 比例过滤，`casterRow` (`Front` / `Back`) / `requiresCasterFrontRow` 按施法者当前前后排过滤。条件不满足时整条 calculation effect 跳过；这用于满血威力提升、低血威力提升、前排发动威力提升、目标已有 debuff 伤害提升、自身有 buff 伤害提升、兵种特攻无视防御/不可格挡等 structured effects。`SkillPowerBonus` 会加到 `DamageCalculation.EffectivePower`，与 `SkillPowerMultiplier` 不同，它表达固定威力值加算。
 
 ## Effects 执行
 
@@ -221,7 +221,7 @@ Operator 约定：
 
 `SkillType.Assist` 的自施辅助主动技（例如 `act_great_shield` / `act_formation_breaker`）把 `AddBuff`、`RecoverPp`、`HealRatio` 直接写在顶层 `effects`。当前非 Heal 的 Assist 仍会进入一次 0 威力命中/伤害流程；新增测试应断言只影响自身资源/面板，不对敌方造成伤害或附加副作用。
 
-`SkillType.Debuff` 的纯妨害主动技（例如 `act_passive_curse` / `act_attack_curse` / `act_defense_curse`）应把 `PpDamage`、`AddDebuff`、`StatusAilment` 等直接写在顶层 `effects`。这些 action effects 在 `DamageCalculator` 命中/回避判定前执行，不受随机命中影响；只有“伤害命中后才附加”的异常/减益才用 `OnHitEffect` 包裹。
+`SkillType.Debuff` 的纯妨害主动技（例如 `act_passive_curse` / `act_attack_curse` / `act_defense_curse` / `act_curse_disaster`）应把 `PpDamage`、`AddDebuff`、`AmplifyDebuffs`、`StatusAilment` 等直接写在顶层 `effects`。这些 action effects 在 `DamageCalculator` 命中/回避判定前执行，不受随机命中影响；只有“伤害命中后才附加”的异常/减益才用 `OnHitEffect` 包裹。
 
 `SelfOnActiveUse` 被动在 `BeforeActiveUseEvent` 执行，早于主动 AP 扣费、主动 action effects 和伤害计算；因此 `RecoverAp` 可作为当前主动行动的 AP 回补，`oneTime` 命中等 buff 会参与当前主动伤害计算，并在该单位本次行动完成后由 `CleanupAfterAction` 清理。
 
@@ -231,8 +231,11 @@ Operator 约定：
 Self, Caster, Target, Defender, Attacker,
 AllTargets, AllAllies, Allies, AllEnemies, Enemies,
 RowAllies, FrontRowAllies, BackRowAllies, ColumnAllies,
+ColumnAlliesOfTarget,
 LowestHpAlly, HighestHpAlly, RandomAlly
 ```
+
+`ColumnAllies` 以施法者位置为列锚点；`ColumnAlliesOfTarget` 以 `calculation.Defender` 或当前 action target 为列锚点，选择锚点同阵营、同列的存活单位。
 
 未知 target 当前回退到显式传入 targets。`targetClass` / `targetClasses` 会在 target DSL 选完后按 `UnitClass` 过滤，`maxTargets` 可限制最终目标数量。修改这个行为必须改测试。
 
@@ -246,6 +249,7 @@ BattleEnd 常用 structured effects：
 - `OnKillEffect`: 本次伤害击倒实际承伤者后执行嵌套 `effects`；击倒判断使用 `DamageResult.ResolvedDefender` 对应的扣血结果。
 - `TransferResource`: 在选中的 `from` 与 `to` 目标之间转移资源，参数包括 `resource` (`AP` / `PP`)、`amount`（整数或 `"All"`）、`from`、`to`。当前用于命中后偷取 PP。
 - `HealRatio`: 按最大 HP 比例治疗；可选 `lowHpThreshold` + `lowHpMultiplier` 表示低血量目标治疗倍率。
+- `AmplifyDebuffs`: 放大选中目标身上已有的纯 debuff（`IsPureBuffOrDebuff` 且 `Ratio < 0` 或 `FlatAmount < 0`），只乘以负向数值；不影响正向 buff，不创建新 debuff。参数：`target`、`multiplier`。
 - `TemporalMark`: 给目标添加一次性/限时标记。当前 `DebuffNullify` 会在下一次结构化 `AddDebuff` 时被消费并阻止该 debuff。
 
 ## 被动与同时发动限制

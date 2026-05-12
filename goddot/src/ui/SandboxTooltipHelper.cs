@@ -394,6 +394,7 @@ namespace BattleKing.Ui
 
         private static string EffectTypeLabel(string effectType) => effectType switch
         {
+            "AmplifyDebuffs" => "减益放大",
             "ModifyDamageCalc" => "伤害判定修正",
             "AddBuff" => "增益",
             "AddDebuff" => "减益",
@@ -416,6 +417,7 @@ namespace BattleKing.Ui
 
         private static string ParameterLabel(string key) => key switch
         {
+            "multiplier" => "倍率",
             "ForceHit" => "必中",
             "ForceBlock" => "强制格挡",
             "HitCount" => "段数",
@@ -479,6 +481,7 @@ namespace BattleKing.Ui
             "AllAllies" or "Allies" => "友方全体",
             "AllEnemies" or "Enemies" => "敌方全体",
             "ColumnAllies" => "同列友方",
+            "ColumnAlliesOfTarget" => "目标同列友方",
             _ => value
         };
 

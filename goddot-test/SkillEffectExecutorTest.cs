@@ -86,6 +86,82 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void AmplifyDebuffs_ActionEffect_MultipliesOnlyExistingPureNegativeBuffs()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var affected = TestDataFactory.CreateUnit(str: 100, def: 100, mag: 100, spd: 100, isPlayer: false);
+            var noDebuffTarget = TestDataFactory.CreateUnit(str: 100, def: 100, mag: 100, spd: 100, isPlayer: false);
+            affected.Buffs.Add(new Buff
+            {
+                SkillId = "shared_debuff",
+                TargetStat = "Str",
+                Ratio = -0.2f,
+                RemainingTurns = -1,
+                IsPureBuffOrDebuff = true
+            });
+            affected.Buffs.Add(new Buff
+            {
+                SkillId = "shared_debuff",
+                TargetStat = "Def",
+                FlatAmount = -10,
+                RemainingTurns = -1,
+                IsPureBuffOrDebuff = true
+            });
+            affected.Buffs.Add(new Buff
+            {
+                SkillId = "positive_buff",
+                TargetStat = "Mag",
+                Ratio = 0.2f,
+                RemainingTurns = -1,
+                IsPureBuffOrDebuff = true
+            });
+            affected.Buffs.Add(new Buff
+            {
+                SkillId = "mixed_runtime_modifier",
+                TargetStat = "Spd",
+                Ratio = -0.2f,
+                RemainingTurns = -1,
+                IsPureBuffOrDebuff = false
+            });
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "AmplifyDebuffs",
+                    Parameters = new()
+                    {
+                        { "target", "Target" },
+                        { "multiplier", 1.5 }
+                    }
+                }
+            });
+
+            var logs = executor.ExecuteActionEffects(
+                context,
+                caster,
+                new List<BattleUnit> { affected, noDebuffTarget },
+                skill.Data.Effects,
+                skill.Data.Id);
+
+            ClassicAssert.AreEqual(-0.3f, affected.Buffs.Single(buff => buff.TargetStat == "Str").Ratio, 0.001f);
+            ClassicAssert.AreEqual(-15, affected.Buffs.Single(buff => buff.TargetStat == "Def").FlatAmount);
+            ClassicAssert.AreEqual(0.2f, affected.Buffs.Single(buff => buff.TargetStat == "Mag").Ratio, 0.001f);
+            ClassicAssert.AreEqual(-0.2f, affected.Buffs.Single(buff => buff.TargetStat == "Spd").Ratio, 0.001f);
+            ClassicAssert.AreEqual(2, affected.Buffs.Count(buff => buff.SkillId == "shared_debuff"));
+            ClassicAssert.IsEmpty(noDebuffTarget.Buffs);
+            ClassicAssert.AreEqual(70, affected.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(85, affected.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(120, affected.GetCurrentStat("Mag"));
+            ClassicAssert.AreEqual(80, affected.GetCurrentStat("Spd"));
+            Assert.That(logs, Has.Some.Contains("Str"));
+            Assert.That(logs, Has.Some.Contains("Def"));
+            Assert.That(logs, Has.None.Contains("Mag"));
+            Assert.That(logs, Has.None.Contains("Spd"));
+        }
+
+        [Test]
         public void CounterEffects_主动效果_一次消耗并作用到同次技能所有目标()
         {
             var executor = new SkillEffectExecutor();
@@ -1198,6 +1274,68 @@ namespace BattleKing.Tests
                 casterAp: 3);
 
             ClassicAssert.AreEqual(200, capped.Caster.CurrentHp);
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonLineDefense_BuffsSelectedAllyColumnNotCasterColumn()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var skill = repository.ActiveSkills["act_line_defense"];
+            var effect = skill.Effects.Single();
+            var caster = new BattleUnit(CreateCharacter("caster", "act_line_defense", hp: 1000, str: 10, def: 100, spd: 100), repository, true)
+            {
+                Position = 3,
+                CurrentLevel = 30
+            };
+            var selectedAlly = new BattleUnit(CreateCharacter("selectedAlly", null, hp: 1000, str: 10, def: 100, spd: 1), repository, true)
+            {
+                Position = 1
+            };
+            var otherFrontColumn = new BattleUnit(CreateCharacter("otherFrontColumn", null, hp: 1000, str: 10, def: 100, spd: 1), repository, true)
+            {
+                Position = 2
+            };
+            var sameTargetColumn = new BattleUnit(CreateCharacter("sameTargetColumn", null, hp: 1000, str: 10, def: 100, spd: 1), repository, true)
+            {
+                Position = 4
+            };
+            var otherBackColumn = new BattleUnit(CreateCharacter("otherBackColumn", null, hp: 1000, str: 10, def: 100, spd: 1), repository, true)
+            {
+                Position = 5
+            };
+            var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 1000, str: 10, def: 100, spd: 1), repository, false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_line_defense" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster, selectedAlly, otherFrontColumn, sameTargetColumn, otherBackColumn },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            CollectionAssert.AreEqual(new[] { "AddBuff" }, skill.Effects.Select(e => e.EffectType).ToList());
+            ClassicAssert.AreEqual("ColumnAlliesOfTarget", ((JsonElement)effect.Parameters["target"]).GetString());
+            ClassicAssert.AreEqual("Def", ((JsonElement)effect.Parameters["stat"]).GetString());
+            ClassicAssert.AreEqual(0.5, ((JsonElement)effect.Parameters["ratio"]).GetDouble());
+            ClassicAssert.AreEqual(-1, ((JsonElement)effect.Parameters["turns"]).GetInt32());
+            ClassicAssert.AreEqual(150, selectedAlly.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(150, sameTargetColumn.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(100, otherFrontColumn.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(100, otherBackColumn.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(100, caster.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(2, context.PlayerUnits.Sum(unit => unit.Buffs.Count(buff =>
+                buff.SkillId == "act_line_defense"
+                && buff.TargetStat == "Def"
+                && buff.Ratio == 0.5f
+                && buff.IsPureBuffOrDebuff)));
+            Assert.That(logs, Has.Some.Contains("effects:").And.Contains("selectedAlly.Def").And.Contains("sameTargetColumn.Def"));
         }
 
         [Test]
