@@ -69,18 +69,24 @@ namespace BattleKing.Ai
                     "front_and_back" => HasAliveOppositeRowUnitInSameColumn(target),
                     _ => false
                 },
-                "greater_or_equal" => EvaluateColumnCount(value, target, (count, threshold) => count >= threshold),
-                "less_or_equal" => EvaluateColumnCount(value, target, (count, threshold) => count <= threshold),
+                "greater_or_equal" => EvaluateRowCount(value, target, (count, threshold) => count >= threshold),
+                "less_or_equal" => EvaluateRowCount(value, target, (count, threshold) => count <= threshold),
                 _ => false
             };
         }
 
-        private bool EvaluateColumnCount(string value, BattleUnit target, Func<int, int, bool> compare)
+        private bool EvaluateRowCount(string value, BattleUnit target, Func<int, int, bool> compare)
         {
-            if (!TryParsePrefixedInt(value, "column_units:", out int threshold))
+            // Compatibility: early local docs translated the original row-based
+            // condition as "column", so saved data/tests may still contain the
+            // old column_units prefix. Treat it as front/back row population.
+            if (!TryParsePrefixedInt(value, "row_units:", out int threshold)
+                && !TryParsePrefixedInt(value, "column_units:", out threshold))
+            {
                 return false;
+            }
 
-            int count = GetAliveColumnUnitCount(target);
+            int count = GetAliveRowUnitCount(target);
             return compare(count, threshold);
         }
 
@@ -362,14 +368,13 @@ namespace BattleKing.Ai
             };
         }
 
-        private int GetAliveColumnUnitCount(BattleUnit target)
+        private int GetAliveRowUnitCount(BattleUnit target)
         {
             if (target == null)
                 return 0;
 
-            int column = (target.Position - 1) % 3;
             return _ctx.GetAliveUnits(target.IsPlayer)
-                .Count(unit => (unit.Position - 1) % 3 == column);
+                .Count(unit => unit.IsFrontRow == target.IsFrontRow);
         }
 
         private static float GetHpRatio(BattleUnit unit)

@@ -507,13 +507,13 @@ namespace BattleKing.Tests
         }
 
         [Test]
-        public void Only_ColumnAtLeastTwo_FiltersTargetsByColumnPopulation()
+        public void Only_RowAtLeastTwo_FiltersTargetsByRowPopulation()
         {
-            var frontColumnMember = AddEnemy(1);
-            AddEnemy(2);
+            var frontRowMember = AddEnemy(1);
+            var frontRowOther = AddEnemy(2);
             AddEnemy(4);
             var caster = TestDataFactory.CreateUnit(isPlayer: true);
-            var skill = TestDataFactory.CreateSkill(attackType: AttackType.Ranged, targetType: TargetType.SingleEnemy);
+            var skill = TestDataFactory.CreateSkill(attackType: AttackType.Ranged, targetType: TargetType.AllEnemies);
             var strategy = new Strategy
             {
                 SkillId = "test_skill",
@@ -523,8 +523,7 @@ namespace BattleKing.Tests
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
 
-            ClassicAssert.AreEqual(1, targets.Count);
-            ClassicAssert.AreSame(frontColumnMember, targets[0]);
+            CollectionAssert.AreEquivalent(new[] { frontRowMember, frontRowOther }, targets);
         }
 
         [Test]

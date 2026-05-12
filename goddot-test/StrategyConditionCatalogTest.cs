@@ -44,7 +44,7 @@ namespace BattleKing.Tests
             var columnAtLeastTwo = StrategyConditionCatalog.BuildCondition("queue-only-column-at-least-2");
             ClassicAssert.AreEqual(ConditionCategory.Position, columnAtLeastTwo.Category);
             ClassicAssert.AreEqual("greater_or_equal", columnAtLeastTwo.Operator);
-            ClassicAssert.AreEqual("column_units:2", columnAtLeastTwo.Value);
+            ClassicAssert.AreEqual("row_units:2", columnAtLeastTwo.Value);
 
             var thirdAction = StrategyConditionCatalog.BuildCondition("self-only-action-3");
             ClassicAssert.AreEqual(ConditionCategory.SelfState, thirdAction.Category);

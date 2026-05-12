@@ -559,9 +559,7 @@ namespace BattleKing.Ui
                     ClearSlot(_selectedIsPlayer, _selectedIndex);
             });
             removeSelected.CustomMinimumSize = new Vector2(72, 24);
-            removeSelected.Disabled = _selectedIndex < 0
-                || _selectedIndex >= SlotCount
-                || string.IsNullOrWhiteSpace(GetSlots(_selectedIsPlayer)[_selectedIndex]);
+            removeSelected.TooltipText = "退下当前选中的我方或敌方阵容角色。";
             poolHeader.AddChild(removeSelected);
             _formationPanel.AddChild(poolHeader);
 
@@ -633,13 +631,14 @@ namespace BattleKing.Ui
 
             for (var i = start; i < start + 3; i++)
             {
-                row.AddChild(new SandboxFormationSlot(this, isPlayer, i));
+                var slotIndex = i;
+                row.AddChild(new SandboxFormationSlot(this, isPlayer, slotIndex));
 
                 var clear = CreateSmallButton("x", () =>
                 {
-                    ClearSlot(isPlayer, i);
+                    ClearSlot(isPlayer, slotIndex);
                 });
-                clear.Disabled = GetSlots(isPlayer)[i] == null;
+                clear.Disabled = GetSlots(isPlayer)[slotIndex] == null;
                 row.AddChild(clear);
             }
 
@@ -730,6 +729,9 @@ namespace BattleKing.Ui
                 case SlotDebugAction.DamageHalf:
                     ApplyManualDamage(unit, Math.Max(1, GetMaxHp(unit) / 2), "扣减50% HP");
                     break;
+                case SlotDebugAction.HealHalf:
+                    ApplyManualHeal(unit, Math.Max(1, GetMaxHp(unit) / 2), "恢复50% HP");
+                    break;
                 case SlotDebugAction.Stun:
                     unit.State = UnitState.Stunned;
                     AppendLog($"[测试] {BattleLogHelper.FormatUnitName(unit)} 陷入气绝，下次行动跳过。");
@@ -745,6 +747,13 @@ namespace BattleKing.Ui
         {
             var before = unit.CurrentHp;
             unit.CurrentHp = Math.Max(0, unit.CurrentHp - Math.Max(0, amount));
+            AppendLog($"[测试] {BattleLogHelper.FormatUnitName(unit)} {label}: {before} -> {unit.CurrentHp}");
+        }
+
+        private void ApplyManualHeal(BattleUnit unit, int amount, string label)
+        {
+            var before = unit.CurrentHp;
+            unit.CurrentHp = Math.Min(GetMaxHp(unit), unit.CurrentHp + Math.Max(0, amount));
             AppendLog($"[测试] {BattleLogHelper.FormatUnitName(unit)} {label}: {before} -> {unit.CurrentHp}");
         }
 
@@ -1073,7 +1082,8 @@ namespace BattleKing.Ui
         {
             Damage10 = 1,
             DamageHalf = 2,
-            Stun = 3
+            HealHalf = 3,
+            Stun = 4
         }
 
         private void AppendLog(string message)
@@ -1306,6 +1316,7 @@ namespace BattleKing.Ui
                 _debugMenu = new PopupMenu();
                 _debugMenu.AddItem("扣减 10 HP", (int)SlotDebugAction.Damage10);
                 _debugMenu.AddItem("扣减 50% HP", (int)SlotDebugAction.DamageHalf);
+                _debugMenu.AddItem("恢复 50% HP", (int)SlotDebugAction.HealHalf);
                 _debugMenu.AddItem("气绝：跳过下次行动", (int)SlotDebugAction.Stun);
                 _debugMenu.IdPressed += id => _owner.ApplySlotDebugAction(_isPlayer, _index, (SlotDebugAction)id);
                 AddChild(_debugMenu);

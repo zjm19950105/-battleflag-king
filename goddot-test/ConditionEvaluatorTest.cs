@@ -156,22 +156,22 @@ namespace BattleKing.Tests
         }
 
         [Test]
-        public void Position_ColumnUnitCount_PassesOnlyWhenTargetColumnHasEnoughAliveUnits()
+        public void Position_RowUnitCount_PassesOnlyWhenTargetRowHasEnoughAliveUnits()
         {
             var front = TestDataFactory.CreateUnit(isPlayer: false);
             front.Position = 1;
-            var sameColumnBack = TestDataFactory.CreateUnit(isPlayer: false);
-            sameColumnBack.Position = 4;
-            var otherColumn = TestDataFactory.CreateUnit(isPlayer: false);
-            otherColumn.Position = 2;
+            var sameRow = TestDataFactory.CreateUnit(isPlayer: false);
+            sameRow.Position = 2;
+            var backRow = TestDataFactory.CreateUnit(isPlayer: false);
+            backRow.Position = 4;
             _ctx.EnemyUnits.Add(front);
-            _ctx.EnemyUnits.Add(sameColumnBack);
-            _ctx.EnemyUnits.Add(otherColumn);
+            _ctx.EnemyUnits.Add(sameRow);
+            _ctx.EnemyUnits.Add(backRow);
             var cond = StrategyConditionCatalog.BuildCondition("queue-only-column-at-least-2");
 
             ClassicAssert.IsTrue(_eval.Evaluate(cond, _caster, front));
-            ClassicAssert.IsTrue(_eval.Evaluate(cond, _caster, sameColumnBack));
-            ClassicAssert.IsFalse(_eval.Evaluate(cond, _caster, otherColumn));
+            ClassicAssert.IsTrue(_eval.Evaluate(cond, _caster, sameRow));
+            ClassicAssert.IsFalse(_eval.Evaluate(cond, _caster, backRow));
         }
 
         [Test]

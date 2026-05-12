@@ -228,18 +228,21 @@ namespace BattleKing.Ai
                 ConditionCategory.Position, "equals", "back", StrategyConditionArrow.None);
             AddTargetPair(items, "queue-front-and-back", StrategyConditionCatalogCategoryId.QueueStatus, "前后排一列",
                 ConditionCategory.Position, "equals", "front_and_back", StrategyConditionArrow.None);
-            AddTargetPair(items, "queue-most-column", StrategyConditionCatalogCategoryId.QueueStatus, "人数最多一列",
-                ConditionCategory.Position, "highest", "column_unit_count", StrategyConditionArrow.Up);
-            AddTargetPair(items, "queue-fewest-column", StrategyConditionCatalogCategoryId.QueueStatus, "人数最少一列",
-                ConditionCategory.Position, "lowest", "column_unit_count", StrategyConditionArrow.Down);
+            // Historical note: these IDs kept the old "column" wording after a
+            // JP->CN terminology correction. In game terms they mean front/back
+            // row population, not vertical 1-4 / 2-5 / 3-6 column population.
+            AddTargetPair(items, "queue-most-column", StrategyConditionCatalogCategoryId.QueueStatus, "人数最多一排",
+                ConditionCategory.Position, "highest", "row_unit_count", StrategyConditionArrow.Up);
+            AddTargetPair(items, "queue-fewest-column", StrategyConditionCatalogCategoryId.QueueStatus, "人数最少一排",
+                ConditionCategory.Position, "lowest", "row_unit_count", StrategyConditionArrow.Down);
             items.Add(Item("queue-only-column-at-least-2", StrategyConditionCatalogCategoryId.QueueStatus,
-                "仅{target}2体以上一列", StrategyConditionKind.Only, StrategyConditionTargetSide.SkillDependent,
+                "仅{target}2体以上一排", StrategyConditionKind.Only, StrategyConditionTargetSide.SkillDependent,
                 StrategyConditionArrow.Up, StrategyConditionTextColor.NeutralWhite,
-                ConditionCategory.Position, "greater_or_equal", "column_units:2"));
+                ConditionCategory.Position, "greater_or_equal", "row_units:2"));
             items.Add(Item("queue-only-column-at-least-3", StrategyConditionCatalogCategoryId.QueueStatus,
-                "仅{target}3体以上一列", StrategyConditionKind.Only, StrategyConditionTargetSide.SkillDependent,
+                "仅{target}3体以上一排", StrategyConditionKind.Only, StrategyConditionTargetSide.SkillDependent,
                 StrategyConditionArrow.Up, StrategyConditionTextColor.NeutralWhite,
-                ConditionCategory.Position, "greater_or_equal", "column_units:3"));
+                ConditionCategory.Position, "greater_or_equal", "row_units:3"));
             items.Add(Item("queue-only-daytime", StrategyConditionCatalogCategoryId.QueueStatus,
                 "仅白天", StrategyConditionKind.Only, StrategyConditionTargetSide.None,
                 StrategyConditionArrow.None, StrategyConditionTextColor.NeutralGold,

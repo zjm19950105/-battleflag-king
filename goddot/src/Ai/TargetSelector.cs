@@ -238,11 +238,13 @@ namespace BattleKing.Ai
 				return 0;
 
 			string value = condition.Value?.ToString() ?? "";
-			if (value == "column_unit_count")
+			// Compatibility: "column_unit_count" is a legacy internal value from
+			// an early translation pass. The actual original-game condition is
+			// row population, meaning front row vs back row.
+			if (value == "row_unit_count" || value == "column_unit_count")
 			{
-				int column = (unit.Position - 1) % 3;
 				return _ctx.GetAliveUnits(unit.IsPlayer)
-					.Count(u => (u.Position - 1) % 3 == column);
+					.Count(u => u.IsFrontRow == unit.IsFrontRow);
 			}
 
 			return 0;
