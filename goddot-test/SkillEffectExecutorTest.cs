@@ -60,6 +60,43 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void ModifyDamageCalc_CasterHasBuff_TreatsFlatPositivePureBuffAsBuffState()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var attacker = TestDataFactory.CreateUnit();
+            attacker.Buffs.Add(new Buff
+            {
+                SkillId = "act_rapid_order",
+                TargetStat = "Spd",
+                FlatAmount = 20,
+                RemainingTurns = -1,
+                IsPureBuffOrDebuff = true
+            });
+            var defender = TestDataFactory.CreateUnit(isPlayer: false);
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "ModifyDamageCalc",
+                    Parameters = new()
+                    {
+                        { "casterHasBuff", true },
+                        { "SkillPowerBonus", 50 }
+                    }
+                }
+            });
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            var logs = executor.ExecuteCalculationEffects(
+                context, attacker, new List<BattleUnit> { defender }, skill.Data.Effects,
+                skill.Data.Id, calc, new SkillEffectExecutionState());
+
+            ClassicAssert.AreEqual(50f, calc.SkillPowerBonus);
+            Assert.That(logs, Has.Some.Contains("PowerBonus=50"));
+        }
+
+        [Test]
         public void AddBuff_主动效果_按JSON参数修改目标面板()
         {
             var executor = new SkillEffectExecutor();
@@ -396,6 +433,42 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void RecoverHp_TargetLowestHpAllyExcludeSelf_SelectsLowestOtherAlly()
+        {
+            var executor = new SkillEffectExecutor();
+            var caster = TestDataFactory.CreateUnit(hp: 200, isPlayer: true);
+            caster.CurrentHp = 10;
+            var lowestOtherAlly = TestDataFactory.CreateUnit(hp: 200, isPlayer: true);
+            lowestOtherAlly.CurrentHp = 40;
+            var otherAlly = TestDataFactory.CreateUnit(hp: 200, isPlayer: true);
+            otherAlly.CurrentHp = 80;
+            var context = new BattleContext(new GameDataRepository())
+            {
+                PlayerUnits = new List<BattleUnit> { caster, lowestOtherAlly, otherAlly },
+                EnemyUnits = new List<BattleUnit>()
+            };
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "RecoverHp",
+                    Parameters = new()
+                    {
+                        { "target", "LowestHpAlly" },
+                        { "excludeSelf", true },
+                        { "amount", 25 }
+                    }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, Array.Empty<BattleUnit>(), skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(10, caster.CurrentHp);
+            ClassicAssert.AreEqual(90, lowestOtherAlly.CurrentHp);
+            ClassicAssert.AreEqual(80, otherAlly.CurrentHp);
+        }
+
+        [Test]
         public void UnknownTarget_FallsBackToExplicitTargets()
         {
             var executor = new SkillEffectExecutor();
@@ -674,6 +747,7 @@ namespace BattleKing.Tests
                 Position = 1,
                 CurrentPp = 2
             };
+            medic.CurrentHp = 20;
             var wounded = new BattleUnit(CreateCharacter("wounded", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
             {
                 Position = 2,
@@ -693,9 +767,41 @@ namespace BattleKing.Tests
 
             ClassicAssert.IsNotEmpty(passive.Effects);
             CollectionAssert.IsEmpty(passive.Tags);
+            ClassicAssert.AreEqual(true, ((JsonElement)passive.Effects.Single().Parameters["excludeSelf"]).GetBoolean());
             ClassicAssert.AreEqual(400, wounded.GetCurrentStat("HP"));
             ClassicAssert.AreEqual(280, wounded.CurrentHp);
-            ClassicAssert.AreEqual(200, medic.CurrentHp);
+            ClassicAssert.AreEqual(20, medic.CurrentHp);
+        }
+
+        [Test]
+        public void BattleEndPasGiveAp_NoOtherAliveAlly_DoesNotHealSelfOrThrow()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var medic = new BattleUnit(CreateCharacter("medic", null, hp: 200, str: 10, def: 10, spd: 20), repository, true)
+            {
+                Position = 1,
+                CurrentPp = 2
+            };
+            medic.CurrentHp = 20;
+            var defeatedAlly = new BattleUnit(CreateCharacter("defeatedAlly", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
+            {
+                Position = 2,
+                CurrentHp = 0
+            };
+            medic.EquippedPassiveSkillIds.Add("pas_give_ap");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { medic, defeatedAlly }
+            };
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+
+            Assert.DoesNotThrow(() => eventBus.Publish(new BattleEndEvent { Context = context, Result = BattleResult.Draw }));
+
+            ClassicAssert.AreEqual(20, medic.CurrentHp);
+            ClassicAssert.AreEqual(0, defeatedAlly.CurrentHp);
         }
 
         [Test]
@@ -1034,7 +1140,7 @@ namespace BattleKing.Tests
         }
 
         [Test]
-        public void RealActiveJsonShieldBash_UsesChanceGatedOnHitStun()
+        public void RealActiveJsonShieldBash_UsesGuaranteedOnHitStun()
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
@@ -1046,9 +1152,11 @@ namespace BattleKing.Tests
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             ClassicAssert.AreEqual("OnHitEffect", onHit.EffectType);
-            ClassicAssert.AreEqual(25, ((JsonElement)onHit.Parameters["chance"]).GetInt32());
-            ClassicAssert.AreEqual("StatusAilment", nested.Single().EffectType);
-            ClassicAssert.AreEqual("Stun", ((JsonElement)nested.Single().Parameters["ailment"]).GetString());
+            ClassicAssert.IsFalse(onHit.Parameters.ContainsKey("chance"));
+            ClassicAssert.NotNull(nested);
+            var stunEffect = nested!.Single();
+            ClassicAssert.AreEqual("StatusAilment", stunEffect.EffectType);
+            ClassicAssert.AreEqual("Stun", ((JsonElement)stunEffect.Parameters["ailment"]).GetString());
         }
 
         [Test]

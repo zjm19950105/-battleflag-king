@@ -22,8 +22,6 @@ namespace BattleKing.Skills
         private BattleContext _ctx;
         // Per-side simultaneous limit: key=true=player, false=enemy
         private Dictionary<bool, HashSet<string>> _battleStartFired = new() { [true] = new(), [false] = new() };
-        private Dictionary<bool, HashSet<string>> _allyBuffFired = new() { [true] = new(), [false] = new() };
-        private Dictionary<bool, HashSet<string>> _defenseFired = new() { [true] = new(), [false] = new() };
         private Dictionary<bool, HashSet<string>> _afterActionFired = new() { [true] = new(), [false] = new() };
 
         public PassiveSkillProcessor(EventBus eventBus, GameDataRepository gameData, Action<string> log, Action<PendingAction> enqueueAction = null)
@@ -52,8 +50,6 @@ namespace BattleKing.Skills
         {
             _ctx = evt.Context;
             foreach (var set in _battleStartFired.Values) set.Clear();
-            foreach (var set in _allyBuffFired.Values) set.Clear();
-            foreach (var set in _defenseFired.Values) set.Clear();
             foreach (var set in _afterActionFired.Values) set.Clear();
 
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.BattleStart, "战斗开始时",
@@ -84,7 +80,7 @@ namespace BattleKing.Skills
 
             var allies = GetAllies(evt.Caster, evt.Context).Where(u => u != evt.Caster).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeAttack, "友方攻击前",
-                limitSimultaneous: true, _allyBuffFired, activeSkill: evt.Skill);
+                limitSimultaneous: true, CreateSimultaneousFiredSet(), activeSkill: evt.Skill);
         }
 
         private void OnBeforeHit(BeforeHitEvent evt)
@@ -103,7 +99,7 @@ namespace BattleKing.Skills
             // Ally defense/cover
             var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeHit, "友方被攻击前",
-                limitSimultaneous: true, _defenseFired, calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender,
+                limitSimultaneous: true, CreateSimultaneousFiredSet(), calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender,
                 sourceKind: evt.SourceKind);
         }
 
@@ -256,6 +252,11 @@ namespace BattleKing.Skills
                     break;
                 }
             }
+        }
+
+        private static Dictionary<bool, HashSet<string>> CreateSimultaneousFiredSet()
+        {
+            return new Dictionary<bool, HashSet<string>> { [true] = new(), [false] = new() };
         }
 
         private static bool PassiveMatchesBattleContext(

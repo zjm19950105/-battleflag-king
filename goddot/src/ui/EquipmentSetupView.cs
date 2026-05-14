@@ -54,17 +54,19 @@ namespace BattleKing.Ui
                 row.AddChild(new Label { Text = $"[{slotLabel}] " });
 
                 var dropdown = new OptionButton();
-                dropdown.AddItem("(空)");
-                int selectedIdx = 0;
+                bool canClear = EquipmentSlotUiPolicy.CanClearSlot(slotName, cd, isCc);
+                if (canClear)
+                    dropdown.AddItem("(空)");
+                int selectedIdx = canClear ? 0 : -1;
 
                 // Determine which equipment fits this slot
-                string expectedCat = GetExpectedCategory(slotName, cd, isCc);
+                var expectedCat = EquipmentSlotUiPolicy.GetExpectedCategory(slotName, cd, isCc);
                 var candidates = new List<EquipmentData>();
-                if (expectedCat != null)
+                if (expectedCat.HasValue)
                 {
                     foreach (var eq in allEquip)
                     {
-                        if (eq.Category.ToString() == expectedCat && EquipmentSlot.CanEquipCategory(eq.Category, cd, isCc))
+                        if (eq.Category == expectedCat.Value && EquipmentSlot.CanEquipCategory(eq.Category, cd, isCc))
                             candidates.Add(eq);
                     }
                 }
@@ -79,18 +81,23 @@ namespace BattleKing.Ui
                         desc += $" [{string.Join(",", eq.SpecialEffects)}]";
                     dropdown.AddItem(desc);
                     if (current != null && eq.Id == current.Data.Id)
-                        selectedIdx = i + 1;
+                        selectedIdx = i + (canClear ? 1 : 0);
                 }
-                dropdown.Selected = selectedIdx;
+                if (selectedIdx >= 0)
+                    dropdown.Selected = selectedIdx;
 
                 string slotCapture = slotName;
                 var capsCopy = candidates;
                 dropdown.ItemSelected += (long sel) => {
                     int s = (int)sel;
                     int previousMaxHp = Math.Max(1, unit.GetCurrentStat("HP"));
-                    if (s == 0) unit.Equipment.Unequip(slotCapture);
-                    else if (s - 1 < capsCopy.Count)
-                        unit.Equipment.EquipToSlot(slotCapture, capsCopy[s - 1]);
+                    if (canClear && s == 0) unit.Equipment.EquipToSlot(slotCapture, null);
+                    else
+                    {
+                        int candidateIndex = s - (canClear ? 1 : 0);
+                        if (candidateIndex >= 0 && candidateIndex < capsCopy.Count)
+                            unit.Equipment.EquipToSlot(slotCapture, capsCopy[candidateIndex]);
+                    }
                     unit.SyncResourceCapsFromStats(previousMaxHp);
                     UpdateEquipDetail(unit);
                 };
@@ -114,15 +121,6 @@ namespace BattleKing.Ui
             return EquipmentSlot.GetSlotNames(unit.Data, unit.IsCc).Count;
         }
 
-        private static string GetExpectedCategory(string slotName, CharacterData cd, bool isCc)
-        {
-            var types = isCc && cd.CcEquippableCategories?.Count > 0 ? cd.CcEquippableCategories : cd.EquippableCategories;
-            var slots = EquipmentSlot.GetSlotNames(cd, isCc);
-            int idx = slots.IndexOf(slotName);
-            if (idx < 0 || idx >= types.Count) return null;
-            return types[idx].ToString();
-        }
-
         private void UpdateEquipDetail(BattleUnit unit)
         {
             ClearPanel(_rightPanel);
@@ -139,10 +137,11 @@ namespace BattleKing.Ui
             foreach (var sn in statNames)
             {
                 if (!cd.BaseStats.ContainsKey(sn)) continue;
-                int baseVal = cd.BaseStats[sn];
-                int equipVal = unit.Equipment.GetTotalStat(sn);
-                int buffVal = (int)(baseVal * BuffManager.GetTotalBuffRatio(unit, sn));
-                int total = baseVal + equipVal + buffVal;
+                var breakdown = unit.GetStatBreakdown(sn);
+                int baseVal = breakdown.BaseValue;
+                int equipVal = breakdown.EquipmentValue;
+                int buffVal = breakdown.BuffDelta;
+                int total = breakdown.Current;
 
                 string line = $"{sn}: {baseVal}";
                 if (equipVal > 0) line += $" [color=#88ff88]+{equipVal}[/color]";

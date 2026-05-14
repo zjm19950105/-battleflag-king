@@ -364,6 +364,85 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void RealPassiveJson_ArrowCover_CanTriggerAgainOnLaterRangedPhysicalAttack()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var arrowCover = repository.PassiveSkills["pas_cheer_shout"];
+            var logs = new List<string>();
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, logs.Add);
+            processor.SubscribeAll();
+            var attacker = new BattleUnit(CreatePassiveBattleCharacter(
+                "attacker", null, hp: 200, str: 50, def: 0, spd: 10, hit: 1000, eva: 0, ap: 0, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            var defender = new BattleUnit(CreatePassiveBattleCharacter(
+                "defender", null, hp: 200, str: 1, def: 0, spd: 1, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                true)
+            {
+                Position = 1
+            };
+            var fastCover = new BattleUnit(CreatePassiveBattleCharacter(
+                "fastCover", null, hp: 200, str: 1, def: 0, spd: 40, hit: 0, eva: 0, ap: 0, pp: 2),
+                repository,
+                true)
+            {
+                Position = 4
+            };
+            var slowCover = new BattleUnit(CreatePassiveBattleCharacter(
+                "slowCover", null, hp: 200, str: 1, def: 0, spd: 20, hit: 0, eva: 0, ap: 0, pp: 2),
+                repository,
+                true)
+            {
+                Position = 5
+            };
+            fastCover.EquippedPassiveSkillIds.Add("pas_cheer_shout");
+            slowCover.EquippedPassiveSkillIds.Add("pas_cheer_shout");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { defender, fastCover, slowCover },
+                EnemyUnits = new List<BattleUnit> { attacker }
+            };
+            var skill = TestDataFactory.CreateSkill(type: SkillType.Physical, attackType: AttackType.Ranged);
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+            var firstCalc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                Context = context,
+                Calc = firstCalc
+            });
+
+            var secondCalc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                Context = context,
+                Calc = secondCalc
+            });
+
+            CollectionAssert.Contains(arrowCover.Tags, "RangedCover");
+            ClassicAssert.IsTrue(arrowCover.HasSimultaneousLimit);
+            ClassicAssert.AreSame(fastCover, firstCalc.CoverTarget);
+            ClassicAssert.IsTrue(firstCalc.NullifyPhysicalDamage);
+            ClassicAssert.AreSame(fastCover, secondCalc.CoverTarget);
+            ClassicAssert.IsTrue(secondCalc.NullifyPhysicalDamage);
+            ClassicAssert.AreEqual(0, fastCover.CurrentPp);
+            ClassicAssert.AreEqual(2, slowCover.CurrentPp);
+            ClassicAssert.AreEqual(2, logs.Count(log => log.Contains("pas_cheer_shout") || log.Contains(arrowCover.Name)));
+        }
+
+        [Test]
         public void RealPassiveJson_Concentration_RecoversApBuffsCurrentActiveHitAndCleansAfterAction()
         {
             var repository = new GameDataRepository();
@@ -747,7 +826,12 @@ namespace BattleKing.Tests
                     Position = 1,
                     CurrentAp = 1
                 };
-                attacker.Strategies.Add(new Strategy { SkillId = "act_fervor_probe" });
+                attacker.Strategies.Add(new Strategy
+                {
+                    SkillId = "act_fervor_probe",
+                    Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                    Mode1 = ConditionMode.Priority
+                });
                 hunter.EquippedPassiveSkillIds.Add("pas_fervor");
                 var context = new BattleContext(repository)
                 {
@@ -1517,7 +1601,12 @@ namespace BattleKing.Tests
                 Position = 1
             };
             barrierUser.EquippedPassiveSkillIds.Add("pas_magic_barrier");
-            enemy.Strategies.Add(new Strategy { SkillId = "act_magic_barrier_probe" });
+            enemy.Strategies.Add(new Strategy
+            {
+                SkillId = "act_magic_barrier_probe",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                Mode1 = ConditionMode.Priority
+            });
             var logs = new List<string>();
             var context = new BattleContext(repository)
             {
@@ -2036,6 +2125,198 @@ namespace BattleKing.Tests
 
             ClassicAssert.IsTrue(caster.TemporalStates.Any(state => state.Key == "DeathResist"));
             ClassicAssert.IsFalse(caster.TemporalStates.Any(state => state.Key == "AfterProbe"));
+        }
+
+        [Test]
+        public void RealPassiveJson_RapidOrder_BattleLongBuffSurvivesTurnAndActionCleanup()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+            var caster = new BattleUnit(CreatePassiveBattleCharacter(
+                "caster", null, hp: 100, str: 1, def: 0, spd: 30, hit: 0, eva: 0, ap: 0, pp: 1),
+                repository,
+                true)
+            {
+                Position = 1
+            };
+            var ally = new BattleUnit(CreatePassiveBattleCharacter(
+                "ally", null, hp: 100, str: 1, def: 0, spd: 40, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                true)
+            {
+                Position = 2
+            };
+            var enemy = new BattleUnit(CreatePassiveBattleCharacter(
+                "enemy", null, hp: 100, str: 1, def: 0, spd: 50, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            caster.EquippedPassiveSkillIds.Add("pas_rapid_order");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster, ally },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+            BuffManager.CleanupAfterAction(ally);
+            foreach (var unit in context.AllUnits)
+                BuffManager.CleanupEndOfTurn(unit);
+
+            ClassicAssert.AreEqual(60, ally.GetCurrentStat("Spd"));
+            ClassicAssert.IsTrue(ally.Buffs.Any(buff =>
+                buff.SkillId == "pas_rapid_order"
+                && buff.TargetStat == "Spd"
+                && buff.FlatAmount == 20
+                && buff.RemainingTurns == -1));
+        }
+
+        [Test]
+        public void RealPassiveJson_ForcedTarget_PersistsAcrossSelectionAndTurnCleanup()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, _ => { });
+            processor.SubscribeAll();
+            var taunter = new BattleUnit(CreatePassiveBattleCharacter(
+                "taunter", null, hp: 500, str: 1, def: 0, spd: 1, hit: 0, eva: 0, ap: 0, pp: 2),
+                repository,
+                true)
+            {
+                Position = 1
+            };
+            var lowHpAlly = new BattleUnit(CreatePassiveBattleCharacter(
+                "lowHpAlly", null, hp: 500, str: 1, def: 0, spd: 1, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                true)
+            {
+                Position = 2,
+                CurrentHp = 50
+            };
+            var enemy = new BattleUnit(CreatePassiveBattleCharacter(
+                "enemy", null, hp: 500, str: 30, def: 0, spd: 100, hit: 1000, eva: 0, ap: 1, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            taunter.EquippedPassiveSkillIds.Add("pas_hundred_crit");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { taunter, lowHpAlly },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var skill = new ActiveSkillData
+            {
+                Id = "act_forced_target_probe",
+                Name = "Forced Target Probe",
+                ApCost = 1,
+                Type = SkillType.Physical,
+                AttackType = AttackType.Ranged,
+                Power = 10,
+                HitRate = 100,
+                TargetType = TargetType.SingleEnemy,
+                Effects = new List<SkillEffectData>()
+            };
+            var strategy = new Strategy
+            {
+                SkillId = skill.Id,
+                Condition1 = new Condition { Category = ConditionCategory.Hp, Operator = "lowest" },
+                Mode1 = ConditionMode.Priority
+            };
+            var selector = new TargetSelector(context);
+
+            eventBus.Publish(new BattleStartEvent { Context = context });
+            var firstSelection = selector.SelectTargets(enemy, strategy, skill);
+            BuffManager.CleanupAfterAction(enemy);
+            foreach (var unit in context.AllUnits)
+                BuffManager.CleanupEndOfTurn(unit);
+            var secondSelection = selector.SelectTargets(enemy, strategy, skill);
+
+            CollectionAssert.AreEqual(new[] { taunter }, firstSelection);
+            CollectionAssert.AreEqual(new[] { taunter }, secondSelection);
+            ClassicAssert.IsTrue(taunter.TemporalStates.Any(state =>
+                state.Key == "ForcedTarget"
+                && state.RemainingCount != 0
+                && state.RemainingTurns == -1));
+        }
+
+        [Test]
+        public void RealPassiveJson_KeenCall_ForcesEveryLandedHitOfMultiHitActionToCrit()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_keen_multi_probe"] = new ActiveSkillData
+            {
+                Id = "act_keen_multi_probe",
+                Name = "Keen Multi Probe",
+                ApCost = 1,
+                Type = SkillType.Physical,
+                AttackType = AttackType.Melee,
+                Power = 100,
+                HitRate = 100,
+                TargetType = TargetType.SingleEnemy,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "ModifyDamageCalc",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "HitCount", 4 }
+                        }
+                    }
+                }
+            };
+            var attacker = new BattleUnit(CreatePassiveBattleCharacter(
+                "attacker", "act_keen_multi_probe", hp: 500, str: 60, def: 0, spd: 100, hit: 1000, eva: 0, ap: 1, pp: 0),
+                repository,
+                true)
+            {
+                Position = 1
+            };
+            var support = new BattleUnit(CreatePassiveBattleCharacter(
+                "support", null, hp: 500, str: 1, def: 0, spd: 40, hit: 0, eva: 0, ap: 0, pp: 1),
+                repository,
+                true)
+            {
+                Position = 2
+            };
+            var enemy = new BattleUnit(CreatePassiveBattleCharacter(
+                "enemy", null, hp: 500, str: 1, def: 10, spd: 1, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            support.EquippedPassiveSkillIds.Add("pas_muscle_swelling");
+            attacker.Strategies.Add(new Strategy { SkillId = "act_keen_multi_probe" });
+            var logs = new List<string>();
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker, support },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(0, support.CurrentPp);
+            var activeEntry = engine.BattleLogEntries.Single(entry => entry.SkillId == "act_keen_multi_probe");
+            ClassicAssert.AreEqual(300, activeEntry.Damage);
+            CollectionAssert.Contains(activeEntry.Flags, "Critical");
+            CollectionAssert.Contains(activeEntry.Flags, "Augment:pas_muscle_swelling");
+            Assert.That(logs, Has.Some.Contains("HitCount=4"));
+            Assert.That(logs, Has.Some.Contains("ForceCrit"));
         }
 
         private static CharacterData CreateCharacter(string id, int hp, int pp)

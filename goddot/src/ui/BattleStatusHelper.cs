@@ -36,34 +36,18 @@ namespace BattleKing.Ui
             label.AppendText("  [" + u.Position + "] [color=#88ff88]" + hpBar + "[/color] " + classStr + "[color=white]" + u.Data.Name + "[/color]" + ccStr + " HP:" + u.CurrentHp + "/" + maxHp + " [color=red]AP:" + StarStr(u.CurrentAp, u.MaxAp) + "[/color] [color=blue]PP:" + StarStr(u.CurrentPp, u.MaxPp) + "[/color]\n");
 
             // Combat stats
-            int spd = u.GetCurrentStat("Spd");
-            int bStr = u.Data.BaseStats.GetValueOrDefault("Str", 0);
-            int bDef = u.Data.BaseStats.GetValueOrDefault("Def", 0);
-            int bMag = u.Data.BaseStats.GetValueOrDefault("Mag", 0);
-            int bMDef = u.Data.BaseStats.GetValueOrDefault("MDef", 0);
-            int bHit = u.Data.BaseStats.GetValueOrDefault("Hit", 0);
-            int bEva = u.Data.BaseStats.GetValueOrDefault("Eva", 0);
-            int bCrit = u.Data.BaseStats.GetValueOrDefault("Crit", 0);
-            int bBlock = u.Data.BaseStats.GetValueOrDefault("Block", 0);
-            int bSpd = u.Data.BaseStats.GetValueOrDefault("Spd", 0);
-            int eqPAtk = u.GetCurrentAttackPower(SkillType.Physical) - bStr;
-            int eqPDef = u.GetCurrentDefense(SkillType.Physical) - bDef;
-            int eqMAtk = u.GetCurrentAttackPower(SkillType.Magical) - bMag;
-            int eqMDef = u.GetCurrentDefense(SkillType.Magical) - bMDef;
-            int eqHit = u.GetCurrentHitRate() - bHit;
-            int eqEva = u.GetCurrentEvasion() - bEva;
-            int eqCrit = u.GetCurrentCritRate() - bCrit;
-            int eqBlock = u.GetCurrentBlockRate() - bBlock;
-            int eqSpd = spd - bSpd;
+            var str = u.GetStatBreakdown("Str");
+            var def = u.GetStatBreakdown("Def");
+            var mag = u.GetStatBreakdown("Mag");
+            var mdef = u.GetStatBreakdown("MDef");
+            var hit = u.GetStatBreakdown("Hit");
+            var eva = u.GetStatBreakdown("Eva");
+            var crit = u.GetStatBreakdown("Crit");
+            var block = u.GetStatBreakdown("Block");
+            var spd = u.GetStatBreakdown("Spd");
 
-            string atkStr = FormatStatBreakdown(bStr, eqPAtk);
-            string defStr = FormatStatBreakdown(bDef, eqPDef);
-            string magStr = FormatStatBreakdown(bMag, eqMAtk);
-            string mdefStr = FormatStatBreakdown(bMDef, eqMDef);
-            string spdStr = FormatStatBreakdown(bSpd, eqSpd);
-
-            label.AppendText("    SPD" + spdStr + " | 物攻" + (bStr + eqPAtk) + atkStr + " | 物防" + (bDef + eqPDef) + defStr + " | 魔攻" + (bMag + eqMAtk) + magStr + " | 魔防" + (bMDef + eqMDef) + mdefStr + "\n");
-            label.AppendText("    命中" + (bHit + eqHit) + "(" + bHit + "+" + eqHit + ") | 回避" + (bEva + eqEva) + "(" + bEva + "+" + eqEva + ") | 会心" + (bCrit + eqCrit) + "%(" + bCrit + "+" + eqCrit + ") | 格挡" + (bBlock + eqBlock) + "%(" + bBlock + "+" + eqBlock + ")\n");
+            label.AppendText("    SPD" + FormatStatBreakdown(spd.EquippedBaseline, spd.BuffDelta) + " | 物攻" + str.Current + FormatStatBreakdown(str.EquippedBaseline, str.BuffDelta) + " | 物防" + def.Current + FormatStatBreakdown(def.EquippedBaseline, def.BuffDelta) + " | 魔攻" + mag.Current + FormatStatBreakdown(mag.EquippedBaseline, mag.BuffDelta) + " | 魔防" + mdef.Current + FormatStatBreakdown(mdef.EquippedBaseline, mdef.BuffDelta) + "\n");
+            label.AppendText("    命中" + hit.Current + FormatStatBreakdown(hit.EquippedBaseline, hit.BuffDelta) + " | 回避" + eva.Current + FormatStatBreakdown(eva.EquippedBaseline, eva.BuffDelta) + " | 会心" + crit.Current + "%" + FormatStatBreakdown(crit.EquippedBaseline, crit.BuffDelta) + " | 格挡" + block.Current + "%" + FormatStatBreakdown(block.EquippedBaseline, block.BuffDelta) + "\n");
 
             // Buffs
             var buffs = u.Buffs.Where(b => b.Ratio > 0).ToList();

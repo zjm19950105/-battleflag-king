@@ -467,14 +467,7 @@ namespace BattleKing.Ui
 
         private static int GetDisplayStat(BattleUnit unit, string statName)
         {
-            return statName switch
-            {
-                "Str" => unit.GetCurrentStat("Str") + unit.Equipment.GetTotalStat("phys_atk"),
-                "Def" => unit.GetCurrentStat("Def") + unit.Equipment.GetTotalStat("phys_def"),
-                "Mag" => unit.GetCurrentStat("Mag") + unit.Equipment.GetTotalStat("mag_atk"),
-                "MDef" => unit.GetCurrentStat("MDef") + unit.Equipment.GetTotalStat("mag_def"),
-                _ => unit.GetCurrentStat(statName)
-            };
+            return unit.GetCurrentStat(statName);
         }
 
         private void RefreshFormationPanel()

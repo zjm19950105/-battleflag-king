@@ -68,10 +68,12 @@ namespace BattleKing.Ui
             }
             if (result.IsEvaded)
                 lines.Add("  * EVADE: 已回避 " + calc.EvadedHits + " hit，其余命中段继续结算");
-            if (calc.NullifiedHits > 0)
-                lines.Add("  * NULLIFY: 已无效 " + calc.NullifiedHits + " hit");
+            int displayedNullifiedHits = GetDisplayedNullifiedHits(calc, result, hitResults);
+            if (displayedNullifiedHits > 0)
+                lines.Add("  * NULLIFY: 已无效 " + displayedNullifiedHits + " hit");
 
             string flags = "";
+            if (displayedNullifiedHits > 0) flags += "NULLIFY ";
             if (result.IsCritical) flags += "CRIT(x" + calc.CritMultiplier.ToString("F1") + ") ";
             if (result.IsBlocked) flags += "BLOCK(-" + (calc.BlockReduction * 100).ToString("F0") + "%) ";
 
@@ -165,7 +167,7 @@ namespace BattleKing.Ui
                     yield return "  hit" + hit.HitIndex + " EVADE: 0";
                     continue;
                 }
-                if (hit.Nullified)
+                if (IsDisplayedNullified(calc, hit))
                 {
                     yield return "  hit" + hit.HitIndex + " NULLIFY: 0";
                     continue;
@@ -179,7 +181,8 @@ namespace BattleKing.Ui
                     line += " x" + hit.CritMultiplier.ToString("F1");
                 if (hit.Blocked)
                     line += " -" + (hit.BlockReduction * 100).ToString("F0") + "%";
-                line += " = " + FormatNumber(hit.TotalDamage);
+                line += " = " + FormatNumber(GetRawTotalDamage(hit))
+                    + " -> " + GetAppliedTotalDamage(hit);
                 yield return line;
             }
         }
@@ -206,7 +209,7 @@ namespace BattleKing.Ui
                 {
                     hit.Critical,
                     hit.Blocked,
-                    hit.Nullified,
+                    Nullified = IsDisplayedNullified(calc, hit),
                     Crit = Math.Round(hit.CritMultiplier, 3),
                     Block = Math.Round(hit.BlockReduction, 3)
                 })
@@ -218,14 +221,14 @@ namespace BattleKing.Ui
             var parts = groups.Select(group =>
             {
                 var first = group.First();
-                string label = GetHitGroupLabel(first);
+                string label = group.Key.Nullified ? "无效" : GetHitGroupLabel(first);
                 string modifiers = "";
                 if (first.Critical)
                     modifiers += " x" + first.CritMultiplier.ToString("F1");
                 if (first.Blocked)
                     modifiers += " -" + (first.BlockReduction * 100).ToString("F0") + "%";
-                float total = group.Sum(hit => hit.TotalDamage);
-                return label + group.Count() + "hit" + modifiers + "=" + FormatNumber(total);
+                int total = group.Sum(GetAppliedTotalDamage);
+                return label + group.Count() + "hit" + modifiers + "=" + total;
             }).ToList();
 
             string line = "  合计: " + string.Join(" + ", parts);
@@ -259,6 +262,52 @@ namespace BattleKing.Ui
             if (critical)
                 return 1;
             return 0;
+        }
+
+        private static float GetRawTotalDamage(DamageHitResult hit)
+        {
+            return Math.Abs(hit.RawTotalDamage) > 0.001f
+                ? hit.RawTotalDamage
+                : hit.TotalDamage;
+        }
+
+        private static int GetAppliedTotalDamage(DamageHitResult hit)
+        {
+            return hit.RoundedTotalDamage != 0 || Math.Abs(hit.RawTotalDamage) > 0.001f
+                ? hit.AppliedTotalDamage
+                : (int)Math.Round(hit.TotalDamage, MidpointRounding.AwayFromZero);
+        }
+
+        private static int GetDisplayedNullifiedHits(
+            DamageCalculation calc,
+            DamageResult result,
+            IReadOnlyList<DamageHitResult> hitResults)
+        {
+            if (calc.NullifiedHits > 0)
+                return calc.NullifiedHits;
+
+            if (hitResults.Count > 0)
+                return hitResults.Count(hit => IsDisplayedNullified(calc, hit));
+
+            return result.IsHit && CalculationHasNullifyFlag(calc) ? 1 : 0;
+        }
+
+        private static bool IsDisplayedNullified(DamageCalculation calc, DamageHitResult hit)
+        {
+            if (hit.Nullified)
+                return true;
+
+            if (calc == null || !hit.Landed || !CalculationHasNullifyFlag(calc))
+                return false;
+
+            bool physicalNullified = calc.NullifyPhysicalDamage && hit.BasePhysicalDamage > 0f && hit.PhysicalDamage == 0f;
+            bool magicalNullified = calc.NullifyMagicalDamage && hit.BaseMagicalDamage > 0f && hit.MagicalDamage == 0f;
+            return hit.TotalDamage <= 0.001f && (physicalNullified || magicalNullified);
+        }
+
+        private static bool CalculationHasNullifyFlag(DamageCalculation calc)
+        {
+            return calc?.NullifyPhysicalDamage == true || calc?.NullifyMagicalDamage == true;
         }
 
         private static string FormatPercent(float ratio)

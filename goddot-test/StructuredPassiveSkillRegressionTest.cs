@@ -34,6 +34,7 @@ namespace BattleKing.Tests
             AssertNobleBlockShape(repository.PassiveSkills["pas_noble_block"]);
             AssertStealthBladeShape(repository.PassiveSkills["pas_stealth_blade"]);
             AssertHolyGuardShape(repository.PassiveSkills["pas_holy_guard"]);
+            AssertFirstAidShape(repository.PassiveSkills["pas_give_ap"]);
             Assert.That(Enum.IsDefined(typeof(StatusAilment), nameof(StatusAilment.PassiveSeal)), Is.True);
             Assert.That(Enum.IsDefined(typeof(UnitState), nameof(UnitState.PassiveSeal)), Is.True);
         }
@@ -302,6 +303,16 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual("Self", StringParam(skill.Effects[1], "target"));
             ClassicAssert.AreEqual("DebuffNullify", StringParam(skill.Effects[1], "key"));
             ClassicAssert.AreEqual(1, IntParam(skill.Effects[1], "count"));
+        }
+
+        private static void AssertFirstAidShape(PassiveSkillData skill)
+        {
+            CollectionAssert.AreEqual(
+                new[] { "RecoverHp" },
+                skill.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual("LowestHpAlly", StringParam(skill.Effects[0], "target"));
+            ClassicAssert.AreEqual(true, BoolParam(skill.Effects[0], "excludeSelf"));
+            ClassicAssert.AreEqual(25, IntParam(skill.Effects[0], "amount"));
         }
 
         private static List<SkillEffectData> NestedEffects(SkillEffectData effect)

@@ -30,9 +30,18 @@ namespace BattleKing.Core
         // Per-action stepping
         private Queue<BattleUnit> _turnQueue = new Queue<BattleUnit>();
         private int _actionsThisTurn = 0;
+        private int _realActionsThisTurn = 0;
+        private int _retrySkipsThisTurn = 0;
         private bool _battleEnded = false;
         private bool _battleEndPhaseStarted = false;
         private BattleResult _finalResult;
+
+        private enum UnitTurnOutcome
+        {
+            PerformedAction,
+            UnableToAct,
+            RetryLater
+        }
 
         public BattleEngine(BattleContext ctx)
         {
@@ -74,6 +83,8 @@ namespace BattleKing.Core
             _battleEndPhaseStarted = false;
             _turnQueue.Clear();
             _actionsThisTurn = 0;
+            _realActionsThisTurn = 0;
+            _retrySkipsThisTurn = 0;
             _ctx.OutgoingActionAugments.Clear();
             Log("=== 战斗开始 ===");
             PrintTeamStatus();
@@ -122,8 +133,13 @@ namespace BattleKing.Core
                 return EndBattleAction(preCheck.Value);
 
             _actionsThisTurn++;
-            ExecuteUnitTurn(unit);
-            ProcessPendingActions();
+            var turnOutcome = ExecuteUnitTurn(unit);
+            if (turnOutcome == UnitTurnOutcome.PerformedAction)
+                _realActionsThisTurn++;
+            else if (turnOutcome == UnitTurnOutcome.RetryLater)
+                _retrySkipsThisTurn++;
+            if (ProcessPendingActions())
+                _realActionsThisTurn++;
             CompleteAction(unit);
             Log("");
 
@@ -148,6 +164,8 @@ namespace BattleKing.Core
             _ctx.TurnCount++;
             Log($"--- 第 {_ctx.TurnCount} 回合 ---");
             _actionsThisTurn = 0;
+            _realActionsThisTurn = 0;
+            _retrySkipsThisTurn = 0;
 
             var aliveUnits = _ctx.AllUnits.Where(u => u.IsAlive).ToList();
             if (aliveUnits.Count == 0)
@@ -185,7 +203,11 @@ namespace BattleKing.Core
             foreach (var u in _ctx.AllUnits.Where(u => u != null && u.IsAlive))
                 BattleKing.Equipment.BuffManager.CleanupEndOfTurn(u);
 
-            return CheckApExhaustion();
+            var apResult = CheckApExhaustion();
+            if (apResult.HasValue)
+                return apResult;
+
+            return CheckNoActionStalemate();
         }
 
         private BattleResult EndBattle(BattleResult result)
@@ -300,14 +322,14 @@ namespace BattleKing.Core
                 : SingleActionResult.Draw;
         }
 
-        private void ExecuteUnitTurn(BattleUnit unit)
+        private UnitTurnOutcome ExecuteUnitTurn(BattleUnit unit)
         {
             if (unit.State == UnitState.Stunned)
             {
                 Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 气绝中，跳过本次行动");
                 unit.State = UnitState.Normal;
                 unit.ConsecutiveWaitCount = 0;
-                return;
+                return UnitTurnOutcome.RetryLater;
             }
 
             // Module 6: Charge state machine
@@ -320,7 +342,7 @@ namespace BattleKing.Core
                     unit.State = UnitState.Normal;
                     unit.ChargedSkillId = null;
                     unit.ConsecutiveWaitCount = 0;
-                    return;
+                    return UnitTurnOutcome.RetryLater;
                 }
 
                 // Execute the charged skill
@@ -329,7 +351,7 @@ namespace BattleKing.Core
                 {
                     unit.State = UnitState.Normal;
                     unit.ChargedSkillId = null;
-                    return;
+                    return UnitTurnOutcome.RetryLater;
                 }
 
                 Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 蓄力发动！→ {chargeSkill.Name}");
@@ -338,7 +360,7 @@ namespace BattleKing.Core
 
                 var chargeTargets = _strategyEvaluator.SelectTargetsForSkill(unit, chargeSkill);
                 ExecuteSkillAgainstTargets(unit, new BattleKing.Skills.ActiveSkill(chargeSkill, unit.GameData), chargeTargets);
-                return;
+                return UnitTurnOutcome.PerformedAction;
             }
 
             // Normal flow: evaluate strategy
@@ -352,13 +374,13 @@ namespace BattleKing.Core
                     Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 蓄力中，无法行动（第{unit.ConsecutiveWaitCount}次待机）");
                 else
                     Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 无法行动，跳过");
-                return;
+                return UnitTurnOutcome.UnableToAct;
             }
 
             if (!unit.CanUseActiveSkill(skill))
             {
                 Log($"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} AP不足，无法行动，跳过");
-                return;
+                return UnitTurnOutcome.UnableToAct;
             }
 
             // Check if skill has Charge tag → enter charging state, skip this turn
@@ -369,11 +391,12 @@ namespace BattleKing.Core
                 unit.ChargedSkillId = skill.Data.Id;
                 unit.ConsecutiveWaitCount = 0;
                 unit.ConsumeAp(skill.ApCost);  // AP consumed on charge start
-                return;
+                return UnitTurnOutcome.PerformedAction;
             }
 
             unit.ConsecutiveWaitCount = 0;
             ExecuteSkillAgainstTargets(unit, skill, targets);
+            return UnitTurnOutcome.PerformedAction;
         }
 
         private void ExecuteSkillAgainstTargets(BattleUnit unit, BattleKing.Skills.ActiveSkill skill, List<BattleUnit> targets)
@@ -679,8 +702,9 @@ namespace BattleKing.Core
             return flags.Distinct();
         }
 
-        private void ProcessPendingActions()
+        private bool ProcessPendingActions()
         {
+            bool processed = false;
             while (_pendingActions.Count > 0)
             {
                 var action = _pendingActions.Dequeue();
@@ -694,6 +718,8 @@ namespace BattleKing.Core
                     continue;
                 if (!TryActivatePendingAction(action))
                     continue;
+
+                processed = true;
 
                 foreach (var target in pendingTargets)
                 {
@@ -785,6 +811,8 @@ namespace BattleKing.Core
                     });
                 }
             }
+
+            return processed;
         }
 
         private bool TryActivatePendingAction(PendingAction action)
@@ -923,6 +951,36 @@ namespace BattleKing.Core
                 return BattleResult.Draw;
             }
             return null;
+        }
+
+        private BattleResult? CheckNoActionStalemate()
+        {
+            if (_actionsThisTurn == 0 || _realActionsThisTurn > 0 || _retrySkipsThisTurn > 0)
+                return null;
+
+            bool playerAlive = _ctx.PlayerUnits.Any(u => u != null && u.IsAlive);
+            bool enemyAlive = _ctx.EnemyUnits.Any(u => u != null && u.IsAlive);
+            if (!playerAlive || !enemyAlive)
+                return null;
+
+            Log("\n=== 双方无法继续行动 ===");
+            double playerHpRatio = GetHpRatio(_ctx.PlayerUnits);
+            double enemyHpRatio = GetHpRatio(_ctx.EnemyUnits);
+
+            Log($"玩家HP比例: {playerHpRatio:F2}, 敌方HP比例: {enemyHpRatio:F2}");
+
+            if (playerHpRatio > enemyHpRatio)
+            {
+                Log("=== 玩家胜利（HP优势）===");
+                return BattleResult.PlayerWin;
+            }
+            if (enemyHpRatio > playerHpRatio)
+            {
+                Log("=== 敌方胜利（HP优势）===");
+                return BattleResult.EnemyWin;
+            }
+            Log("=== 平局 ===");
+            return BattleResult.Draw;
         }
 
         private double GetHpRatio(List<BattleUnit> units)

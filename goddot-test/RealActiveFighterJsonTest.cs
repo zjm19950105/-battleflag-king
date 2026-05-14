@@ -24,7 +24,12 @@ namespace BattleKing.Tests
             var caster = CreateUnit(repository, "caster", true, 1, skillId, str: 160, def: 100, spd: 100);
             var ally = CreateUnit(repository, "ally", true, 2, null, hp: 300, spd: 1);
             var enemy = CreateUnit(repository, "enemy", false, 1, null, hp: 300, def: 20, spd: 1);
-            caster.Strategies.Add(new Strategy { SkillId = skillId });
+            caster.Strategies.Add(new Strategy
+            {
+                SkillId = skillId,
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                Mode1 = ConditionMode.Priority
+            });
             var logs = new List<string>();
             var engine = new BattleEngine(new BattleContext(repository)
             {
@@ -56,7 +61,12 @@ namespace BattleKing.Tests
             caster.CurrentPp = 0;
             var firstEnemy = CreateUnit(repository, "first_enemy", false, 1, null, hp: 500, def: 20, spd: 1);
             var secondEnemy = CreateUnit(repository, "second_enemy", false, 2, null, hp: 500, def: 20, spd: 1);
-            caster.Strategies.Add(new Strategy { SkillId = skillId });
+            caster.Strategies.Add(new Strategy
+            {
+                SkillId = skillId,
+                Condition1 = new Condition { Category = ConditionCategory.Hp, Operator = "lowest" },
+                Mode1 = ConditionMode.Priority
+            });
             var logs = new List<string>();
             var engine = new BattleEngine(new BattleContext(repository)
             {

@@ -10,11 +10,13 @@ namespace BattleKing.Ai
 	{
 		private BattleContext _ctx;
 		private ConditionEvaluator _conditionEvaluator;
+		private Random _random;
 
-		public TargetSelector(BattleContext ctx)
+		public TargetSelector(BattleContext ctx, Random random = null)
 		{
 			_ctx = ctx;
 			_conditionEvaluator = new ConditionEvaluator(ctx);
+			_random = random ?? Random.Shared;
 		}
 
 		public List<BattleUnit> SelectTargets(BattleUnit caster, Strategy strategy, ActiveSkillData skill)
@@ -23,24 +25,28 @@ namespace BattleKing.Ai
 				? new List<BattleUnit> { caster }
 				: GetDefaultTargetList(caster, skill);
 
+			bool hasStrategyConditions = HasStrategyConditions(strategy);
 			var candidates = ApplyStrategyConditions(defaultTargets, strategy, caster, skill);
 			var forcedTargets = GetForcedTargetCandidates(caster, skill, defaultTargets);
-			if (forcedTargets.Count > 0)
+			bool hasForcedTargets = forcedTargets.Count > 0;
+			if (hasForcedTargets)
 				candidates = OrderByGroups(defaultTargets, forcedTargets);
 
 			if (candidates == null || candidates.Count == 0)
 				return null;
 
+			bool useRandomTargeting = !hasStrategyConditions && !hasForcedTargets;
+
 			return skill.TargetType switch
 			{
 				TargetType.Self => new List<BattleUnit> { candidates.First() },
-				TargetType.SingleEnemy => new List<BattleUnit> { candidates.First() },
+				TargetType.SingleEnemy => new List<BattleUnit> { PickSingleEnemyTarget(candidates, useRandomTargeting) },
 				TargetType.SingleAlly => new List<BattleUnit> { candidates.First() },
 				TargetType.TwoEnemies => candidates.Take(2).ToList(),
 				TargetType.ThreeEnemies => candidates.Take(3).ToList(),
 				TargetType.FrontAndBack => GetPiercingTargets(candidates.First()),
 				TargetType.Column => GetColumnTargets(candidates.First()),
-				TargetType.Row => GetRowTargets(candidates.First()),
+				TargetType.Row => GetRowTargets(candidates.First(), defaultTargets),
 				TargetType.AllEnemies => candidates.ToList(),
 				TargetType.AllAllies => candidates.ToList(),
 				_ => new List<BattleUnit> { candidates.First() }
@@ -136,11 +142,11 @@ namespace BattleKing.Ai
 				.ToList();
 		}
 
-		private List<BattleUnit> GetRowTargets(BattleUnit first)
+		private List<BattleUnit> GetRowTargets(BattleUnit first, List<BattleUnit> legalTargets)
 		{
 			if (first == null) return new List<BattleUnit>();
 			bool isFront = first.IsFrontRow;
-			return _ctx.GetAliveUnits(first.IsPlayer)
+			return legalTargets
 				.Where(u => u.IsFrontRow == isFront)
 				.OrderBy(u => u.Position)
 				.ToList();
@@ -341,6 +347,19 @@ namespace BattleKing.Ai
 			}
 
 			return ordered;
+		}
+
+		private BattleUnit PickSingleEnemyTarget(List<BattleUnit> candidates, bool useRandomTargeting)
+		{
+			if (!useRandomTargeting || candidates.Count == 1)
+				return candidates.First();
+
+			return candidates[_random.Next(candidates.Count)];
+		}
+
+		private static bool HasStrategyConditions(Strategy strategy)
+		{
+			return GetConditionSlots(strategy).Any(slot => slot.Condition != null);
 		}
 
 		private static bool IsFrontOrBackPositionPriority(Condition condition)

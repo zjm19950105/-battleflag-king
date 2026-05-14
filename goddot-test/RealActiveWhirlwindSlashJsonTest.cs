@@ -24,7 +24,7 @@ namespace BattleKing.Tests
             "data"));
 
         [Test]
-        public void StepOneAction_RealJsonWhirlwindSlash_HitsOnlyEnemyColumnAndDebuffsDefense()
+        public void StepOneAction_RealJsonWhirlwindSlash_HitsEnemyRowAndDebuffsDefense()
         {
             var repository = LoadRepository();
             var skill = repository.ActiveSkills[SkillId];
@@ -46,17 +46,17 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
             AssertWhirlwindSlashShape(skill);
             ClassicAssert.Less(sameFront.CurrentHp, sameFront.Data.BaseStats["HP"]);
-            ClassicAssert.Less(sameBack.CurrentHp, sameBack.Data.BaseStats["HP"]);
-            ClassicAssert.AreEqual(otherFront.Data.BaseStats["HP"], otherFront.CurrentHp);
+            ClassicAssert.Less(otherFront.CurrentHp, otherFront.Data.BaseStats["HP"]);
+            ClassicAssert.AreEqual(sameBack.Data.BaseStats["HP"], sameBack.CurrentHp);
             ClassicAssert.AreEqual(otherBack.Data.BaseStats["HP"], otherBack.CurrentHp);
             ClassicAssert.AreEqual(85, sameFront.GetCurrentStat("Def"));
-            ClassicAssert.AreEqual(85, sameBack.GetCurrentStat("Def"));
-            ClassicAssert.AreEqual(100, otherFront.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(85, otherFront.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(100, sameBack.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(100, otherBack.GetCurrentStat("Def"));
-            AssertAttackTargets(engine, "same_front", "same_back");
+            AssertAttackTargets(engine, "same_front", "other_front");
             Assert.That(logs, Has.Some.Contains("calc effects:").And.Contains("HitCount=3"));
             Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("same_front.Def 100->85"));
-            Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("same_back.Def 100->85"));
+            Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("other_front.Def 100->85"));
         }
 
         [Test]
@@ -89,7 +89,7 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(100, sameBack.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(100, otherFront.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(100, otherBack.GetCurrentStat("Def"));
-            AssertAttackTargets(engine, "same_front", "same_back");
+            AssertAttackTargets(engine, "same_front", "other_front");
             Assert.That(logs, Has.None.Contains("post effects:"));
         }
 
@@ -147,7 +147,7 @@ namespace BattleKing.Tests
 
         private static void AssertWhirlwindSlashShape(ActiveSkillData skill)
         {
-            ClassicAssert.AreEqual(TargetType.Column, skill.TargetType);
+            ClassicAssert.AreEqual(TargetType.Row, skill.TargetType);
             CollectionAssert.AreEqual(
                 new[] { "ModifyDamageCalc", "OnHitEffect" },
                 skill.Effects.Select(effect => effect.EffectType).ToArray());

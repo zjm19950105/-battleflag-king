@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using BattleKing.Core;
+using BattleKing.Data;
 using BattleKing.Equipment;
 
 namespace BattleKing.Tests
@@ -92,6 +93,73 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(2, _unit.Buffs.Count);
             ClassicAssert.That(BuffManager.GetTotalBuffRatio(_unit, "Def"), Is.EqualTo(0.4f).Within(0.01f));
+        }
+
+        [Test]
+        public void RatioBuffs_AreAdditiveAgainstEquippedSameStatBaseline()
+        {
+            _unit = TestDataFactory.CreateUnit(str: 30, def: 30);
+            _unit.Equipment.Equip(TestDataFactory.CreateEquipment(
+                "eq_stat_ring",
+                "Stat Ring",
+                EquipmentCategory.Accessory,
+                new() { { "Str", 10 }, { "Def", 10 } }));
+
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_a", TargetStat = "Str", Ratio = 0.2f });
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_b", TargetStat = "Str", Ratio = 0.2f });
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_a", TargetStat = "Def", Ratio = 0.2f });
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_b", TargetStat = "Def", Ratio = 0.2f });
+
+            ClassicAssert.AreEqual(56, _unit.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(56, _unit.GetCurrentStat("Def"));
+        }
+
+        [Test]
+        public void RatioBuffs_PhysicalAttackAndDefenseUseEquippedCombatBaseline()
+        {
+            _unit = TestDataFactory.CreateUnit(str: 30, def: 30);
+            _unit.Equipment.Equip(TestDataFactory.CreateEquipment(
+                "eq_combat_gear",
+                "Combat Gear",
+                EquipmentCategory.Accessory,
+                new() { { "phys_atk", 10 }, { "phys_def", 10 } }));
+
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_a", TargetStat = "Str", Ratio = 0.2f });
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_b", TargetStat = "Str", Ratio = 0.2f });
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_a", TargetStat = "Def", Ratio = 0.2f });
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "buff_b", TargetStat = "Def", Ratio = 0.2f });
+
+            Assert.Multiple(() =>
+            {
+                ClassicAssert.AreEqual(
+                    56,
+                    _unit.GetCurrentAttackPower(SkillType.Physical),
+                    "Physical attack buffs should use Str + phys_atk as the additive ratio baseline.");
+                ClassicAssert.AreEqual(
+                    56,
+                    _unit.GetCurrentDefense(SkillType.Physical),
+                    "Physical defense buffs should use Def + phys_def as the additive ratio baseline.");
+            });
+        }
+
+        [Test]
+        public void RatioDebuffs_CurrentStatAndBreakdownUseEquippedCombatBaseline()
+        {
+            _unit = TestDataFactory.CreateUnit(def: 30);
+            _unit.Equipment.Equip(TestDataFactory.CreateEquipment(
+                "eq_def_shield",
+                "Def Shield",
+                EquipmentCategory.Accessory,
+                new() { { "phys_def", 12 } }));
+
+            BuffManager.ApplyBuff(_unit, new Buff { SkillId = "debuff_def", TargetStat = "Def", Ratio = -0.2f });
+
+            var breakdown = _unit.GetStatBreakdown("Def");
+            ClassicAssert.AreEqual(42, breakdown.EquippedBaseline);
+            ClassicAssert.AreEqual(-9, breakdown.BuffDelta);
+            ClassicAssert.AreEqual(33, breakdown.Current);
+            ClassicAssert.AreEqual(33, _unit.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(33, _unit.GetCurrentDefense(SkillType.Physical));
         }
     }
 }

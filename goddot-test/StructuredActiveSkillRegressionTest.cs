@@ -56,6 +56,30 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void RealActiveJson_ResearchConfirmedActiveDataFixes_StayPinned()
+        {
+            var repository = LoadRepository();
+
+            var wingGust = repository.ActiveSkills["act_wing_gust"];
+            ClassicAssert.AreEqual(AttackType.Ranged, wingGust.AttackType);
+            ClassicAssert.AreEqual(TargetType.Row, wingGust.TargetType);
+
+            var longThrust = repository.ActiveSkills["act_enhanced_spear"];
+            ClassicAssert.AreEqual(1, longThrust.ApCost);
+            ClassicAssert.AreEqual(TargetType.FrontAndBack, longThrust.TargetType);
+
+            var enhancedSpear = repository.ActiveSkills["act_throwing_spear"];
+            ClassicAssert.AreEqual(1, enhancedSpear.ApCost);
+            ClassicAssert.AreEqual(TargetType.FrontAndBack, enhancedSpear.TargetType);
+
+            AssertRollingAxe(repository.ActiveSkills["act_whirlwind_slash"]);
+            AssertWideBreaker(repository.ActiveSkills["act_break_formation"]);
+            AssertBattleLongStackingBuff(repository.PassiveSkills["pas_hawk_eye"], ("Def", 0.2d), ("Block", 0.2d));
+            AssertBattleLongStackingBuff(repository.PassiveSkills["pas_emergency_cover"], ("Str", 0.2d), ("Hit", 0.2d));
+            AssertShieldBashGuaranteedStun(repository.ActiveSkills["act_shield_bash"]);
+        }
+
+        [Test]
         public void StepOneAction_LordSlash_HealsOnHitAndOnKill()
         {
             const string skillId = "act_lord_slash";
@@ -253,6 +277,64 @@ namespace BattleKing.Tests
             foreach (var parameter in preservedParameters)
             {
                 ClassicAssert.AreEqual(parameter.Value, GetScalarString(bonus.Parameters, parameter.Key));
+            }
+        }
+
+        private static void AssertShieldBashGuaranteedStun(ActiveSkillData skill)
+        {
+            CollectionAssert.DoesNotContain(skill.Tags, "StunLowChance");
+
+            var onHit = EffectAt(skill, "OnHitEffect");
+            ClassicAssert.IsFalse(onHit.Parameters.ContainsKey("chance"));
+
+            var stun = NestedEffects(onHit).Single();
+            ClassicAssert.AreEqual("StatusAilment", stun.EffectType);
+            ClassicAssert.AreEqual("Target", GetString(stun.Parameters, "target"));
+            ClassicAssert.AreEqual("Stun", GetString(stun.Parameters, "ailment"));
+        }
+
+        private static void AssertRollingAxe(ActiveSkillData skill)
+        {
+            ClassicAssert.AreEqual(1, skill.ApCost);
+            ClassicAssert.AreEqual(40, skill.Power);
+            ClassicAssert.AreEqual(75, skill.HitRate);
+            ClassicAssert.AreEqual(TargetType.Row, skill.TargetType);
+            AssertHitCount(skill, 3);
+            AssertOnHitDefDebuff(skill, 0.15d);
+        }
+
+        private static void AssertWideBreaker(ActiveSkillData skill)
+        {
+            ClassicAssert.AreEqual(2, skill.ApCost);
+            ClassicAssert.AreEqual(100, skill.Power);
+            ClassicAssert.AreEqual(100, skill.HitRate);
+            ClassicAssert.AreEqual(TargetType.Row, skill.TargetType);
+            AssertFlatPowerBonus(skill, 50, ("targetHasDebuff", "True"));
+            AssertOnHitDefDebuff(skill, 0.3d);
+        }
+
+        private static void AssertOnHitDefDebuff(ActiveSkillData skill, double ratio)
+        {
+            var debuff = NestedEffects(EffectAt(skill, "OnHitEffect")).Single(effect => effect.EffectType == "AddDebuff");
+            ClassicAssert.AreEqual("Target", GetString(debuff.Parameters, "target"));
+            ClassicAssert.AreEqual("Def", GetString(debuff.Parameters, "stat"));
+            ClassicAssert.AreEqual(ratio, GetDouble(debuff.Parameters, "ratio"), 0.0001d);
+            ClassicAssert.AreEqual(-1, GetInt(debuff.Parameters, "turns"));
+        }
+
+        private static void AssertBattleLongStackingBuff(
+            PassiveSkillData skill,
+            params (string Stat, double Ratio)[] expectedBuffs)
+        {
+            foreach (var expected in expectedBuffs)
+            {
+                var buff = skill.Effects.Single(effect =>
+                    effect.EffectType == "AddBuff"
+                    && GetString(effect.Parameters, "stat") == expected.Stat);
+                ClassicAssert.AreEqual("Self", GetString(buff.Parameters, "target"));
+                ClassicAssert.AreEqual(expected.Ratio, GetDouble(buff.Parameters, "ratio"), 0.0001d);
+                ClassicAssert.AreEqual(-1, GetInt(buff.Parameters, "turns"));
+                ClassicAssert.AreEqual("Stack", GetString(buff.Parameters, "stackPolicy"));
             }
         }
 

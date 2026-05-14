@@ -341,6 +341,25 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void SingleHitLog_ShowsNullifyWhenCalculationNullifiesBlockedPhysicalDamage()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 65, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(hp: 500, def: 15, block: 100);
+            var skill = TestDataFactory.CreateSkill(power: 100, name: "Arrow Cover Probe");
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.ForceBlock = true;
+            calc.NullifyPhysicalDamage = true;
+
+            var result = _calc.Calculate(calc);
+            var lines = BattleLogHelper.FormatAttack(attacker, defender, skill, calc, result, false, new());
+
+            ClassicAssert.AreEqual(0, result.TotalDamage);
+            ClassicAssert.IsTrue(result.IsBlocked);
+            Assert.That(lines, Has.Some.Contains("NULLIFY"));
+            Assert.That(lines, Has.Some.Contains("Damage:").And.Contains("NULLIFY").And.Contains("BLOCK"));
+        }
+
+        [Test]
         public void 命中率_技能命中字段作为倍率而不是加值()
         {
             var attacker = TestDataFactory.CreateUnit(hit: 120);
@@ -565,6 +584,26 @@ namespace BattleKing.Tests
             var result = _calc.Calculate(TestDataFactory.CreateCalc(a, d, skill));
 
             ClassicAssert.AreEqual(35, result.TotalDamage);
+        }
+
+        [Test]
+        public void MultiHit_FractionalDamage_RoundsEachHitBeforeSumming()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 11, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 0, eva: 0, block: 0);
+            var skill = TestDataFactory.CreateSkill(power: 15);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.HitCount = 3;
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.AreEqual(3, result.HitResults.Count);
+            ClassicAssert.IsTrue(result.HitResults.All(hit => hit.Landed));
+            Assert.That(result.HitResults.Select(hit => hit.TotalDamage), Is.All.EqualTo(1.65f).Within(0.0001f));
+            Assert.That(result.HitResults.Select(hit => hit.RawTotalDamage), Is.All.EqualTo(1.65f).Within(0.0001f));
+            Assert.That(result.HitResults.Select(hit => hit.RoundedTotalDamage), Is.All.EqualTo(2));
+            Assert.That(result.HitResults.Select(hit => hit.AppliedTotalDamage), Is.All.EqualTo(2));
+            ClassicAssert.AreEqual(6, result.TotalDamage);
         }
     }
 }

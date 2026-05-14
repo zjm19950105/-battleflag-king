@@ -647,13 +647,19 @@ namespace BattleKing.Tests
             };
             var attackedAlly = new BattleUnit(CreateStructuredLogCharacter("attacked_ally", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 0), repository, false)
             {
-                Position = 1
+                Position = 1,
+                CurrentHp = 250
             };
             var pursuitUser = new BattleUnit(CreateStructuredLogCharacter("pursuit_user", null, hp: 300, str: 80, def: 0, spd: 5, ap: 0, pp: 1), repository, false)
             {
                 Position = 2
             };
-            attacker.Strategies.Add(new Strategy { SkillId = "act_touch" });
+            attacker.Strategies.Add(new Strategy
+            {
+                SkillId = "act_touch",
+                Condition1 = new Condition { Category = ConditionCategory.Hp, Operator = "lowest" },
+                Mode1 = ConditionMode.Priority
+            });
             pursuitUser.EquippedPassiveSkillIds.Add("pas_pursuit_slash");
             var context = new BattleContext(repository)
             {
@@ -687,7 +693,8 @@ namespace BattleKing.Tests
             };
             var attackedAlly = new BattleUnit(CreateStructuredLogCharacter("attacked_ally", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
             {
-                Position = 1
+                Position = 1,
+                CurrentHp = 250
             };
             var firstCounter = new BattleUnit(CreateStructuredLogCharacter("first_counter", null, hp: 300, str: 200, def: 0, spd: 20, ap: 0, pp: 1), repository, false)
             {
@@ -697,7 +704,12 @@ namespace BattleKing.Tests
             {
                 Position = 3
             };
-            attacker.Strategies.Add(new Strategy { SkillId = "act_touch" });
+            attacker.Strategies.Add(new Strategy
+            {
+                SkillId = "act_touch",
+                Condition1 = new Condition { Category = ConditionCategory.Hp, Operator = "lowest" },
+                Mode1 = ConditionMode.Priority
+            });
             firstCounter.EquippedPassiveSkillIds.Add("pas_first_counter");
             secondCounter.EquippedPassiveSkillIds.Add("pas_second_counter");
             var context = new BattleContext(repository)
@@ -850,6 +862,105 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void StepOneAction_RowActiveAttack_HitsEveryAliveEnemyInSelectedRow()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_row_probe"] = new ActiveSkillData
+            {
+                Id = "act_row_probe",
+                Name = "Row Probe",
+                ApCost = 1,
+                Type = SkillType.Physical,
+                AttackType = AttackType.Ranged,
+                Power = 20,
+                HitRate = 1000,
+                TargetType = TargetType.Row,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "ModifyDamageCalc",
+                        Parameters = new Dictionary<string, object> { { "HitCount", 3 } }
+                    }
+                }
+            };
+            var caster = new BattleUnit(CreateStructuredLogCharacter("caster", "act_row_probe", hp: 300, str: 100, def: 0, spd: 30, ap: 1, pp: 0), repository, true)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy
+            {
+                SkillId = "act_row_probe",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                Mode1 = ConditionMode.Priority
+            });
+            var frontLeft = new BattleUnit(CreateStructuredLogCharacter("front_left", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            var frontRight = new BattleUnit(CreateStructuredLogCharacter("front_right", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 2
+            };
+            var back = new BattleUnit(CreateStructuredLogCharacter("back", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 4
+            };
+            var engine = new BattleEngine(new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { frontLeft, frontRight, back }
+            }) { OnLog = _ => { } };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.Less(frontLeft.CurrentHp, 300);
+            ClassicAssert.Less(frontRight.CurrentHp, 300);
+            ClassicAssert.AreEqual(300, back.CurrentHp);
+            var rowEntries = engine.BattleLogEntries
+                .Where(entry => entry.SkillId == "act_row_probe" && entry.Flags.Contains("ActiveAttack"))
+                .ToList();
+            ClassicAssert.AreEqual(2, rowEntries.Count);
+            CollectionAssert.AreEquivalent(
+                new[] { "front_left", "front_right" },
+                rowEntries.SelectMany(entry => entry.TargetIds).ToArray());
+        }
+
+        [Test]
+        public void StepOneAction_WhenNoUnitCanActButApRemains_EndsByHpRatio()
+        {
+            var repository = new GameDataRepository();
+            var player = new BattleUnit(CreateNoActionCharacter("player", hp: 100, currentAp: 2, spd: 20), repository, true)
+            {
+                Position = 1,
+                CurrentHp = 80
+            };
+            var enemy = new BattleUnit(CreateNoActionCharacter("enemy", hp: 100, currentAp: 2, spd: 10), repository, false)
+            {
+                Position = 1,
+                CurrentHp = 50
+            };
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { player },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var battleEndEvents = new List<BattleEndEvent>();
+            engine.EventBus.Subscribe<BattleEndEvent>(battleEndEvents.Add);
+
+            var result = RunStepOneActionToEnd(engine);
+
+            ClassicAssert.AreEqual(BattleResult.PlayerWin, result);
+            ClassicAssert.AreEqual(2, player.CurrentAp);
+            ClassicAssert.AreEqual(2, enemy.CurrentAp);
+            ClassicAssert.AreEqual(1, battleEndEvents.Count);
+            ClassicAssert.AreEqual(BattleResult.PlayerWin, battleEndEvents[0].Result);
+        }
+
+        [Test]
         public void StepOneAction_WhenBattleEndPassiveHealsEnemy_RecalculatesFinalResultFromPostBattleEndHp()
         {
             var context = CreateApExhaustionContext(enemyPassiveId: "pas_end_heal_enemy");
@@ -888,6 +999,11 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(1, battleEndEvents.Count);
             ClassicAssert.AreEqual(BattleResult.PlayerWin, battleEndEvents[0].Result);
             ClassicAssert.AreEqual(1, engine.BattleLogEntries.Count(e => e.Flags.Contains("BattleEnd")));
+            var pendingIndex = engine.BattleLogEntries.FindIndex(e => e.SkillId == "pas_end_attack_player");
+            var battleEndIndex = engine.BattleLogEntries.FindIndex(e => e.Flags.Contains("BattleEnd"));
+            ClassicAssert.GreaterOrEqual(pendingIndex, 0);
+            ClassicAssert.Greater(battleEndIndex, pendingIndex);
+            CollectionAssert.Contains(engine.BattleLogEntries[battleEndIndex].Flags, BattleResult.EnemyWin.ToString());
         }
 
         private static BattleContext CreateContextWithDefeatedEnemy()
@@ -1219,6 +1335,32 @@ namespace BattleKing.Tests
                     { "Block", 0 },
                     { "Spd", spd },
                     { "AP", ap },
+                    { "PP", 0 }
+                }
+            };
+        }
+
+        private static CharacterData CreateNoActionCharacter(string id, int hp, int currentAp, int spd)
+        {
+            return new CharacterData
+            {
+                Id = id,
+                Name = id,
+                Classes = new List<UnitClass> { UnitClass.Infantry },
+                InnateActiveSkillIds = new List<string>(),
+                BaseStats = new Dictionary<string, int>
+                {
+                    { "HP", hp },
+                    { "Str", 10 },
+                    { "Def", 0 },
+                    { "Mag", 0 },
+                    { "MDef", 0 },
+                    { "Hit", 100 },
+                    { "Eva", 0 },
+                    { "Crit", 0 },
+                    { "Block", 0 },
+                    { "Spd", spd },
+                    { "AP", currentAp },
                     { "PP", 0 }
                 }
             };

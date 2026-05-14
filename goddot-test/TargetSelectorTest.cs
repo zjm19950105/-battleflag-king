@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BattleKing.Ai;
@@ -65,8 +66,57 @@ namespace BattleKing.Tests
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
             ClassicAssert.AreEqual(1, targets.Count);
-            // Default order: position 1 before position 5
-            ClassicAssert.AreEqual(1, targets[0].Position);
+            ClassicAssert.IsTrue(targets[0].Position == 1 || targets[0].Position == 5);
+        }
+
+        [Test]
+        public void Default_NoConditions_RandomizesAmongMultipleLegalFrontRowTargets()
+        {
+            AddEnemies((1, 80), (2, 60), (3, 40), (4, 20));
+            var selector = new TargetSelector(_ctx, new Random(1));
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var skill = TestDataFactory.CreateSkill(attackType: AttackType.Melee, targetType: TargetType.SingleEnemy);
+            var strategy = new Strategy { SkillId = "test_skill" };
+            var selectedPositions = new HashSet<int>();
+
+            for (int i = 0; i < 20; i++)
+            {
+                var targets = selector.SelectTargets(caster, strategy, skill.Data);
+
+                ClassicAssert.AreEqual(1, targets.Count);
+                ClassicAssert.IsTrue(targets[0].IsFrontRow);
+                selectedPositions.Add(targets[0].Position);
+            }
+
+            ClassicAssert.Greater(selectedPositions.Count, 1);
+            ClassicAssert.IsTrue(selectedPositions.All(position => position >= 1 && position <= 3));
+        }
+
+        [Test]
+        public void Conditions_OnlyAndPriorityKeepTheirFilteringAndOrdering()
+        {
+            AddEnemy(1, hp: 80, classes: new() { UnitClass.Infantry });
+            var cavalry = AddEnemy(2, hp: 20, classes: new() { UnitClass.Cavalry });
+            AddEnemy(3, hp: 60, classes: new() { UnitClass.Cavalry });
+            var selector = new TargetSelector(_ctx, new Random(1));
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var skill = TestDataFactory.CreateSkill(attackType: AttackType.Ranged, targetType: TargetType.SingleEnemy);
+            var strategy = new Strategy
+            {
+                SkillId = "test_skill",
+                Condition1 = new Condition { Category = ConditionCategory.UnitClass, Operator = "equals", Value = "Cavalry" },
+                Mode1 = ConditionMode.Only,
+                Condition2 = new Condition { Category = ConditionCategory.Hp, Operator = "lowest" },
+                Mode2 = ConditionMode.Priority
+            };
+
+            for (int i = 0; i < 10; i++)
+            {
+                var targets = selector.SelectTargets(caster, strategy, skill.Data);
+
+                ClassicAssert.AreEqual(1, targets.Count);
+                ClassicAssert.AreSame(cavalry, targets[0]);
+            }
         }
 
         // ────────── 条件过滤 ──────────
@@ -259,10 +309,28 @@ namespace BattleKing.Tests
             var strategy = new Strategy { SkillId = "test_skill" };
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
-            ClassicAssert.GreaterOrEqual(targets.Count, 2);
+            ClassicAssert.GreaterOrEqual(targets.Count, 1);
             // All targets should be in the same row as the first target
             bool isFront = targets[0].IsFrontRow;
             ClassicAssert.IsTrue(targets.All(t => t.IsFrontRow == isFront));
+        }
+
+        [Test]
+        public void Row_ExpandsSelectedBackRowAnchorToAllAliveEnemiesInThatRow()
+        {
+            AddEnemies((1, 80), (4, 50), (5, 40));
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var skill = TestDataFactory.CreateSkill(attackType: AttackType.Ranged, targetType: TargetType.Row);
+            var strategy = new Strategy
+            {
+                SkillId = "test_skill",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "back" },
+                Mode1 = ConditionMode.Priority
+            };
+
+            var targets = _selector.SelectTargets(caster, strategy, skill.Data);
+
+            CollectionAssert.AreEqual(new[] { 4, 5 }, targets.Select(target => target.Position).ToArray());
         }
 
         [Test]
@@ -274,7 +342,12 @@ namespace BattleKing.Tests
             _ctx.PlayerUnits.Add(ally);
             var caster = TestDataFactory.CreateUnit(isPlayer: true);
             var skill = TestDataFactory.CreateSkill(targetType: TargetType.Row);
-            var strategy = new Strategy { SkillId = "test_skill" };
+            var strategy = new Strategy
+            {
+                SkillId = "test_skill",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                Mode1 = ConditionMode.Priority
+            };
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
 
@@ -291,7 +364,12 @@ namespace BattleKing.Tests
             _ctx.PlayerUnits.Add(ally);
             var caster = TestDataFactory.CreateUnit(isPlayer: true);
             var skill = TestDataFactory.CreateSkill(targetType: TargetType.Column);
-            var strategy = new Strategy { SkillId = "test_skill" };
+            var strategy = new Strategy
+            {
+                SkillId = "test_skill",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                Mode1 = ConditionMode.Priority
+            };
 
             var targets = _selector.SelectTargets(caster, strategy, skill.Data);
 

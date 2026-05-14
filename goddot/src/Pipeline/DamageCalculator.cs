@@ -40,9 +40,9 @@ namespace BattleKing.Pipeline
             baseDmgPerHit *= calc.ClassTraitMultiplier;
             baseDmgPerHit *= calc.CharacterTraitMultiplier;
 
-            // Run multi-hit pipeline: all damage kept as float, only rounded at end
-            float totalPhysical = 0f;
-            float totalMagical = 0f;
+            // Run multi-hit pipeline: each hit is rounded before it contributes to totals.
+            int totalPhysical = 0;
+            int totalMagical = 0;
             bool anyHit = false;
             bool anyCritical = false;
             bool anyBlocked = false;
@@ -167,8 +167,12 @@ namespace BattleKing.Pipeline
                     nullifiedThisHit = true;
                 }
 
-                totalPhysical += hitPhysical;
-                totalMagical += hitMagical;
+                hitPhysical *= calc.DamageMultiplier;
+                hitMagical *= calc.DamageMultiplier;
+                int roundedPhysical = RoundHitDamage(hitPhysical);
+                int roundedMagical = RoundHitDamage(hitMagical);
+                totalPhysical += roundedPhysical;
+                totalMagical += roundedMagical;
                 hitsLanded++;
                 anyHit = true;
                 calc.HitResults.Add(new DamageHitResult
@@ -182,18 +186,18 @@ namespace BattleKing.Pipeline
                     Nullified = nullifiedThisHit,
                     BasePhysicalDamage = baseHitPhysical,
                     BaseMagicalDamage = baseHitMagical,
+                    RawPhysicalDamage = hitPhysical,
+                    RawMagicalDamage = hitMagical,
+                    RoundedPhysicalDamage = roundedPhysical,
+                    RoundedMagicalDamage = roundedMagical,
                     PhysicalDamage = hitPhysical,
                     MagicalDamage = hitMagical
                 });
             }
 
-            // Final damage multiplier
-            totalPhysical *= calc.DamageMultiplier;
-            totalMagical *= calc.DamageMultiplier;
-
-            // Round once at the very end (四捨五入 is the final step per original game formula)
-            calc.PhysicalDamage = (int)Math.Round((double)totalPhysical);
-            calc.MagicalDamage = (int)Math.Round((double)totalMagical);
+            // Totals are already rounded per hit.
+            calc.PhysicalDamage = totalPhysical;
+            calc.MagicalDamage = totalMagical;
             calc.IsHit = anyHit;
             calc.IsCritical = anyCritical;
             calc.LandedHits = hitsLanded;
@@ -227,6 +231,11 @@ namespace BattleKing.Pipeline
                 Skill = skill
             };
             return Calculate(calc);
+        }
+
+        private static int RoundHitDamage(float value)
+        {
+            return (int)Math.Round(value, MidpointRounding.AwayFromZero);
         }
 
         private float GetClassTraitMultiplier(BattleUnit attacker, BattleUnit defender)

@@ -437,6 +437,7 @@
         "effectType": "RecoverHp",
         "parameters": {
           "target": "LowestHpAlly",
+          "excludeSelf": true,
           "amount": 25
         }
       }
@@ -651,7 +652,7 @@
           "target": "Self",
           "stat": "Def",
           "ratio": 0.2,
-          "turns": 1,
+          "turns": -1,
           "stackPolicy": "Stack"
         }
       },
@@ -661,7 +662,7 @@
           "target": "Self",
           "stat": "Block",
           "ratio": 0.2,
-          "turns": 1,
+          "turns": -1,
           "stackPolicy": "Stack"
         }
       }
@@ -760,7 +761,7 @@
           "target": "Self",
           "stat": "Str",
           "ratio": 0.2,
-          "turns": 1,
+          "turns": -1,
           "stackPolicy": "Stack"
         }
       },
@@ -770,7 +771,7 @@
           "target": "Self",
           "stat": "Hit",
           "ratio": 0.2,
-          "turns": 1,
+          "turns": -1,
           "stackPolicy": "Stack"
         }
       }

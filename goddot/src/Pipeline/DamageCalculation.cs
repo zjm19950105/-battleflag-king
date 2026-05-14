@@ -110,9 +110,18 @@ namespace BattleKing.Pipeline
         public float BlockReduction { get; set; } = 0f;
         public float BasePhysicalDamage { get; set; }
         public float BaseMagicalDamage { get; set; }
+        public float RawPhysicalDamage { get; set; }
+        public float RawMagicalDamage { get; set; }
+        public int RoundedPhysicalDamage { get; set; }
+        public int RoundedMagicalDamage { get; set; }
+        public int AppliedPhysicalDamage => RoundedPhysicalDamage;
+        public int AppliedMagicalDamage => RoundedMagicalDamage;
         public float PhysicalDamage { get; set; }
         public float MagicalDamage { get; set; }
         public float BaseTotalDamage => BasePhysicalDamage + BaseMagicalDamage;
+        public float RawTotalDamage => RawPhysicalDamage + RawMagicalDamage;
+        public int RoundedTotalDamage => RoundedPhysicalDamage + RoundedMagicalDamage;
+        public int AppliedTotalDamage => AppliedPhysicalDamage + AppliedMagicalDamage;
         public float TotalDamage => PhysicalDamage + MagicalDamage;
     }
 }

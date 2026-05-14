@@ -217,11 +217,14 @@ namespace BattleKing.Ui
             changeButton.Pressed += () => ShowCandidates(unit, gameData, slotName, onPreviewChanged, onPreviewCleared, onEquipmentChanged);
             row.AddChild(changeButton);
 
+            bool canClear = EquipmentSlotUiPolicy.CanClearSlot(unit, slotName);
             var clearButton = CreateButton("清空", new Vector2(52, 28), new Color(0.32f, 0.22f, 0.23f));
-            clearButton.Disabled = current == null;
-            clearButton.TooltipText = "卸下当前装备";
+            clearButton.Disabled = current == null || !canClear;
+            clearButton.TooltipText = canClear ? "卸下当前装备" : "武器和盾槽不可清空";
             clearButton.MouseEntered += () =>
             {
+                if (!canClear)
+                    return;
                 ShowEquipmentDetail(null);
                 onPreviewChanged?.Invoke(EquipmentStatPreviewHelper.Build(unit, slotName, null));
             };
@@ -232,6 +235,8 @@ namespace BattleKing.Ui
             };
             clearButton.Pressed += () =>
             {
+                if (!canClear)
+                    return;
                 EquipAndRefresh(unit, gameData, slotName, null, onPreviewCleared, onEquipmentChanged);
                 RebuildSlots(unit, gameData, onPreviewChanged, onPreviewCleared, onEquipmentChanged);
             };
@@ -279,7 +284,8 @@ namespace BattleKing.Ui
             scroll.AddChild(list);
 
             list.AddChild(CreateLabel($"{GetSlotLabel(slotName)} 候选装备", TitleFontSize, new Color(1f, 0.93f, 0.68f)));
-            list.AddChild(BuildCandidateButton(unit, gameData, slotName, null, onPreviewChanged, onPreviewCleared, onEquipmentChanged));
+            if (EquipmentSlotUiPolicy.CanClearSlot(unit, slotName))
+                list.AddChild(BuildCandidateButton(unit, gameData, slotName, null, onPreviewChanged, onPreviewCleared, onEquipmentChanged));
 
             var candidates = GetCandidates(unit, gameData, slotName);
             if (candidates.Count == 0)
@@ -450,6 +456,9 @@ namespace BattleKing.Ui
             Action onPreviewCleared,
             Action onEquipmentChanged)
         {
+            if (equipment == null && !EquipmentSlotUiPolicy.CanClearSlot(unit, slotName))
+                return;
+
             int previousMaxHp = Math.Max(1, unit.GetCurrentStat("HP"));
             unit.Equipment.EquipToSlot(slotName, equipment);
             unit.SyncResourceCapsFromStats(previousMaxHp);
@@ -460,7 +469,7 @@ namespace BattleKing.Ui
 
         private static List<EquipmentData> GetCandidates(BattleUnit unit, GameDataRepository gameData, string slotName)
         {
-            var expectedCategory = GetExpectedCategory(slotName, unit.Data, unit.IsCc);
+            var expectedCategory = EquipmentSlotUiPolicy.GetExpectedCategory(slotName, unit.Data, unit.IsCc);
             if (!expectedCategory.HasValue)
                 return new List<EquipmentData>();
 
@@ -470,20 +479,6 @@ namespace BattleKing.Ui
                 .Where(e => EquipmentSlot.CanEquipCategory(e.Category, unit.Data, unit.IsCc))
                 .OrderBy(e => e.Name ?? e.Id)
                 .ToList();
-        }
-
-        private static EquipmentCategory? GetExpectedCategory(string slotName, CharacterData character, bool isCc)
-        {
-            var categories = isCc && character.CcEquippableCategories?.Count > 0
-                ? character.CcEquippableCategories
-                : character.EquippableCategories;
-            var slots = EquipmentSlot.GetSlotNames(character, isCc);
-            int slotIndex = slots.IndexOf(slotName);
-
-            if (categories == null || slotIndex < 0 || slotIndex >= categories.Count)
-                return null;
-
-            return categories[slotIndex];
         }
 
         private static string GetCandidateText(EquipmentData equipment)

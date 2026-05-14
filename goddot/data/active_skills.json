@@ -395,14 +395,11 @@
     "hitRate": 100,
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击，赋予气绝",
-    "tags": [
-      "StunLowChance"
-    ],
+    "tags": [],
     "effects": [
       {
         "effectType": "OnHitEffect",
         "parameters": {
-          "chance": 25,
           "effects": [
             {
               "effectType": "StatusAilment",
@@ -475,7 +472,7 @@
     "attackType": "Ranged",
     "power": 100,
     "hitRate": 100,
-    "targetType": "SingleEnemy",
+    "targetType": "FrontAndBack",
     "effectDescription": "敌前后列贯通攻击，对骑兵系格挡不可且威力+50",
     "tags": [
       "CavalryBonus"
@@ -527,7 +524,7 @@
     "attackType": "Ranged",
     "power": 130,
     "hitRate": 100,
-    "targetType": "SingleEnemy",
+    "targetType": "FrontAndBack",
     "effectDescription": "敌前后列贯通攻击，自身有buff时威力+50，对骑兵系格挡不可",
     "tags": [
       "CavalryBonus"
@@ -588,12 +585,12 @@
   {
     "id": "act_whirlwind_slash",
     "name": "回旋斧",
-    "apCost": 2,
+    "apCost": 1,
     "type": "Physical",
     "attackType": "Melee",
     "power": 40,
     "hitRate": 75,
-    "targetType": "Column",
+    "targetType": "Row",
     "effectDescription": "敌一列多段攻击（3hit），对象物防-15%",
     "tags": [
       "AoE",
@@ -1578,7 +1575,7 @@
     "name": "风翼突袭",
     "apCost": 2,
     "type": "Physical",
-    "attackType": "Melee",
+    "attackType": "Ranged",
     "power": 100,
     "hitRate": 100,
     "targetType": "Row",

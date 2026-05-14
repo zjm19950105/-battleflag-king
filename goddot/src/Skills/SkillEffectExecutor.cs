@@ -507,7 +507,9 @@ namespace BattleKing.Skills
 
         private static bool HasBuff(BattleUnit unit)
         {
-            return unit?.Buffs.Any(buff => buff.Ratio > 0f && buff.IsPureBuffOrDebuff) == true;
+            return unit?.Buffs.Any(buff =>
+                buff.IsPureBuffOrDebuff
+                && (buff.Ratio > 0f || buff.FlatAmount > 0)) == true;
         }
 
         private static bool TargetClassConditionMatches(
@@ -1358,6 +1360,7 @@ namespace BattleKing.Skills
             string defaultTarget)
         {
             string targetKind = GetString(parameters, "target", defaultTarget);
+            var allies = SelectAliveAllies(context, caster, parameters);
             var selected = targetKind.ToLowerInvariant() switch
             {
                 "self" => new List<BattleUnit> { caster },
@@ -1366,23 +1369,23 @@ namespace BattleKing.Skills
                 "defender" => calculation?.ResolvedDefender != null ? new List<BattleUnit> { calculation.ResolvedDefender } : calculation?.Defender != null ? new List<BattleUnit> { calculation.Defender } : targets.Where(t => t != null).ToList(),
                 "attacker" => calculation?.Attacker != null ? new List<BattleUnit> { calculation.Attacker } : targets.Where(t => t != null).ToList(),
                 "alltargets" => targets.Where(t => t != null).ToList(),
-                "allallies" => context.GetAliveUnits(caster.IsPlayer),
-                "allies" => context.GetAliveUnits(caster.IsPlayer),
+                "allallies" => allies,
+                "allies" => allies,
                 "allenemies" => context.GetAliveUnits(!caster.IsPlayer),
                 "enemies" => context.GetAliveUnits(!caster.IsPlayer),
-                "rowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => u.IsFrontRow == caster.IsFrontRow).ToList(),
-                "frontrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => u.IsFrontRow).ToList(),
-                "backrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => !u.IsFrontRow).ToList(),
-                "columnallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => IsSameColumn(u.Position, caster.Position)).ToList(),
+                "rowallies" => allies.Where(u => u.IsFrontRow == caster.IsFrontRow).ToList(),
+                "frontrowallies" => allies.Where(u => u.IsFrontRow).ToList(),
+                "backrowallies" => allies.Where(u => !u.IsFrontRow).ToList(),
+                "columnallies" => allies.Where(u => IsSameColumn(u.Position, caster.Position)).ToList(),
                 "rowalliesoftarget" => SelectRowAlliesOfTarget(context, targets, calculation),
                 "columnalliesoftarget" => SelectColumnAlliesOfTarget(context, targets, calculation),
-                "lowesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderBy(u => u.CurrentHp).Take(1).ToList(),
-                "highesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderByDescending(u => u.CurrentHp).Take(1).ToList(),
-                "randomally" => SelectRandomUnit(context.GetAliveUnits(caster.IsPlayer)),
+                "lowesthpally" => allies.OrderBy(u => u.CurrentHp).Take(1).ToList(),
+                "highesthpally" => allies.OrderByDescending(u => u.CurrentHp).Take(1).ToList(),
+                "randomally" => SelectRandomUnit(allies),
                 _ => targets.Where(t => t != null).ToList()
             };
 
-            selected = ApplyTargetFilters(selected, parameters);
+            selected = ApplyTargetFilters(selected, parameters, caster);
 
             if (TryGetInt(parameters, "maxTargets", out int maxTargets))
                 selected = selected.Take(Math.Max(0, maxTargets)).ToList();
@@ -1390,8 +1393,28 @@ namespace BattleKing.Skills
             return selected;
         }
 
-        private static List<BattleUnit> ApplyTargetFilters(List<BattleUnit> selected, Dictionary<string, object> parameters)
+        private static List<BattleUnit> SelectAliveAllies(
+            BattleContext context,
+            BattleUnit caster,
+            Dictionary<string, object> parameters)
         {
+            if (context == null || caster == null)
+                return new List<BattleUnit>();
+
+            var allies = context.GetAliveUnits(caster.IsPlayer);
+            return GetBool(parameters, "excludeSelf", false)
+                ? allies.Where(unit => unit != caster).ToList()
+                : allies;
+        }
+
+        private static List<BattleUnit> ApplyTargetFilters(
+            List<BattleUnit> selected,
+            Dictionary<string, object> parameters,
+            BattleUnit caster)
+        {
+            if (GetBool(parameters, "excludeSelf", false))
+                selected = selected.Where(unit => unit != caster).ToList();
+
             var targetClasses = GetStringList(parameters, "targetClasses");
             if (TryGetString(parameters, "targetClass", out string targetClass))
                 targetClasses.Add(targetClass);

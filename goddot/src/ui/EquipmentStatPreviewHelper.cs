@@ -51,32 +51,7 @@ namespace BattleKing.Ui
 
         private static int GetEffectiveStat(BattleUnit unit, EquipmentSlot slot, string statName)
         {
-            return statName switch
-            {
-                "Str" => BattleUnit.ClampCalculatedStat(
-                    "Str",
-                    GetCurrentStat(unit, slot, "Str") + slot.GetTotalStat("phys_atk")),
-                "Def" => BattleUnit.ClampCalculatedStat(
-                    "Def",
-                    GetCurrentStat(unit, slot, "Def") + slot.GetTotalStat("phys_def")),
-                "Mag" => BattleUnit.ClampCalculatedStat(
-                    "Mag",
-                    GetCurrentStat(unit, slot, "Mag") + slot.GetTotalStat("mag_atk")),
-                "MDef" => BattleUnit.ClampCalculatedStat(
-                    "MDef",
-                    GetCurrentStat(unit, slot, "MDef") + slot.GetTotalStat("mag_def")),
-                _ => GetCurrentStat(unit, slot, statName)
-            };
-        }
-
-        private static int GetCurrentStat(BattleUnit unit, EquipmentSlot slot, string statName)
-        {
-            int baseValue = unit.Data.BaseStats.GetValueOrDefault(statName, 0);
-            int equipValue = slot.GetTotalStat(statName);
-            float buffRatio = unit.Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
-            int flatBuff = unit.Buffs.Where(b => b.TargetStat == statName).Sum(b => b.FlatAmount);
-            int value = (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
-            return BattleUnit.ClampCalculatedStat(statName, value);
+            return unit.GetCurrentStat(statName, slot);
         }
     }
 

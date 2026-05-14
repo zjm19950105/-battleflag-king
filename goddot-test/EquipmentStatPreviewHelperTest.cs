@@ -1,4 +1,5 @@
 using System.Linq;
+using BattleKing.Equipment;
 using BattleKing.Data;
 using BattleKing.Ui;
 using NUnit.Framework;
@@ -76,6 +77,26 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(65, str.Preview);
             ClassicAssert.AreEqual(7, str.Delta);
             ClassicAssert.AreEqual("eq_old_sword", unit.Equipment.MainHand.Data.Id);
+        }
+
+        [Test]
+        public void Build_RatioDebuffUsesEquippedCombatBaselineForDefensePreview()
+        {
+            var unit = TestDataFactory.CreateUnit(def: 30);
+            var shieldCharm = TestDataFactory.CreateEquipment(
+                "eq_phys_def_charm",
+                "Phys Def Charm",
+                EquipmentCategory.Accessory,
+                new() { { "phys_def", 12 } });
+            unit.Equipment.EquipToSlot("Accessory1", shieldCharm);
+            BuffManager.ApplyBuff(unit, new Buff { SkillId = "debuff_def", TargetStat = "Def", Ratio = -0.2f });
+
+            var preview = EquipmentStatPreviewHelper.Build(unit, "Accessory1", null);
+            var def = preview.GetRow("Def");
+
+            ClassicAssert.AreEqual(33, def.Current);
+            ClassicAssert.AreEqual(24, def.Preview);
+            ClassicAssert.AreEqual(-9, def.Delta);
         }
 
         [Test]

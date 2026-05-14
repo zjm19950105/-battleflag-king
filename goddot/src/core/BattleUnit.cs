@@ -111,29 +111,81 @@ namespace BattleKing.Core
             return Data.EquippableCategories;
         }
 
+        public readonly struct StatBreakdown
+        {
+            public StatBreakdown(string statName, int baseValue, int equipmentValue, int buffDelta, int current)
+            {
+                StatName = statName;
+                BaseValue = baseValue;
+                EquipmentValue = equipmentValue;
+                BuffDelta = buffDelta;
+                Current = current;
+            }
+
+            public string StatName { get; }
+            public int BaseValue { get; }
+            public int EquipmentValue { get; }
+            public int EquippedBaseline => BaseValue + EquipmentValue;
+            public int BuffDelta { get; }
+            public int Current { get; }
+        }
+
         // Dynamic stat calculation (base + equipment + buff)
         public int GetCurrentStat(string statName)
         {
+            return GetStatBreakdown(statName).Current;
+        }
+
+        public int GetCurrentStat(string statName, EquipmentSlot equipment)
+        {
+            return GetStatBreakdown(statName, equipment).Current;
+        }
+
+        public StatBreakdown GetStatBreakdown(string statName)
+        {
+            return GetStatBreakdown(statName, Equipment);
+        }
+
+        public StatBreakdown GetStatBreakdown(string statName, EquipmentSlot equipment)
+        {
             int baseValue = Data.BaseStats.GetValueOrDefault(statName, 0);
-            int equipValue = Equipment.GetTotalStat(statName);
+            int equipValue = GetDisplayEquipmentStat(equipment ?? Equipment, statName);
             float buffRatio = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
             int flatBuff = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.FlatAmount);
             int value = (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
-            return ClampCalculatedStat(statName, value);
+            int current = ClampCalculatedStat(statName, value);
+            return new StatBreakdown(statName, baseValue, equipValue, current - (baseValue + equipValue), current);
         }
 
         public int GetCurrentAttackPower(SkillType damageType)
         {
             string stat = damageType == SkillType.Magical ? "Mag" : "Str";
-            string equipmentStat = damageType == SkillType.Magical ? "mag_atk" : "phys_atk";
-            return Math.Max(0, GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat));
+            return GetCurrentCombatStat(stat);
         }
 
         public int GetCurrentDefense(SkillType damageType)
         {
             string stat = damageType == SkillType.Magical ? "MDef" : "Def";
-            string equipmentStat = damageType == SkillType.Magical ? "mag_def" : "phys_def";
-            return Math.Max(0, GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat));
+            return GetCurrentCombatStat(stat);
+        }
+
+        private int GetCurrentCombatStat(string statName)
+        {
+            return GetStatBreakdown(statName).Current;
+        }
+
+        private static int GetDisplayEquipmentStat(EquipmentSlot equipment, string statName)
+        {
+            int value = equipment?.GetTotalStat(statName) ?? 0;
+            value += statName switch
+            {
+                "Str" => equipment?.GetTotalStat("phys_atk") ?? 0,
+                "Def" => equipment?.GetTotalStat("phys_def") ?? 0,
+                "Mag" => equipment?.GetTotalStat("mag_atk") ?? 0,
+                "MDef" => equipment?.GetTotalStat("mag_def") ?? 0,
+                _ => 0
+            };
+            return value;
         }
 
         public int GetCurrentSpeed() => GetCurrentStat("Spd");
