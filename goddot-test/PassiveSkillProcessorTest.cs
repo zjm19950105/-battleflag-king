@@ -178,7 +178,7 @@ namespace BattleKing.Tests
         }
 
         [Test]
-        public void RealPassiveJson_Bounce_SelfBeforeHitHealsOnlyDefenderAndPaysPp()
+        public void RealPassiveJson_Bounce_OnBeingHitHealsOnlyAfterHitAndPaysPp()
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
@@ -220,11 +220,65 @@ namespace BattleKing.Tests
             CollectionAssert.AreEqual(
                 new[] { "HealRatio" },
                 bounce.Effects.Select(effect => effect.EffectType).ToList());
+
+            ClassicAssert.AreEqual(PassiveTriggerTiming.OnBeingHit, bounce.TriggerTiming);
+            ClassicAssert.AreEqual(1, defender.CurrentPp);
+            ClassicAssert.AreEqual(40, defender.CurrentHp);
+            ClassicAssert.AreEqual(40, attacker.CurrentHp);
+            ClassicAssert.AreEqual(40, ally.CurrentHp);
+
+            eventBus.Publish(new AfterHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                Context = context,
+                DamageDealt = 1,
+                IsHit = true
+            });
+
             ClassicAssert.AreEqual(0, defender.CurrentPp);
             ClassicAssert.AreEqual(120, defender.CurrentHp);
             ClassicAssert.AreEqual(40, attacker.CurrentHp);
             ClassicAssert.AreEqual(40, ally.CurrentHp);
             ClassicAssert.IsNotEmpty(logs);
+        }
+
+        [Test]
+        public void RealPassiveJson_Bounce_HealRatioDoesNotLowerHpAboveCurrentMax()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var logs = new List<string>();
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, logs.Add);
+            processor.SubscribeAll();
+            var attacker = new BattleUnit(CreateCharacter("attacker", hp: 200, pp: 0), repository, true);
+            var defender = new BattleUnit(CreateCharacter("defender", hp: 148, pp: 1), repository, false)
+            {
+                CurrentHp = 151
+            };
+            defender.EquippedPassiveSkillIds.Add("pas_bounce");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var skill = TestDataFactory.CreateSkill(type: SkillType.Physical, attackType: AttackType.Melee);
+
+            eventBus.Publish(new AfterHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                Context = context,
+                DamageDealt = 1,
+                IsHit = true
+            });
+
+            ClassicAssert.AreEqual(0, defender.CurrentPp);
+            ClassicAssert.AreEqual(151, defender.CurrentHp);
+            Assert.That(logs, Has.Some.Contains("defender.HP 151->151"));
         }
 
         [Test]
@@ -300,10 +354,11 @@ namespace BattleKing.Tests
             ClassicAssert.AreSame(cover, calc.CoverTarget);
             ClassicAssert.AreSame(cover, calc.ResolvedDefender);
             ClassicAssert.AreEqual(true, calc.ForceBlock);
+            ClassicAssert.AreEqual(0.50f, calc.ForcedBlockReduction ?? -1f, 0.001f);
             ClassicAssert.IsTrue(calc.IsBlocked);
             ClassicAssert.AreEqual(0, cover.CurrentPp);
             ClassicAssert.AreEqual(90, defender.CurrentHp);
-            ClassicAssert.AreEqual(25, cover.CurrentHp);
+            ClassicAssert.AreEqual(50, cover.CurrentHp);
             CollectionAssert.AreEqual(new[] { cover }, afterHitDefenders);
             ClassicAssert.IsNotEmpty(logs);
         }
@@ -1676,6 +1731,17 @@ namespace BattleKing.Tests
                 Calc = calc
             });
 
+            eventBus.Publish(new AfterHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                Context = context,
+                DamageDealt = 1,
+                IsHit = true,
+                SourceKind = BattleActionSourceKind.ActiveAttack
+            });
+
             ClassicAssert.AreEqual("CounterAttack", blockSeal.Effects.Single().EffectType);
             ClassicAssert.IsFalse(calc.CannotBeBlocked);
             var action = queued.Single();
@@ -1884,8 +1950,13 @@ namespace BattleKing.Tests
             ClassicAssert.IsTrue(caster.TemporalStates.Any(state => state.Key == "DeathResist"));
             Assert.That(logs, Has.Some.Contains("caster.AP").And.Contains("caster.PP").And.Contains("DeathResist"));
 
-            caster.CurrentHp = 5;
+            caster.CurrentHp = 101;
             caster.TakeDamage(100);
+
+            ClassicAssert.AreEqual(1, caster.CurrentHp);
+            ClassicAssert.IsTrue(caster.TemporalStates.Any(state => state.Key == "DeathResist"));
+
+            caster.TakeDamage(2);
 
             ClassicAssert.AreEqual(1, caster.CurrentHp);
             ClassicAssert.IsFalse(caster.TemporalStates.Any(state => state.Key == "DeathResist"));

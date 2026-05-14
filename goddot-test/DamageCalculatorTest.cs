@@ -132,6 +132,58 @@ namespace BattleKing.Tests
                 ClassicAssert.Less(result.TotalDamage, 50); // block reduces damage
         }
 
+        [Test]
+        public void ShieldBlockReduction_ForcedGuardUsesShield50Percent()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 100, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 20, block: 100);
+            defender.Equipment.Equip(TestDataFactory.CreateEquipment(category: EquipmentCategory.Shield));
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.ForceBlock = true;
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsBlocked);
+            ClassicAssert.AreEqual(0.50f, result.HitResults[0].BlockReduction, 0.001f);
+            ClassicAssert.AreEqual(40, result.TotalDamage);
+        }
+
+        [Test]
+        public void GreatShieldBlockReduction_ForcedGuardUsesGreatShield75Percent()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 100, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 20, block: 100);
+            defender.Equipment.Equip(TestDataFactory.CreateEquipment(category: EquipmentCategory.GreatShield));
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.ForceBlock = true;
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsBlocked);
+            ClassicAssert.AreEqual(0.75f, result.HitResults[0].BlockReduction, 0.001f);
+            ClassicAssert.AreEqual(20, result.TotalDamage);
+        }
+
+        [Test]
+        public void ForcedBlockReduction_OverridesEquipmentReduction()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 100, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 20, block: 100);
+            defender.Equipment.Equip(TestDataFactory.CreateEquipment(category: EquipmentCategory.Shield));
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.ForceBlock = true;
+            calc.ForcedBlockReduction = 0.75f;
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsBlocked);
+            ClassicAssert.AreEqual(0.75f, result.HitResults[0].BlockReduction, 0.001f);
+            ClassicAssert.AreEqual(20, result.TotalDamage);
+        }
+
         // ────────── 多段攻击 ──────────
 
         [Test]
@@ -218,6 +270,74 @@ namespace BattleKing.Tests
             Assert.That(lines, Has.Some.Contains("段数: 9 hit").And.Contains("暴击 3"));
             Assert.That(lines, Has.Some.Contains("单段基础: (65-15=50) x 威力20% = 10"));
             Assert.That(lines, Has.Some.Contains("合计: 普通6hit=60 + 暴击3hit x2.0=60 => 120"));
+        }
+
+        [Test]
+        public void MultiHitLog_WritesPerHitNullifyCritAndBlockDetails()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 65, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(hp: 500, def: 15, block: 0);
+            var skill = TestDataFactory.CreateSkill(power: 20, name: "Multi Probe");
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.HitCount = 4;
+            calc.LandedHits = 4;
+            calc.NullifiedHits = 1;
+            calc.FinalAttackPower = 65;
+            calc.FinalDefense = 15;
+            calc.SkillPowerRatio = 0.2f;
+            calc.CritMultiplier = 2.0f;
+            calc.HitResults.Add(new DamageHitResult
+            {
+                HitIndex = 1,
+                Landed = true,
+                Nullified = true,
+                BasePhysicalDamage = 10,
+                PhysicalDamage = 0
+            });
+            calc.HitResults.Add(new DamageHitResult
+            {
+                HitIndex = 2,
+                Landed = true,
+                BasePhysicalDamage = 10,
+                PhysicalDamage = 10
+            });
+            calc.HitResults.Add(new DamageHitResult
+            {
+                HitIndex = 3,
+                Landed = true,
+                Critical = true,
+                CritMultiplier = 2.0f,
+                BasePhysicalDamage = 10,
+                PhysicalDamage = 20
+            });
+            calc.HitResults.Add(new DamageHitResult
+            {
+                HitIndex = 4,
+                Landed = true,
+                Critical = true,
+                CritMultiplier = 2.0f,
+                Blocked = true,
+                BlockReduction = 0.25f,
+                BasePhysicalDamage = 10,
+                PhysicalDamage = 15
+            });
+            var result = new DamageResult(
+                45,
+                0,
+                isHit: true,
+                isCritical: true,
+                isBlocked: true,
+                isEvaded: false,
+                appliedAilments: new(),
+                resolvedDefender: defender,
+                hitResults: calc.HitResults);
+
+            var lines = BattleLogHelper.FormatAttack(attacker, defender, skill, calc, result, false, new());
+
+            Assert.That(lines, Has.Some.Contains("hit1").And.Contains("NULLIFY"));
+            Assert.That(lines, Has.Some.Contains("hit2").And.Contains("普通"));
+            Assert.That(lines, Has.Some.Contains("hit3").And.Contains("暴击"));
+            Assert.That(lines, Has.Some.Contains("hit4").And.Contains("暴击格挡"));
         }
 
         [Test]
@@ -326,6 +446,50 @@ namespace BattleKing.Tests
             var result = _calc.Calculate(c);
             ClassicAssert.IsTrue(result.IsHit);
             ClassicAssert.IsFalse(result.IsEvaded);
+        }
+
+        [Test]
+        public void ForceHit_OverridesForceEvasion()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 50, hit: 10);
+            var defender = TestDataFactory.CreateUnit(def: 20, eva: 80);
+            var skill = TestDataFactory.CreateSkill(power: 100, hitRate: 50);
+            var calc = new DamageCalculation
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                ForceHit = true,
+                ForceEvasion = true
+            };
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsHit);
+            ClassicAssert.IsFalse(result.IsEvaded);
+            ClassicAssert.Greater(result.TotalDamage, 0);
+        }
+
+        [Test]
+        public void ForceHit_DoesNotBypassDarknessMiss()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 50, hit: 1000);
+            attacker.Ailments.Add(StatusAilment.Darkness);
+            var defender = TestDataFactory.CreateUnit(def: 20, eva: 0);
+            var skill = TestDataFactory.CreateSkill(power: 100, hitRate: 100);
+            var calc = new DamageCalculation
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = skill,
+                ForceHit = true
+            };
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsFalse(result.IsHit);
+            ClassicAssert.IsFalse(result.IsEvaded);
+            ClassicAssert.AreEqual(0, result.TotalDamage);
         }
 
         [Test]

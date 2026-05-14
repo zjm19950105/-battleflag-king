@@ -74,26 +74,25 @@ namespace BattleKing.Pipeline
                 float baseHitPhysical = hitPhysical;
                 float baseHitMagical = hitMagical;
 
-                // Stage 7: Hit check (skip if ForceHit)
-                if (!calc.ForceHit)
+                // Stage 7: Hit check. ForceHit bypasses accuracy, but Darkness still forces a miss.
+                if (attacker.Ailments.Contains(StatusAilment.Darkness)
+                    || (!calc.ForceHit && !RollHit(attacker, defender, skill)))
                 {
-                    if (!RollHit(attacker, defender, skill))
+                    calc.IsHit = false;
+                    hitsMissed++;
+                    calc.HitResults.Add(new DamageHitResult
                     {
-                        calc.IsHit = false;
-                        hitsMissed++;
-                        calc.HitResults.Add(new DamageHitResult
-                        {
-                            HitIndex = hit + 1,
-                            Missed = true,
-                            BasePhysicalDamage = baseHitPhysical,
-                            BaseMagicalDamage = baseHitMagical
-                        });
-                        continue;  // this hit missed, try next hit
-                    }
+                        HitIndex = hit + 1,
+                        Missed = true,
+                        BasePhysicalDamage = baseHitPhysical,
+                        BaseMagicalDamage = baseHitMagical
+                    });
+                    continue;  // this hit missed, try next hit
                 }
 
-                // Stage 7.5: Evasion check (ForceEvasion evades the first hit only)
-                if ((calc.ForceEvasion && hit == 0) || RollEvasion(attacker, defender, skill))
+                // Stage 7.5: Evasion check (ForceEvasion evades the first hit only; ForceHit suppresses it)
+                if (!calc.ForceHit
+                    && ((calc.ForceEvasion && hit == 0) || RollEvasion(attacker, defender, skill)))
                 {
                     calc.IsEvaded = true;
                     anyEvaded = true;
@@ -130,7 +129,7 @@ namespace BattleKing.Pipeline
                     {
                         blockThisHit = true;
                         anyBlocked = true;
-                        calc.BlockReduction = resolvedDefender.GetBlockReduction();
+                        calc.BlockReduction = calc.ForcedBlockReduction ?? resolvedDefender.GetBlockReduction();
                         hitPhysical *= (1f - calc.BlockReduction);
                     }
                 }

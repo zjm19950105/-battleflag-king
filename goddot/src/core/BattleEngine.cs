@@ -384,7 +384,11 @@ namespace BattleKing.Core
             _eventBus.Publish(new BeforeActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
 
             if (unit.State != UnitState.Charging)
+            {
+                int apBefore = unit.CurrentAp;
                 unit.ConsumeAp(skill.ApCost);
+                Log($"  AP消耗: {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} {apBefore}->{unit.CurrentAp}");
+            }
 
             _eventBus.Publish(new AfterActiveCostEvent { Caster = unit, Skill = skill, Context = _ctx });
             _eventBus.Publish(new BeforeAttackCalculationEvent { Caster = unit, Skill = skill, Context = _ctx });
@@ -435,7 +439,8 @@ namespace BattleKing.Core
                     Defender = target,
                     Skill = skill,
                     Context = _ctx,
-                    Calc = calc
+                    Calc = calc,
+                    SourceKind = BattleActionSourceKind.ActiveAttack
                 });
 
                 var result = _damageCalculator.Calculate(calc);
@@ -482,7 +487,8 @@ namespace BattleKing.Core
 					Skill = skill,
 					DamageDealt = result.TotalDamage,
 					IsHit = result.IsHit,
-					Context = _ctx
+					Context = _ctx,
+					SourceKind = BattleActionSourceKind.ActiveAttack
 				});
                 // State already shown in multi-line log above
             }
@@ -730,7 +736,8 @@ namespace BattleKing.Core
                         Defender = target,
                         Skill = tempSkill,
                         Context = _ctx,
-                        Calc = calc
+                        Calc = calc,
+                        SourceKind = BattleActionSourceKind.PendingAction
                     });
 
                     var result = _damageCalculator.Calculate(calc);
@@ -773,7 +780,8 @@ namespace BattleKing.Core
                         Skill = tempSkill,
                         DamageDealt = result.TotalDamage,
                         IsHit = result.IsHit,
-                        Context = _ctx
+                        Context = _ctx,
+                        SourceKind = BattleActionSourceKind.PendingAction
                     });
                 }
             }
@@ -1022,10 +1030,10 @@ namespace BattleKing.Core
             DamageResult result,
             bool killed)
         {
-            return $"[{action.Type}] actor={BattleKing.Ui.BattleLogHelper.FormatUnitName(action.Actor)}"
+            return $"[{action.Type}] actor={FormatPendingUnit(action.Actor)}"
                 + $" passive={GetPassiveDisplayName(action.SourcePassiveId)}"
-                + $" target={BattleKing.Ui.BattleLogHelper.FormatUnitName(declaredTarget)}"
-                + $" receiver={BattleKing.Ui.BattleLogHelper.FormatUnitName(damageReceiver)}"
+                + $" target={FormatPendingUnit(declaredTarget)}"
+                + $" receiver={FormatPendingUnit(damageReceiver)}"
                 + $" damage={result.TotalDamage}"
                 + FormatPendingHpChange(result)
                 + $" hit={result.IsHit}"
@@ -1038,6 +1046,14 @@ namespace BattleKing.Core
                 + $" ailments={FormatAilments(result.AppliedAilments)}"
                 + $" temporary=actor:{FormatTemporalStates(action.Actor)};receiver:{FormatTemporalStates(damageReceiver)}"
                 + $" tags={FormatTags(action.Tags)}";
+        }
+
+        private static string FormatPendingUnit(BattleUnit unit)
+        {
+            if (unit == null)
+                return "";
+
+            return $"{BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)}(id={unit.Data?.Id ?? ""},pos={unit.Position})";
         }
 
         private static string FormatPendingHpChange(DamageResult result)

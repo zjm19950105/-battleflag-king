@@ -92,29 +92,31 @@ namespace BattleKing.Skills
             _ctx = evt.Context;
             // Defender self-defense
             ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeHit, "被攻击前", limitSimultaneous: false,
-                calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender);
+                calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender, sourceKind: evt.SourceKind);
             if (evt.Skill.Data.Type == SkillType.Physical)
                 ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforePhysicalHit, "被物理攻击前", limitSimultaneous: false,
-                    calc: evt.Calc);
+                    calc: evt.Calc, sourceKind: evt.SourceKind);
             if (evt.Skill.Data.AttackType == AttackType.Melee)
                 ProcessForUnit(evt.Defender, PassiveTriggerTiming.SelfBeforeMeleeHit, "被近接攻击前", limitSimultaneous: false,
-                    calc: evt.Calc);
+                    calc: evt.Calc, sourceKind: evt.SourceKind);
 
             // Ally defense/cover
             var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeHit, "友方被攻击前",
-                limitSimultaneous: true, _defenseFired, calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender);
+                limitSimultaneous: true, _defenseFired, calc: evt.Calc, attacker: evt.Attacker, defender: evt.Defender,
+                sourceKind: evt.SourceKind);
         }
 
         private void OnAfterHit(AfterHitEvent evt)
         {
             _ctx = evt.Context;
             ProcessForUnit(evt.Defender, PassiveTriggerTiming.OnBeingHit, "被攻击后", limitSimultaneous: false,
-                attacker: evt.Attacker);
+                attacker: evt.Attacker, activeSkill: evt.Skill, sourceKind: evt.SourceKind);
 
             var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnAttacked, "友方被攻击后",
-                limitSimultaneous: false, attacker: evt.Attacker, defender: evt.Defender);
+                limitSimultaneous: false, attacker: evt.Attacker, defender: evt.Defender,
+                activeSkill: evt.Skill, sourceKind: evt.SourceKind);
         }
 
         private void OnAfterActiveUse(AfterActiveUseEvent evt)
@@ -143,7 +145,7 @@ namespace BattleKing.Skills
         private void ProcessForUnit(BattleUnit unit, PassiveTriggerTiming timing, string timingLabel,
             bool limitSimultaneous, DamageCalculation calc = null, BattleUnit attacker = null,
             BattleUnit defender = null, BattleUnit knockoutVictim = null, BattleUnit knockoutKiller = null,
-            ActiveSkill activeSkill = null)
+            ActiveSkill activeSkill = null, BattleActionSourceKind sourceKind = BattleActionSourceKind.ActiveAttack)
         {
             if (unit == null || !unit.IsAlive) return;
 
@@ -155,7 +157,7 @@ namespace BattleKing.Skills
                     continue;
                 if (skillData.TriggerTiming != timing)
                     continue;
-                if (!PassiveMatchesBattleContext(skillData, calc, activeSkill))
+                if (!PassiveMatchesBattleContext(skillData, calc, activeSkill, sourceKind))
                     continue;
                 if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                     continue;
@@ -203,7 +205,8 @@ namespace BattleKing.Skills
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
             bool limitSimultaneous, Dictionary<bool, HashSet<string>> firedSet = null, DamageCalculation calc = null,
             BattleUnit attacker = null, BattleUnit defender = null, BattleUnit knockoutVictim = null,
-            BattleUnit knockoutKiller = null, ActiveSkill activeSkill = null)
+            BattleUnit knockoutKiller = null, ActiveSkill activeSkill = null,
+            BattleActionSourceKind sourceKind = BattleActionSourceKind.ActiveAttack)
         {
             if (candidates == null || candidates.Count == 0) return;
 
@@ -224,7 +227,7 @@ namespace BattleKing.Skills
                         continue;
                     if (skillData.TriggerTiming != timing)
                         continue;
-                    if (!PassiveMatchesBattleContext(skillData, calc, activeSkill))
+                    if (!PassiveMatchesBattleContext(skillData, calc, activeSkill, sourceKind))
                         continue;
                     if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                         continue;
@@ -253,7 +256,11 @@ namespace BattleKing.Skills
             }
         }
 
-        private static bool PassiveMatchesBattleContext(PassiveSkillData skillData, DamageCalculation calc, ActiveSkill activeSkill = null)
+        private static bool PassiveMatchesBattleContext(
+            PassiveSkillData skillData,
+            DamageCalculation calc,
+            ActiveSkill activeSkill = null,
+            BattleActionSourceKind sourceKind = BattleActionSourceKind.ActiveAttack)
         {
             var tags = skillData.Tags ?? new List<string>();
             if (tags.Contains("RangedCover"))
@@ -268,7 +275,32 @@ namespace BattleKing.Skills
             if (!CurrentActionRequirementsMatch(skillData, activeSkill))
                 return false;
 
+            if (!SourceKindRequirementsMatch(skillData, sourceKind))
+                return false;
+
             return true;
+        }
+
+        private static bool SourceKindRequirementsMatch(PassiveSkillData skillData, BattleActionSourceKind sourceKind)
+        {
+            var effectsWithRequirements = skillData.Effects?
+                .Where(effect => effect?.Parameters != null
+                    && !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(effect.Parameters, "requiresSourceKind", "")))
+                .ToList() ?? new List<SkillEffectData>();
+
+            return effectsWithRequirements.Count == 0
+                || effectsWithRequirements.Any(effect => SourceKindMatches(effect.Parameters, sourceKind));
+        }
+
+        private static bool SourceKindMatches(Dictionary<string, object> parameters, BattleActionSourceKind sourceKind)
+        {
+            string required = SkillEffectExecutor.GetString(parameters, "requiresSourceKind", "");
+            if (string.IsNullOrWhiteSpace(required))
+                return true;
+
+            return required
+                .Split(new[] { ',', '|', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Any(value => string.Equals(value.Trim(), sourceKind.ToString(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IncomingSkillRequirementsMatch(PassiveSkillData skillData, DamageCalculation calc)
@@ -487,11 +519,13 @@ namespace BattleKing.Skills
             if (tags.Contains("MediumGuard") && calc != null)
             {
                 calc.ForceBlock = true;
+                calc.ForcedBlockReduction = 0.50f;
                 effects.Add("中格挡防御");
             }
             if (tags.Contains("LargeGuardAlly") && calc != null)
             {
                 calc.ForceBlock = true;
+                calc.ForcedBlockReduction = 0.75f;
                 effects.Add("大格挡防御(友方)");
             }
             if (tags.Contains("CoverAlly") && calc != null && !calc.CannotBeCovered)
@@ -537,7 +571,8 @@ namespace BattleKing.Skills
             {
                 int maxHp = Math.Max(1, unit.GetCurrentStat("HP"));
                 int heal = (int)(maxHp * 0.25f);
-                unit.CurrentHp = Math.Min(maxHp, unit.CurrentHp + Math.Max(1, heal));
+                int healed = Math.Min(maxHp, unit.CurrentHp + Math.Max(1, heal));
+                unit.CurrentHp = Math.Max(unit.CurrentHp, healed);
                 effects.Add($"HP回复{Math.Max(1, heal)}");
             }
             if (tags.Contains("HealAlly"))

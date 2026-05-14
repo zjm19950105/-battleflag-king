@@ -286,8 +286,9 @@ namespace BattleKing.Tests
                 PlayerUnits = new List<BattleUnit> { attacker, sameRowAlly, otherRowAlly },
                 EnemyUnits = new List<BattleUnit> { counterUser }
             };
-            var engine = new BattleEngine(context) { OnLog = _ => { } };
-            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
             processor.SubscribeAll();
 
             engine.InitBattle();
@@ -307,6 +308,55 @@ namespace BattleKing.Tests
                 entry.ActorId == "counter_user"
                 && entry.Flags.Contains("PassiveTrigger")
                 && entry.Flags.Contains("Counter")));
+        }
+
+        [Test]
+        public void StepOneAction_WideCounterTriggersOnlyFromActiveAttack_NotFromPendingPursuit()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.PassiveSkills["pas_wide_counter"].Effects[0].Parameters["hitRate"] = 1000;
+            repository.PassiveSkills["pas_pursuit_slash"].Effects[0].Parameters["hitRate"] = 1000;
+            var attacker = new BattleUnit(CreateStructuredLogCharacter("merc_attacker", "act_kill_chain", hp: 500, str: 70, def: 0, spd: 30, ap: 1, pp: 1), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var pursuitAlly = new BattleUnit(CreateStructuredLogCharacter("merc_ally", null, hp: 500, str: 90, def: 0, spd: 10, ap: 0, pp: 1), repository, true)
+            {
+                Position = 4
+            };
+            var gladiator = new BattleUnit(CreateStructuredLogCharacter("gladiator", null, hp: 500, str: 80, def: 20, spd: 5, ap: 0, pp: 3), repository, false)
+            {
+                Position = 1
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_kill_chain" });
+            attacker.EquippedPassiveSkillIds.Add("pas_pursuit_slash");
+            pursuitAlly.EquippedPassiveSkillIds.Add("pas_pursuit_slash");
+            gladiator.EquippedPassiveSkillIds.Add("pas_wide_counter");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker, pursuitAlly },
+                EnemyUnits = new List<BattleUnit> { gladiator }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            var wideLogs = engine.BattleLogEntries.Where(entry => entry.SkillId == "pas_wide_counter").ToList();
+            var pursuitLogs = engine.BattleLogEntries.Where(entry => entry.SkillId == "pas_pursuit_slash").ToList();
+            ClassicAssert.AreEqual(1, wideLogs.Count);
+            ClassicAssert.AreEqual(1, pursuitLogs.Count);
+            ClassicAssert.AreEqual("merc_ally", pursuitLogs[0].ActorId);
+            ClassicAssert.AreNotEqual("merc_attacker", pursuitLogs[0].ActorId);
+            Assert.That(wideLogs[0].Text, Does.Contain("id=gladiator,pos=1"));
+            Assert.That(wideLogs[0].Text, Does.Contain("id=merc_attacker,pos=1"));
+            Assert.That(pursuitLogs[0].Text, Does.Contain("id=merc_ally,pos=4"));
+            Assert.That(pursuitLogs[0].Text, Does.Contain("id=gladiator,pos=1"));
         }
 
         [Test]
@@ -385,8 +435,9 @@ namespace BattleKing.Tests
                 PlayerUnits = new List<BattleUnit> { activeUser, giftUser },
                 EnemyUnits = new List<BattleUnit> { enemy }
             };
-            var engine = new BattleEngine(context) { OnLog = _ => { } };
-            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
             processor.SubscribeAll();
 
             engine.InitBattle();
@@ -423,8 +474,9 @@ namespace BattleKing.Tests
                 PlayerUnits = new List<BattleUnit> { caster },
                 EnemyUnits = new List<BattleUnit> { enemy }
             };
-            var engine = new BattleEngine(context) { OnLog = _ => { } };
-            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
             processor.SubscribeAll();
 
             engine.InitBattle();
@@ -441,6 +493,106 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(200, activeLog.Damage);
             ClassicAssert.IsFalse(caster.Buffs.Any(buff =>
                 buff.TargetStat == "CritDmg" && buff.IsOneTime && buff.SkillId == "pas_charge_action"));
+            int costLogIndex = logs.FindIndex(line => line.Contains("AP消耗") && line.Contains("4->2"));
+            int recoverLogIndex = logs.FindIndex(line => line.Contains("caster.AP 2->3"));
+            ClassicAssert.GreaterOrEqual(costLogIndex, 0);
+            ClassicAssert.Greater(recoverLogIndex, costLogIndex);
+        }
+
+        [Test]
+        public void StepOneAction_RealPassiveJsonBruteForce_RecoversApAfterCost()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_two_ap_probe"] = CreateTouchSkill(power: 100);
+            repository.ActiveSkills["act_two_ap_probe"].Id = "act_two_ap_probe";
+            repository.ActiveSkills["act_two_ap_probe"].Name = "Two AP Probe";
+            repository.ActiveSkills["act_two_ap_probe"].ApCost = 2;
+            var caster = new BattleUnit(CreateStructuredLogCharacter("caster", "act_two_ap_probe", hp: 300, str: 100, def: 0, spd: 30, ap: 4, pp: 2), repository, true)
+            {
+                Position = 1,
+                CurrentAp = 4
+            };
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 500, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_two_ap_probe" });
+            caster.EquippedPassiveSkillIds.Add("pas_brute_force");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            CollectionAssert.AreEqual(
+                new[] { "RecoverAp", "AddBuff", "AddBuff" },
+                repository.PassiveSkills["pas_brute_force"].Effects.Select(effect => effect.EffectType).ToList());
+            ClassicAssert.AreEqual(3, caster.CurrentAp);
+            ClassicAssert.AreEqual(0, caster.CurrentPp);
+            int costLogIndex = logs.FindIndex(line => line.Contains("AP消耗") && line.Contains("4->2"));
+            int recoverLogIndex = logs.FindIndex(line => line.Contains("caster.AP 2->3"));
+            ClassicAssert.GreaterOrEqual(costLogIndex, 0);
+            ClassicAssert.Greater(recoverLogIndex, costLogIndex);
+        }
+
+        [Test]
+        public void StepOneAction_RealActiveJsonSharpSlash_ForceHitOverridesDodgeStep()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var attacker = new BattleUnit(CreateStructuredLogCharacter("attacker", "act_sharp_slash", hp: 300, str: 100, def: 0, spd: 30, ap: 1, pp: 0), repository, true)
+            {
+                Position = 1
+            };
+            attacker.Data.BaseStats["Hit"] = 0;
+            attacker.Data.BaseStats["Crit"] = 0;
+            var defender = new BattleUnit(CreateStructuredLogCharacter("defender", null, hp: 300, str: 10, def: 50, spd: 1, ap: 0, pp: 1), repository, false)
+            {
+                Position = 1
+            };
+            defender.EquippedPassiveSkillIds.Add("pas_dodge_step");
+            attacker.Strategies.Add(new Strategy { SkillId = "act_sharp_slash" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { defender }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            var activeLog = engine.BattleLogEntries.Single(entry => entry.SkillId == "act_sharp_slash");
+            CollectionAssert.Contains(activeLog.Flags, "Hit");
+            CollectionAssert.DoesNotContain(activeLog.Flags, "Evade");
+            ClassicAssert.Less(defender.CurrentHp, 300);
+            ClassicAssert.IsFalse(logs.Any(line => line.Contains("* EVADE")));
+        }
+
+        [Test]
+        public void StepOneAction_RealActiveJsonBastardCross_AddsPowerFromTargetHpRatio()
+        {
+            var fullHp = RunBastardCrossScenario(targetCurrentHp: 1000);
+            var halfHp = RunBastardCrossScenario(targetCurrentHp: 500);
+
+            ClassicAssert.AreEqual(260, fullHp.Entry.Damage);
+            ClassicAssert.AreEqual(740, fullHp.Target.CurrentHp);
+            ClassicAssert.AreEqual(200, halfHp.Entry.Damage);
+            ClassicAssert.AreEqual(300, halfHp.Target.CurrentHp);
+            Assert.That(fullHp.Logs, Has.Some.Contains("PowerBonus").And.Contains("TargetHpRatio"));
+            Assert.That(fullHp.Logs, Has.Some.Contains("PowerBonus TargetHpRatio=60"));
+            Assert.That(halfHp.Logs, Has.Some.Contains("PowerBonus TargetHpRatio=30"));
         }
 
         [Test]
@@ -789,6 +941,36 @@ namespace BattleKing.Tests
             engine.StepOneAction();
 
             return new ActiveScenarioResult(caster, enemy, logs);
+        }
+
+        private static (BattleUnit Target, BattleLogEntry Entry, List<string> Logs) RunBastardCrossScenario(int targetCurrentHp)
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var caster = new BattleUnit(CreateStructuredLogCharacter("caster", "act_bastard_cross", hp: 300, str: 100, def: 0, spd: 30, ap: 2, pp: 0), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            caster.Data.BaseStats["Crit"] = 0;
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 1000, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1,
+                CurrentHp = targetCurrentHp
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_bastard_cross" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            return (enemy, engine.BattleLogEntries.Single(entry => entry.SkillId == "act_bastard_cross"), logs);
         }
 
         private sealed record ActiveScenarioResult(BattleUnit Caster, BattleUnit Enemy, List<string> Logs);

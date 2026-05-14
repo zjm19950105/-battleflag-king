@@ -199,6 +199,13 @@
         "parameters": {
           "HitCount": 2
         }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "SkillPowerBonusFromTargetHpRatio": 60,
+          "mode": "CurrentHpRatio"
+        }
       }
     ],
     "learnCondition": "兰茨克内希特 Lv20",

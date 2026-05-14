@@ -159,7 +159,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.5
         }
       },
       {
@@ -239,7 +240,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.5
         }
       },
       {
@@ -352,7 +354,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.5
         }
       }
     ],
@@ -580,7 +583,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.75
         }
       }
     ],
@@ -653,7 +657,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.5
         }
       }
     ],
@@ -740,7 +745,7 @@
     "id": "pas_block_seal",
     "name": "重装反击",
     "ppCost": 1,
-    "triggerTiming": "SelfBeforeHit",
+    "triggerTiming": "OnBeingHit",
     "type": "Assist",
     "power": 150,
     "hitRate": null,
@@ -759,7 +764,8 @@
           "attackType": "Melee",
           "targetType": "SingleEnemy",
           "ignoreDefenseRatio": 1,
-          "ignoreDefenseTargetClass": "Heavy"
+          "ignoreDefenseTargetClass": "Heavy",
+          "requiresSourceKind": "ActiveAttack"
         }
       }
     ],
@@ -951,7 +957,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.5
         }
       },
       {
@@ -1067,7 +1074,8 @@
           "power": 150,
           "hitRate": 100,
           "damageType": "Magical",
-          "attackType": "Magic"
+          "attackType": "Magic",
+          "requiresSourceKind": "ActiveAttack"
         }
       }
     ],
@@ -1306,7 +1314,8 @@
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
-          "ForceBlock": true
+          "ForceBlock": true,
+          "BlockReduction": 0.5
         }
       }
     ],
@@ -1587,7 +1596,7 @@
     "id": "pas_bounce",
     "name": "弹跳",
     "ppCost": 1,
-    "triggerTiming": "SelfBeforeHit",
+    "triggerTiming": "OnBeingHit",
     "type": "Assist",
     "power": null,
     "hitRate": null,
@@ -1630,7 +1639,8 @@
           "target": "Attacker",
           "power": 100,
           "hitRate": 75,
-          "targetType": "Row"
+          "targetType": "Row",
+          "requiresSourceKind": "ActiveAttack"
         }
       }
     ],

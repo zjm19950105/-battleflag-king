@@ -258,6 +258,18 @@ namespace BattleKing.Skills
                 logs.Add($"ForceBlock={calculation.ForceBlock}");
             }
 
+            if (TryGetFloat(parameters, "BlockReduction", out float blockReduction))
+            {
+                calculation.ForcedBlockReduction = Math.Clamp(blockReduction, 0f, 1f);
+                logs.Add($"BlockReduction={calculation.ForcedBlockReduction:0.##}");
+            }
+            else if (TryGetString(parameters, "GuardType", out string guardType)
+                && TryGetGuardBlockReduction(guardType, out float guardReduction))
+            {
+                calculation.ForcedBlockReduction = guardReduction;
+                logs.Add($"BlockReduction={calculation.ForcedBlockReduction:0.##}");
+            }
+
             if (GetBool(parameters, "CannotBeBlocked", false))
             {
                 calculation.CannotBeBlocked = true;
@@ -291,7 +303,20 @@ namespace BattleKing.Skills
             if (TryGetFloat(parameters, "SkillPowerBonus", out float skillPowerBonus))
             {
                 calculation.SkillPowerBonus += skillPowerBonus;
+                calculation.SkillPowerBonusNotes.Add($"Fixed +{skillPowerBonus:0.##}");
                 logs.Add($"PowerBonus={skillPowerBonus:0.##}");
+            }
+
+            if (TryGetFloat(parameters, "SkillPowerBonusFromTargetHpRatio", out float targetHpRatioMaxBonus))
+            {
+                var target = calculation.Defender;
+                int maxHp = GetMaxHp(target);
+                int currentHp = Math.Max(0, target?.CurrentHp ?? 0);
+                float ratio = Math.Clamp(currentHp / (float)maxHp, 0f, 1f);
+                float bonus = MathF.Floor(targetHpRatioMaxBonus * ratio);
+                calculation.SkillPowerBonus += bonus;
+                calculation.SkillPowerBonusNotes.Add($"目标HP比例(TargetHpRatio) {currentHp}/{maxHp} +{bonus:0.##}");
+                logs.Add($"PowerBonus TargetHpRatio={bonus:0.##} ({currentHp}/{maxHp})");
             }
 
             if (TryGetFloat(parameters, "DamageMultiplier", out float damageMultiplier))
@@ -368,6 +393,33 @@ namespace BattleKing.Skills
                 "backrow" => !caster.IsFrontRow,
                 _ => false
             };
+        }
+
+        private static bool TryGetGuardBlockReduction(string guardType, out float reduction)
+        {
+            reduction = 0f;
+            if (string.IsNullOrWhiteSpace(guardType))
+                return false;
+
+            switch (guardType.Trim().ToLowerInvariant())
+            {
+                case "small":
+                case "light":
+                case "smallguard":
+                case "lightguard":
+                    reduction = 0.25f;
+                    return true;
+                case "medium":
+                case "mediumguard":
+                    reduction = 0.50f;
+                    return true;
+                case "large":
+                case "largeguard":
+                    reduction = 0.75f;
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static bool HasDebuff(BattleUnit unit)
@@ -686,7 +738,7 @@ namespace BattleKing.Skills
                 int maxHp = GetMaxHp(target);
                 int before = target.CurrentHp;
                 int heal = Math.Max(1, (int)(maxHp * percent / 100f));
-                target.CurrentHp = Math.Min(maxHp, target.CurrentHp + heal);
+                target.CurrentHp = HealWithoutLoweringCurrentHp(target.CurrentHp, heal, maxHp);
                 logs.Add($"{target.Data.Name}.HP {before}->{target.CurrentHp}");
             }
         }
@@ -712,9 +764,15 @@ namespace BattleKing.Skills
                     effectiveRatio *= lowHpMultiplier;
                 }
                 int heal = Math.Max(1, (int)(maxHp * effectiveRatio));
-                target.CurrentHp = Math.Min(maxHp, target.CurrentHp + heal);
+                target.CurrentHp = HealWithoutLoweringCurrentHp(target.CurrentHp, heal, maxHp);
                 logs.Add($"{target.Data.Name}.HP {before}->{target.CurrentHp}");
             }
+        }
+
+        private static int HealWithoutLoweringCurrentHp(int currentHp, int heal, int maxHp)
+        {
+            int healed = Math.Min(maxHp, currentHp + Math.Max(1, heal));
+            return Math.Max(currentHp, healed);
         }
 
         private static void ApplyRemoveBuff(

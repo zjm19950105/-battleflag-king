@@ -80,12 +80,15 @@ namespace BattleKing.Ui
             float classMult = calc.ClassTraitMultiplier;
 
             lines.Add("  Atk:" + calc.FinalAttackPower + " | Def:" + calc.FinalDefense + " | Diff:" + diff);
+            if (Math.Abs(calc.SkillPowerBonus) > 0.01f || Math.Abs(calc.CounterPowerBonus) > 0.01f)
+                lines.Add(BuildPowerBonusLine(skill, calc));
             if (calc.MagicalDamage > 0)
                 lines.Add("  MagicDamage:" + calc.MagicalDamage);
 
             if (calc.HitCount > 1 && hitResults.Count > 0)
             {
                 lines.Add(BuildSingleHitFormula(calc, hitResults));
+                lines.AddRange(BuildMultiHitDetails(calc, hitResults));
                 lines.Add(BuildMultiHitTotal(calc, result, hitResults));
             }
             else
@@ -115,6 +118,21 @@ namespace BattleKing.Ui
             return lines;
         }
 
+        private static string BuildPowerBonusLine(ActiveSkill skill, DamageCalculation calc)
+        {
+            var parts = new List<string>();
+            if (calc.SkillPowerBonusNotes.Count > 0)
+                parts.AddRange(calc.SkillPowerBonusNotes);
+            else if (Math.Abs(calc.SkillPowerBonus) > 0.01f)
+                parts.Add("Fixed +" + FormatNumber(calc.SkillPowerBonus));
+            if (Math.Abs(calc.CounterPowerBonus) > 0.01f)
+                parts.Add("Counter +" + FormatNumber(calc.CounterPowerBonus));
+
+            return "  PowerBonus: base " + skill.Power
+                + " + " + string.Join(" + ", parts)
+                + " = " + FormatNumber(calc.EffectivePower);
+        }
+
         private static string BuildSingleHitFormula(DamageCalculation calc, IReadOnlyList<DamageHitResult> hitResults)
         {
             var sample = hitResults.FirstOrDefault(hit => hit.BaseTotalDamage > 0f) ?? hitResults.First();
@@ -130,6 +148,51 @@ namespace BattleKing.Ui
                 formula += " x 特性" + FormatNumber(calc.CharacterTraitMultiplier);
             formula += " = " + FormatNumber(sample.BaseTotalDamage);
             return formula;
+        }
+
+        private static IEnumerable<string> BuildMultiHitDetails(DamageCalculation calc, IReadOnlyList<DamageHitResult> hitResults)
+        {
+            int diff = Math.Max(1, calc.FinalAttackPower - calc.FinalDefense);
+            foreach (var hit in hitResults.OrderBy(hit => hit.HitIndex))
+            {
+                if (hit.Missed)
+                {
+                    yield return "  hit" + hit.HitIndex + " MISS: 0";
+                    continue;
+                }
+                if (hit.Evaded)
+                {
+                    yield return "  hit" + hit.HitIndex + " EVADE: 0";
+                    continue;
+                }
+                if (hit.Nullified)
+                {
+                    yield return "  hit" + hit.HitIndex + " NULLIFY: 0";
+                    continue;
+                }
+
+                string line = "  hit" + hit.HitIndex + " " + GetHitDetailLabel(hit)
+                    + ": (" + calc.FinalAttackPower + "-" + calc.FinalDefense + "=" + diff + ")"
+                    + " x 威力" + FormatPercent(calc.SkillPowerRatio)
+                    + " = " + FormatNumber(hit.BaseTotalDamage);
+                if (hit.Critical)
+                    line += " x" + hit.CritMultiplier.ToString("F1");
+                if (hit.Blocked)
+                    line += " -" + (hit.BlockReduction * 100).ToString("F0") + "%";
+                line += " = " + FormatNumber(hit.TotalDamage);
+                yield return line;
+            }
+        }
+
+        private static string GetHitDetailLabel(DamageHitResult hit)
+        {
+            if (hit.Critical && hit.Blocked)
+                return "暴击格挡";
+            if (hit.Critical)
+                return "暴击";
+            if (hit.Blocked)
+                return "格挡";
+            return "普通";
         }
 
         private static string BuildMultiHitTotal(DamageCalculation calc, DamageResult result, IReadOnlyList<DamageHitResult> hitResults)

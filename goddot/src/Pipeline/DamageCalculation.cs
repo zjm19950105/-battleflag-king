@@ -26,6 +26,7 @@ namespace BattleKing.Pipeline
         public bool IsEvaded { get; set; } = false;
         public float CritMultiplier { get; set; } = 1.5f;
         public float BlockReduction { get; set; } = 0f;
+        public float? ForcedBlockReduction { get; set; } = null;
 
         public int PhysicalDamage { get; set; }
         public int MagicalDamage { get; set; }
@@ -40,7 +41,7 @@ namespace BattleKing.Pipeline
 
         // === Module 1: Mutable params for passive skill intervention ===
 
-        /// <summary>Force hit (skip hit check, but evasion skills still work)</summary>
+        /// <summary>Force hit (skip hit/evasion checks, but Darkness still misses)</summary>
         public bool ForceHit { get; set; } = false;
 
         /// <summary>Force critical hit if the attacker is allowed to crit</summary>
@@ -89,6 +90,8 @@ namespace BattleKing.Pipeline
 
         /// <summary>Bonus power from structured calculation effects.</summary>
         public float SkillPowerBonus { get; set; } = 0f;
+
+        public List<string> SkillPowerBonusNotes { get; } = new List<string>();
 
         /// <summary>Effective skill power = base power + structured/counter bonuses.</summary>
         public float EffectivePower => Skill.Power + SkillPowerBonus + CounterPowerBonus;

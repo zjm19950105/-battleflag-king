@@ -145,6 +145,8 @@ namespace BattleKing.Core
         public float GetBlockReduction()
         {
             if (Equipment?.OffHand?.Data?.Category == EquipmentCategory.GreatShield)
+                return 0.75f;
+            if (Equipment?.OffHand?.Data?.Category == EquipmentCategory.Shield)
                 return 0.50f;
             return 0.25f;
         }
