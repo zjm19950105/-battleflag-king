@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BattleKing.Core;
@@ -23,6 +24,9 @@ namespace BattleKing.Ai
 				: GetDefaultTargetList(caster, skill);
 
 			var candidates = ApplyStrategyConditions(defaultTargets, strategy, caster, skill);
+			var forcedTargets = GetForcedTargetCandidates(caster, skill, defaultTargets);
+			if (forcedTargets.Count > 0)
+				candidates = OrderByGroups(defaultTargets, forcedTargets);
 
 			if (candidates == null || candidates.Count == 0)
 				return null;
@@ -45,13 +49,7 @@ namespace BattleKing.Ai
 
 		private List<BattleUnit> GetDefaultTargetList(BattleUnit caster, ActiveSkillData skill)
 		{
-			bool targetIsEnemy = skill.TargetType switch
-			{
-				TargetType.Self => false,
-				TargetType.SingleAlly => false,
-				TargetType.AllAllies => false,
-				_ => skill.Type != SkillType.Heal
-			};
+			bool targetIsEnemy = IsEnemyTargetingSkill(skill);
 
 			var pool = targetIsEnemy
 				? (caster.IsPlayer ? _ctx.EnemyUnits : _ctx.PlayerUnits)
@@ -77,6 +75,31 @@ namespace BattleKing.Ai
 			}
 
 			return aliveUnits.OrderBy(u => u.Position).ToList();
+		}
+
+		private List<BattleUnit> GetForcedTargetCandidates(
+			BattleUnit caster,
+			ActiveSkillData skill,
+			List<BattleUnit> defaultCandidates)
+		{
+			if (!IsEnemyTargetingSkill(skill) || skill.TargetType == TargetType.AllEnemies)
+				return new List<BattleUnit>();
+
+			return defaultCandidates
+				.Where(u => u.TemporalStates.Any(s =>
+					s.RemainingCount != 0 && s.Key == "ForcedTarget"))
+				.ToList();
+		}
+
+		private static bool IsEnemyTargetingSkill(ActiveSkillData skill)
+		{
+			return skill.TargetType switch
+			{
+				TargetType.Self => false,
+				TargetType.SingleAlly => false,
+				TargetType.AllAllies => false,
+				_ => skill.Type != SkillType.Heal
+			};
 		}
 
 		/// <summary>
@@ -258,8 +281,7 @@ namespace BattleKing.Ai
 			string value = condition.Value?.ToString() ?? "";
 			if (value == "ratio")
 			{
-				int maxHp = unit.Data?.BaseStats?.GetValueOrDefault("HP", 1) ?? 1;
-				if (maxHp <= 0) maxHp = 1;
+				int maxHp = Math.Max(1, unit.GetCurrentStat("HP"));
 				return (int)((float)unit.CurrentHp / maxHp * 100000);
 			}
 
@@ -277,9 +299,9 @@ namespace BattleKing.Ai
 			if (string.Equals(statName, "MaxHp", System.StringComparison.OrdinalIgnoreCase))
 				return unit.GetCurrentStat("HP");
 			if (string.Equals(statName, "MaxAp", System.StringComparison.OrdinalIgnoreCase))
-				return unit.MaxAp;
+				return unit.InitialAp;
 			if (string.Equals(statName, "MaxPp", System.StringComparison.OrdinalIgnoreCase))
-				return unit.MaxPp;
+				return unit.InitialPp;
 
 			return unit.GetCurrentStat(statName);
 		}

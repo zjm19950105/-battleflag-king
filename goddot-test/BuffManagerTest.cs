@@ -66,5 +66,32 @@ namespace BattleKing.Tests
             ClassicAssert.That(BuffManager.GetTotalBuffRatio(_unit, "Str"), Is.EqualTo(0.2f).Within(0.01f));
             ClassicAssert.That(BuffManager.GetTotalBuffRatio(_unit, "Def"), Is.EqualTo(0.5f).Within(0.01f));
         }
+
+        [Test]
+        public void StackablePureBuff_SameSkillAndStat_CanStack()
+        {
+            var b1 = new Buff
+            {
+                SkillId = "pas_hawk_eye",
+                TargetStat = "Def",
+                Ratio = 0.2f,
+                IsPureBuffOrDebuff = true,
+                CanStackWithSameSkill = true
+            };
+            var b2 = new Buff
+            {
+                SkillId = "pas_hawk_eye",
+                TargetStat = "Def",
+                Ratio = 0.2f,
+                IsPureBuffOrDebuff = true,
+                CanStackWithSameSkill = true
+            };
+
+            BuffManager.ApplyBuff(_unit, b1);
+            BuffManager.ApplyBuff(_unit, b2);
+
+            ClassicAssert.AreEqual(2, _unit.Buffs.Count);
+            ClassicAssert.That(BuffManager.GetTotalBuffRatio(_unit, "Def"), Is.EqualTo(0.4f).Within(0.01f));
+        }
     }
 }

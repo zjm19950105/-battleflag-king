@@ -1,7 +1,7 @@
 # 战旗之王 - Codex 接手指南
 
-最后更新：2026-05-13  
-状态：Phase 1.4-A / A01-A16、策略系统、G1/G2/G3 技能 structured effects、剩余 active 技能迁移已完成；当前测试 358/358 通过，游戏项目 build 0 警告。
+最后更新：2026-05-14  
+状态：Phase 1.4-A / A01-A16、策略系统、active/passive legacy tag-only allowlist 已清空；当前测试 395/395 通过，游戏项目 build 0 警告。
 
 本文件给 Codex 使用；内容与 `CLAUDE.md` 保持同一套接手规则。不要把 `docs/next-ai-task-prompts.md` 当作新的待办清单，它现在只是 A01-A16 完成归档。
 
@@ -20,10 +20,10 @@ JSON 数据
   -> BattleSetupService 创建 BattleUnit
   -> StrategyEvaluator / TargetSelector 选技能和目标
   -> BattleEngine 推进战斗状态机
-  -> EventBus 发布战斗阶段事件
+  -> EventBus 发布战斗阶段事件（主动宣言/扣 AP 后/攻击前/命中前后）
   -> PassiveSkillProcessor 仲裁被动
   -> SkillEffectExecutor 执行结构化 effects
-  -> DamageCalculator 结算伤害
+  -> DamageCalculator 结算伤害并记录 per-hit breakdown
   -> BattleLogEntry + OnLog 输出给测试/UI
 ```
 
@@ -65,22 +65,33 @@ JSON 数据
 - 增加金样例、数据契约、结构化日志、合规扫描测试。
 - 追加修复：`EnemyClassExists=无`、`TeamSize` 相对阵营和包含边界、`ApPp highest PP`。
 - 测试沙盒已支持战斗中/战前热插拔：阵容槽可清空、拖回角色池退下，右键可扣 10 HP、扣 50% HP、恢复 50% HP、设置气绝。
+- 测试沙盒第一批 UI 修复已完成：右侧“当前说明”区域常驻战场状态，左侧详情不再显示冗余测试场景说明，重新点击同一角色会复用草稿装备/策略状态。
 - `UnitState.Stunned` 已有真实战斗语义：轮到行动时跳过一次并恢复 `Normal`。
 - 队列・状况条件已按原版语义修正：`前后排一列` 是纵列 1-4 / 2-5 / 3-6；`人数最多/最少一排`、`2/3体以上一排` 是前排/后排人数，不是纵列人数。
 - 新增 `QueueStatusStrategyManualPlanTest`，把队列・状况手动测试方案自动化；后续其它策略分类建议照这个模式写验收测试。
 
 ## 已完成的技能系统迁移
 
-- 主动技能 allowlist 已清空；`goddot-test/DataContractTest.cs` 里当前只剩 passive legacy tag-only allowlist。
+- 主动技能 allowlist 已清空；passive legacy tag-only allowlist 也已清空，`goddot-test/DataContractTest.cs` 当前为 `new()`。
 - G1 资源/命中/击杀收益已落地：`OnHitEffect`、`OnKillEffect`、`TransferResource`，覆盖 `act_pierce`、`act_kill_chain`、`act_hache`、`act_holy_blade`、`act_passive_steal`、`pas_formation_counter`、`pas_pursuit_slash`。
 - G2/G3 异常、debuff、诅咒和常见 ranged/assist active 已迁移；`OnHitEffect` 支持 `chance`，主动攻击附带异常/debuff 必须命中后触发时要包在 `OnHitEffect`。
 - `CritSeal` 方向已修正：攻击者身上有 `CritSeal` 时禁止暴击；防守者身上的 `CritSeal` 不保护自己。
 - `StatusAilment.Stun` 会同步 `UnitState.Stunned`，轮到行动时跳过一次并恢复 `Normal`。
 - `BuffManager` 已允许同一技能的不同属性纯 buff/debuff 共存；仍会去重同一技能 + 同一属性。
+- 剩余 15 个 passive 已迁移到 structured effects：`pas_hundred_crit`、`pas_muscle_swelling`、`pas_calm_cover`、`pas_hawk_eye`、`pas_rapid_reload`、`pas_emergency_cover`、`pas_cut_grass`、`pas_fervor`、`pas_quick_reload`、`pas_pursuit_magic`、`pas_magic_blade`、`pas_quick_cast`、`pas_magic_barrier`、`pas_row_barrier`、`pas_berserk`。
+- 新增/确认的 passive 机制：
+  - `AugmentCurrentAction`：当前主动行动附加 calculation / on-hit / queued action / tags；用于 `pas_rapid_reload`、`pas_quick_reload`、`pas_magic_blade`、`pas_muscle_swelling`、`pas_cut_grass`、`pas_pursuit_magic`。
+  - `AugmentOutgoingActions`：战斗长期阵营光环，当前用于 `pas_calm_cover`。
+  - `ActionOrderPriority`、`ForcedTarget`、`RowAlliesOfTarget`、`MagicDamageNullify`、`AilmentNullify`、`DeathResist`、`ForceCrit`、`stackPolicy: "Stack"` 已落地。
+- 装备资源同步已修复：装备改变 HP/AP/PP 后，`BattleUnit.SyncResourceCapsFromStats(...)` 会同步当前 HP、入场 AP/PP、被动 PP 预算和当前 AP/PP；HP=0 不会因换装复活。战斗中 AP/PP 硬上限固定为 `BattleUnit.ResourceCap == 4`，`MaxAp`/`MaxPp` 用于显示和恢复 clamp，始终是 4；被动装备预算使用 `PassivePpBudget`（装备后入场 PP），不要用固定 4。
 - 新增/确认的 active 收尾机制：
   - `ColumnAlliesOfTarget`：以选中目标为锚点，选其同阵营同纵列存活单位；当前用于 `act_line_defense`。
   - `SkillPowerBonus` + `casterRow` / `requiresCasterFrontRow`：结构化固定威力加算和施法者前后排条件；当前用于 `act_frontline_heavy_bolt`。
   - `AmplifyDebuffs`：只放大已有负向纯 debuff，不影响 buff、不创建新 debuff；当前用于 `act_curse_disaster`。
+- 追加战斗语义修复：
+  - pending 追击/反击 PP 延迟到 `ProcessPendingActions()` 真正结算前消耗；若前一个 Counter/Pursuit 已击杀目标，后续 pending action 不发动、不扣 PP、不写伤害日志。
+  - 主动相关被动已拆阶段：`BeforeActiveUseEvent` 只表示主动宣言；`AfterActiveCostEvent` 在扣 AP 后触发 `SelfOnActiveUse` / `AllyOnActiveUse`；`BeforeAttackCalculationEvent` 再触发 `SelfBeforeAttack` / `AllyBeforeAttack`。`蓄力行动`、`专注`、`主动礼物` 这类 RecoverAp 不再在扣 AP 前被 clamp 掉。
+  - 多段攻击已有 per-hit breakdown：`DamageHitResult` 记录每 hit 的 miss/evade/crit/block/nullify 和伤害，`BattleLogHelper` 按真实 hit 明细汇总普通/暴击/格挡段。
 - 最近提交：
   - `a9ef9b2` `Migrate structured skill effects baseline`
   - `d8b637c` `Migrate remaining active structured effects`
@@ -89,10 +100,14 @@ JSON 数据
 
 - `Main.cs` 仍偏大，UI 和阶段流仍集中。
 - `SkillEffectExecutor`、`PassiveSkillProcessor` 偏大，新增 effect 前先复用已有原子；新增通用机制必须补真实 JSON 测试。
-- BattleEnd 语义已完成追加修复；当前剩余风险主要是继续收敛 passive legacy tag-only 技能，而不是 BattleEnd 关键被动。
-- active legacy tag-only 白名单已清空；仍有 passive legacy tag-only 技能白名单。新增战斗语义必须写 structured `effects`。
-- 剩余 passive 重点包括：`pas_hundred_crit`、`pas_muscle_swelling`、`pas_calm_cover`、`pas_hawk_eye`、`pas_rapid_reload`、`pas_emergency_cover`、`pas_cut_grass`、`pas_fervor`、`pas_quick_reload`、`pas_pursuit_magic`、`pas_magic_blade`、`pas_quick_cast`、`pas_magic_barrier`、`pas_row_barrier`、`pas_berserk`。
-- `pas_rapid_reload` 不要硬编码；审计建议新增通用 `AugmentCurrentAction`，让 `SelfBeforeAttack` / `AllyBeforeAttack` 被动把 calculation effects / on-hit effects 附着到当前主动行动。
+- BattleEnd 语义已完成追加修复；当前剩余风险主要是手测暴露的 UI/日志/战斗语义一致性，而不是 legacy allowlist。
+- 手测暴露的优先风险：
+  - 命中率日志公式用户认为不对：当前显示类似 `技能100 + 命中 - 回避`，需要确认 `ActiveSkillData.HitRate` 是否应作为命中率加值、命中倍率、或只是与威力混淆；不要只改文案，先查数据字段和原版语义。
+  - 简易 buff/debuff 数值不能降到负数：例如 `快速施法` 的 Crit -50 最低应显示/计算为 0，不能负数。需要统一在 `GetCurrentStat` 或 buff 结算层 clamp。
+  - pending action 日志不清晰：反击/追击实际在 `[Counter]` / `[Pursuit]` 行结算，但“行动结束”先出现，导致玩家看不懂目标是否已经扣血/死亡。需要重排或增强日志，明确 pending action 的 HP 变化和最终死亡。
+  - `DeathResist` 当前在日志里可能表现为 `HP:109->1(-108)` 这种“先补血再留 1”的错觉；实际是 `BattleLogHelper` 用 `CurrentHp + damage` 反推 hpBefore。需要让伤害结果携带真实扣血前 HP，避免动画/日志后续耦合出错。
+  - 用户手测怀疑追击系列、空中狙击、列屏障、守护者、暴怒/反击等实现或日志有问题；自动测试通过，但必须用手测日志复现并区分“没实现”和“日志表达不清”。
+- 新增战斗语义必须继续写 structured `effects`；不要恢复旧 `ISkillEffect` / `SkillEffectFactory` / `Skills/Effects/*` 双轨。
 - 测试项目有 nullable/Godot source generator 警告；游戏项目 build 应保持 0 警告。
 - `StrategyConditionCatalog` 里部分历史 ID 仍叫 `queue-most-column` / `queue-only-column-at-least-*`；这是兼容旧数据，代码注释已说明实际语义是“排”。不要把它们改回纵列。
 

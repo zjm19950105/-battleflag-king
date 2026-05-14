@@ -59,24 +59,7 @@ namespace BattleKing.Tests
         // without structured Effects. Keep this list explicit so new tag-only combat
         // logic cannot enter data quietly; remove entries as effects are migrated.
         private const string LegacyTagOnlyReason = "Legacy tag-only skill pending structured effects migration.";
-        private static readonly Dictionary<string, string> LegacyTagOnlySkillAllowlist = new()
-        {
-            ["passive:pas_hundred_crit"] = LegacyTagOnlyReason,
-            ["passive:pas_muscle_swelling"] = LegacyTagOnlyReason,
-            ["passive:pas_calm_cover"] = LegacyTagOnlyReason,
-            ["passive:pas_hawk_eye"] = LegacyTagOnlyReason,
-            ["passive:pas_rapid_reload"] = LegacyTagOnlyReason,
-            ["passive:pas_emergency_cover"] = LegacyTagOnlyReason,
-            ["passive:pas_cut_grass"] = LegacyTagOnlyReason,
-            ["passive:pas_fervor"] = LegacyTagOnlyReason,
-            ["passive:pas_quick_reload"] = LegacyTagOnlyReason,
-            ["passive:pas_pursuit_magic"] = LegacyTagOnlyReason,
-            ["passive:pas_magic_blade"] = LegacyTagOnlyReason,
-            ["passive:pas_quick_cast"] = LegacyTagOnlyReason,
-            ["passive:pas_magic_barrier"] = LegacyTagOnlyReason,
-            ["passive:pas_row_barrier"] = LegacyTagOnlyReason,
-            ["passive:pas_berserk"] = LegacyTagOnlyReason
-        };
+        private static readonly Dictionary<string, string> LegacyTagOnlySkillAllowlist = new();
 
         [Test]
         public void RealData_LoadAll_DeserializesAndMatchesCurrentCounts()

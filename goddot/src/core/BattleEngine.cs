@@ -39,7 +39,7 @@ namespace BattleKing.Core
             _ctx = ctx;
             _strategyEvaluator = new StrategyEvaluator(ctx);
             _damageCalculator = new DamageCalculator();
-            _skillEffectExecutor = new SkillEffectExecutor();
+            _skillEffectExecutor = new SkillEffectExecutor(EnqueueAction);
         }
 
         private void Log(string message)
@@ -74,6 +74,7 @@ namespace BattleKing.Core
             _battleEndPhaseStarted = false;
             _turnQueue.Clear();
             _actionsThisTurn = 0;
+            _ctx.OutgoingActionAugments.Clear();
             Log("=== 战斗开始 ===");
             PrintTeamStatus();
             _eventBus.Publish(new BattleStartEvent { Context = _ctx });
@@ -377,20 +378,29 @@ namespace BattleKing.Core
 
         private void ExecuteSkillAgainstTargets(BattleUnit unit, BattleKing.Skills.ActiveSkill skill, List<BattleUnit> targets)
         {
+            _ctx.CurrentActionAugments.Clear();
+            _ctx.CurrentActionSkill = skill;
+            AddOutgoingActionAugments(unit, skill);
             _eventBus.Publish(new BeforeActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
 
             if (unit.State != UnitState.Charging)
                 unit.ConsumeAp(skill.ApCost);
 
+            _eventBus.Publish(new AfterActiveCostEvent { Caster = unit, Skill = skill, Context = _ctx });
+            _eventBus.Publish(new BeforeAttackCalculationEvent { Caster = unit, Skill = skill, Context = _ctx });
+
             Log($"--- {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 发动 {skill.Data.Name} (AP{skill.ApCost} 威力{skill.Power}) [{DumpUnitBrief(unit)}] ---");
 
             var effectState = new SkillEffectExecutionState();
+            var augmentEffectState = new SkillEffectExecutionState();
             var actionEffectLogs = _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, skill.Data.Effects, skill.Data.Id);
             if (actionEffectLogs.Count > 0)
                 Log($"  effects: {string.Join(", ", actionEffectLogs)}");
 
             if (skill.Type == SkillType.Heal)
             {
+                _ctx.CurrentActionAugments.Clear();
+                _ctx.CurrentActionSkill = null;
                 _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
                 return;
             }
@@ -413,6 +423,10 @@ namespace BattleKing.Core
                     _ctx, unit, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id, calc, effectState);
                 if (calculationEffectLogs.Count > 0)
                     Log($"  calc effects: {string.Join(", ", calculationEffectLogs)}");
+
+                var augmentCalcLogs = ExecuteCurrentActionAugmentCalculationEffects(unit, target, calc, augmentEffectState);
+                if (augmentCalcLogs.Count > 0)
+                    Log($"  augment calc effects: {string.Join(", ", augmentCalcLogs)}");
 
                 _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                 _eventBus.Publish(new BeforeHitEvent
@@ -438,7 +452,15 @@ namespace BattleKing.Core
 
 				var logLines = BattleKing.Ui.BattleLogHelper.FormatAttack(unit, target, skill, calc, result, killed, result.AppliedAilments.ToList());
 				foreach (var l in logLines) Log(l);
-                EmitBattleLogEntry(CreateAttackLogEntry(unit, skill.Data.Id, damageReceiver, result, killed, "ActiveAttack", logLines.LastOrDefault() ?? ""));
+                EmitBattleLogEntry(CreateAttackLogEntry(
+                    unit,
+                    skill.Data.Id,
+                    damageReceiver,
+                    result,
+                    killed,
+                    "ActiveAttack",
+                    AppendCurrentActionAugmentLog(logLines.LastOrDefault() ?? ""),
+                    extraFlags: BuildCurrentActionAugmentFlags()));
 
 				if (killed)
 				{
@@ -455,6 +477,10 @@ namespace BattleKing.Core
                 if (postEffectLogs.Count > 0)
                     Log($"  post effects: {string.Join(", ", postEffectLogs)}");
 
+                var augmentPostEffectLogs = ExecuteCurrentActionAugmentPostDamageEffects(unit, damageReceiver, calc, result, killed);
+                if (augmentPostEffectLogs.Count > 0)
+                    Log($"  augment post effects: {string.Join(", ", augmentPostEffectLogs)}");
+
 				_eventBus.Publish(new AfterHitEvent
 				{
 					Attacker = unit,
@@ -467,9 +493,179 @@ namespace BattleKing.Core
                 // State already shown in multi-line log above
             }
 
+            var augmentQueuedActionLogs = ExecuteCurrentActionAugmentQueuedActions(targets);
+            if (augmentQueuedActionLogs.Count > 0)
+                Log($"  augment queued actions: {string.Join(", ", augmentQueuedActionLogs)}");
+
+            _ctx.CurrentActionAugments.Clear();
+            _ctx.CurrentActionSkill = null;
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
 
             Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 行动结束: {DumpUnitBrief(unit)}");
+        }
+
+        private void AddOutgoingActionAugments(BattleUnit unit, ActiveSkill skill)
+        {
+            foreach (var augment in _ctx.OutgoingActionAugments
+                .Where(augment => augment.IsPlayerSide == unit.IsPlayer
+                    && SkillEffectExecutor.CurrentActionRequirementMatches(augment.RequirementParameters, skill)))
+            {
+                _ctx.CurrentActionAugments.Add(new CurrentActionAugment
+                {
+                    Actor = unit,
+                    SourcePassiveId = augment.SourcePassiveId,
+                    CalculationEffects = augment.CalculationEffects,
+                    OnHitEffects = augment.OnHitEffects,
+                    Tags = augment.Tags
+                });
+            }
+        }
+
+        private List<string> ExecuteCurrentActionAugmentCalculationEffects(
+            BattleUnit unit,
+            BattleUnit target,
+            DamageCalculation calc,
+            SkillEffectExecutionState state)
+        {
+            var logs = new List<string>();
+            foreach (var augment in _ctx.CurrentActionAugments)
+            {
+                var tagged = ApplyCurrentActionAugmentTags(calc, augment.Tags);
+                if (tagged.Count > 0)
+                    logs.Add($"{augment.SourcePassiveId}: tags={FormatTags(tagged)}");
+
+                var effectLogs = _skillEffectExecutor.ExecuteCalculationEffects(
+                    _ctx,
+                    unit,
+                    new List<BattleUnit> { target },
+                    augment.CalculationEffects,
+                    augment.SourcePassiveId,
+                    calc,
+                    state);
+                logs.AddRange(effectLogs.Select(log => $"{augment.SourcePassiveId}: {log}"));
+            }
+
+            return logs;
+        }
+
+        private List<string> ExecuteCurrentActionAugmentPostDamageEffects(
+            BattleUnit unit,
+            BattleUnit damageReceiver,
+            DamageCalculation calc,
+            DamageResult result,
+            bool killed)
+        {
+            var logs = new List<string>();
+            foreach (var augment in _ctx.CurrentActionAugments.Where(augment => augment.OnHitEffects.Count > 0))
+            {
+                var wrapped = new List<SkillEffectData>
+                {
+                    new SkillEffectData
+                    {
+                        EffectType = "OnHitEffect",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "effects", augment.OnHitEffects }
+                        }
+                    }
+                };
+
+                var effectLogs = _skillEffectExecutor.ExecutePostDamageEffects(
+                    _ctx,
+                    unit,
+                    damageReceiver,
+                    wrapped,
+                    augment.SourcePassiveId,
+                    calc,
+                    result,
+                    killed);
+                logs.AddRange(effectLogs.Select(log => $"{augment.SourcePassiveId}: {log}"));
+            }
+
+            return logs;
+        }
+
+        private List<string> ExecuteCurrentActionAugmentQueuedActions(IReadOnlyList<BattleUnit> targets)
+        {
+            var logs = new List<string>();
+            var actionTargets = targets?.Where(target => target != null).ToList() ?? new List<BattleUnit>();
+            if (actionTargets.Count == 0)
+                return logs;
+
+            foreach (var augment in _ctx.CurrentActionAugments.Where(augment => augment.QueuedActionEffects.Count > 0))
+            {
+                if (augment.Actor?.IsAlive != true)
+                    continue;
+
+                var effectLogs = _skillEffectExecutor.ExecuteActionEffects(
+                    _ctx,
+                    augment.Actor,
+                    actionTargets,
+                    augment.QueuedActionEffects,
+                    augment.SourcePassiveId);
+                foreach (var action in _pendingActions.Where(action =>
+                    string.Equals(action.SourcePassiveId, augment.SourcePassiveId, StringComparison.Ordinal)
+                    && action.Actor == augment.Actor
+                    && action.SourcePpCost == 0))
+                {
+                    action.SourcePpCost = augment.SourcePpCost;
+                    action.SourceTimingLabel = augment.SourceTimingLabel;
+                }
+                logs.AddRange(effectLogs.Select(log => $"{augment.SourcePassiveId}: {log}"));
+            }
+
+            return logs;
+        }
+
+        private static List<string> ApplyCurrentActionAugmentTags(DamageCalculation calc, IEnumerable<string> tags)
+        {
+            var applied = tags?.Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct().ToList()
+                ?? new List<string>();
+            if (calc == null)
+                return applied;
+
+            if (applied.Contains("SureHit"))
+                calc.ForceHit = true;
+            if (applied.Contains("CannotBeBlocked"))
+                calc.CannotBeBlocked = true;
+            if (applied.Contains("CannotBeCovered"))
+                calc.CannotBeCovered = true;
+
+            return applied;
+        }
+
+        private string AppendCurrentActionAugmentLog(string text)
+        {
+            var augments = _ctx.CurrentActionAugments;
+            if (augments.Count == 0)
+                return text;
+
+            var sources = augments
+                .Select(augment => augment.SourcePassiveId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+            var tags = augments
+                .SelectMany(augment => augment.Tags ?? new List<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct()
+                .ToList();
+            return text
+                + $" augments={FormatTags(sources)}"
+                + $" augmentTags={FormatTags(tags)}";
+        }
+
+        private IEnumerable<string> BuildCurrentActionAugmentFlags()
+        {
+            var flags = new List<string>();
+            foreach (var augment in _ctx.CurrentActionAugments)
+            {
+                if (!string.IsNullOrWhiteSpace(augment.SourcePassiveId))
+                    flags.Add($"Augment:{augment.SourcePassiveId}");
+                flags.AddRange((augment.Tags ?? new List<string>()).Where(tag => !string.IsNullOrWhiteSpace(tag)));
+            }
+
+            return flags.Distinct();
         }
 
         private void ProcessPendingActions()
@@ -480,11 +676,16 @@ namespace BattleKing.Core
                 if (!action.Actor.IsAlive)
                     continue;
 
-                foreach (var target in ExpandPendingActionTargets(action))
-                {
-                    if (!target.IsAlive)
-                        continue;
+                var pendingTargets = ExpandPendingActionTargets(action)
+                    .Where(target => target != null && target.IsAlive)
+                    .ToList();
+                if (pendingTargets.Count == 0)
+                    continue;
+                if (!TryActivatePendingAction(action))
+                    continue;
 
+                foreach (var target in pendingTargets)
+                {
                     // Build a temporary ActiveSkill for the pending attack
                     var tempSkill = BuildTempSkill(action);
 
@@ -505,6 +706,17 @@ namespace BattleKing.Core
                         calc.CannotBeCovered = true;
                     if (ShouldApplyPendingIgnoreDefense(action, target))
                         calc.IgnoreDefenseRatio = Math.Clamp(action.IgnoreDefenseRatio, 0f, 1f);
+
+                    var pendingCalculationEffectLogs = _skillEffectExecutor.ExecuteCalculationEffects(
+                        _ctx,
+                        action.Actor,
+                        new List<BattleUnit> { target },
+                        tempSkill.Data.Effects,
+                        action.SourcePassiveId,
+                        calc,
+                        new SkillEffectExecutionState());
+                    if (pendingCalculationEffectLogs.Count > 0)
+                        Log($"  pending calc effects: {string.Join(", ", pendingCalculationEffectLogs)}");
 
                     _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                     _eventBus.Publish(new BeforeHitEvent
@@ -567,6 +779,19 @@ namespace BattleKing.Core
                     Log(pendingLogText);
                 }
             }
+        }
+
+        private bool TryActivatePendingAction(PendingAction action)
+        {
+            if (action.SourcePpCost <= 0)
+                return true;
+
+            if (action.Actor.CurrentPp < action.SourcePpCost)
+                return false;
+
+            action.Actor.ConsumePp(action.SourcePpCost);
+            Log($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(action.Actor)} 触发 {GetPassiveName(action.SourcePassiveId)} ({action.SourceTimingLabel ?? action.Type.ToString()})");
+            return true;
         }
 
         private ActiveSkill BuildTempSkill(PendingAction action)
@@ -701,7 +926,7 @@ namespace BattleKing.Core
             foreach (var u in units)
             {
                 if (u == null) continue;
-                totalMaxHp += u.Data.BaseStats.GetValueOrDefault("HP", 1);
+                totalMaxHp += Math.Max(1, u.GetCurrentStat("HP"));
                 totalCurrentHp += u.CurrentHp;
             }
             if (totalMaxHp == 0) return 0;
@@ -721,8 +946,9 @@ namespace BattleKing.Core
         private static List<BattleUnit> OrderBySpeedWithRandomTies(IEnumerable<BattleUnit> units)
         {
             return units
-                .GroupBy(u => u.GetCurrentSpeed())
-                .OrderByDescending(g => g.Key)
+                .GroupBy(u => new { u.ActionOrderPriority, Speed = u.GetCurrentSpeed() })
+                .OrderByDescending(g => g.Key.ActionOrderPriority)
+                .ThenByDescending(g => g.Key.Speed)
                 .SelectMany(g => g.OrderBy(_ => RandUtil.Roll(int.MaxValue)))
                 .ToList();
         }
@@ -731,7 +957,7 @@ namespace BattleKing.Core
         private static string DumpUnitBrief(BattleUnit u)
         {
             if (u == null || !u.IsAlive) return "[阵亡]";
-            string s = $"HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp} PP:{u.CurrentPp}/{u.MaxPp}";
+            string s = $"HP:{u.CurrentHp}/{Math.Max(1, u.GetCurrentStat("HP"))} AP:{u.CurrentAp}/{u.MaxAp} PP:{u.CurrentPp}/{u.MaxPp}";
             var buffs = u.Buffs.Where(b => b.Ratio != 0).Select(b => {
                 string sign = b.Ratio > 0 ? "+" : "";
                 return $"{b.TargetStat}{sign}{(int)(b.Ratio*100)}%";
@@ -815,6 +1041,18 @@ namespace BattleKing.Core
                 && !string.IsNullOrWhiteSpace(passive.Name))
             {
                 return $"{passive.Name} ({passiveId})";
+            }
+
+            return passiveId ?? "";
+        }
+
+        private string GetPassiveName(string passiveId)
+        {
+            if (!string.IsNullOrWhiteSpace(passiveId)
+                && _ctx?.GameData?.PassiveSkills?.TryGetValue(passiveId, out var passive) == true
+                && !string.IsNullOrWhiteSpace(passive.Name))
+            {
+                return passive.Name;
             }
 
             return passiveId ?? "";

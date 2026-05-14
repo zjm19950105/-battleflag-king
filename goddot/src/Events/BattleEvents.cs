@@ -16,6 +16,20 @@ namespace BattleKing.Events
         public BattleContext Context { get; set; }
     }
 
+    public class AfterActiveCostEvent : IBattleEvent
+    {
+        public BattleUnit Caster { get; set; }
+        public ActiveSkill Skill { get; set; }
+        public BattleContext Context { get; set; }
+    }
+
+    public class BeforeAttackCalculationEvent : IBattleEvent
+    {
+        public BattleUnit Caster { get; set; }
+        public ActiveSkill Skill { get; set; }
+        public BattleContext Context { get; set; }
+    }
+
     public class BeforeHitEvent : IBattleEvent
     {
         public BattleUnit Attacker { get; set; }

@@ -87,9 +87,11 @@ namespace BattleKing.Ui
                 var capsCopy = candidates;
                 dropdown.ItemSelected += (long sel) => {
                     int s = (int)sel;
+                    int previousMaxHp = Math.Max(1, unit.GetCurrentStat("HP"));
                     if (s == 0) unit.Equipment.Unequip(slotCapture);
                     else if (s - 1 < capsCopy.Count)
                         unit.Equipment.EquipToSlot(slotCapture, capsCopy[s - 1]);
+                    unit.SyncResourceCapsFromStats(previousMaxHp);
                     UpdateEquipDetail(unit);
                 };
                 row.AddChild(dropdown);

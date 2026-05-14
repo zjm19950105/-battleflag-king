@@ -11,7 +11,7 @@
 3. `BattleSetupService.CreateUnit()` 创建 `BattleUnit`，应用天数等级、CC 状态、初始装备、默认策略，然后 `AutoEquipPassives()` 从 `BattleUnit.GetAvailablePassiveSkillIds()` 里按 PP 消耗自动装备可用被动。
 4. `BattleUnit` 运行时持有 `EquippedPassiveSkillIds`、`PassiveConditions`、PP/AP/HP、buff、异常、临时状态与自定义计数器。
 5. UI 战斗入口创建 `BattleEngine` 后创建 `PassiveSkillProcessor(engine.EventBus, gameData, AppendLog, engine.EnqueueAction)` 并 `SubscribeAll()`。
-6. `BattleEngine` 在状态机关键点发布事件：`BattleStartEvent`、`BeforeActiveUseEvent`、`BeforeHitEvent`、`AfterHitEvent`、`AfterActiveUseEvent`、`OnKnockdownEvent`、`BattleEndEvent`。
+6. `BattleEngine` 在状态机关键点发布事件：`BattleStartEvent`、`BeforeActiveUseEvent`、`AfterActiveCostEvent`、`BeforeAttackCalculationEvent`、`BeforeHitEvent`、`AfterHitEvent`、`AfterActiveUseEvent`、`OnKnockdownEvent`、`BattleEndEvent`。
 7. `PassiveSkillProcessor` 按事件映射到 `PassiveTriggerTiming`，排序候选单位，检查存活、时机、上下文、PP、玩家设置条件、同时发动限制，然后消耗 PP。
 8. 被动执行优先走 `effects`。有 `effects` 时，逐个交给共享 `SkillEffectExecutor`；没有 `effects` 时才进入 `ExecuteLegacyTags()`。
 9. `SkillEffectExecutor` 可改 HP/AP/PP、buff/debuff、异常、临时状态、计数器、`DamageCalculation`，也可排入 `PendingAction`。`BattleEngine.ProcessPendingActions()` 再把反击、追击、先制、BattleEnd 攻击送进 `DamageCalculator`。

@@ -21,7 +21,7 @@ namespace BattleKing.Ui
             if (u == null) return;
             if (!u.IsAlive) { label.AppendText("  [s]x " + u.Data.Name + "[/s]\n"); return; }
 
-            int maxHp = System.Math.Max(1, u.Data.BaseStats.GetValueOrDefault("HP", 1));
+            int maxHp = System.Math.Max(1, u.GetCurrentStat("HP"));
             int hpPct = u.CurrentHp * 100 / maxHp;
             string hpBar = new string('█', System.Math.Min(10, hpPct / 10)) + new string('░', System.Math.Max(0, 10 - hpPct / 10));
 

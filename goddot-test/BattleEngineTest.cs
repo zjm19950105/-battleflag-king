@@ -346,6 +346,92 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void StepOneAction_RealPassiveJsonChargeAction_RecoversApAfterCostAndBuffsCurrentAttack()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_two_ap_probe"] = CreateTouchSkill(power: 100);
+            repository.ActiveSkills["act_two_ap_probe"].Id = "act_two_ap_probe";
+            repository.ActiveSkills["act_two_ap_probe"].Name = "Two AP Probe";
+            repository.ActiveSkills["act_two_ap_probe"].ApCost = 2;
+            var caster = new BattleUnit(CreateStructuredLogCharacter("caster", "act_two_ap_probe", hp: 300, str: 100, def: 0, spd: 30, ap: 4, pp: 2), repository, true)
+            {
+                Position = 1,
+                CurrentAp = 4
+            };
+            caster.Data.BaseStats["Crit"] = 1000;
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 500, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_two_ap_probe" });
+            caster.EquippedPassiveSkillIds.Add("pas_charge_action");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            CollectionAssert.AreEqual(
+                new[] { "RecoverAp", "AddBuff" },
+                repository.PassiveSkills["pas_charge_action"].Effects.Select(effect => effect.EffectType).ToList());
+            ClassicAssert.AreEqual(3, caster.CurrentAp);
+            ClassicAssert.AreEqual(0, caster.CurrentPp);
+            ClassicAssert.AreEqual(300, enemy.CurrentHp);
+            var activeLog = engine.BattleLogEntries.Single(entry => entry.SkillId == "act_two_ap_probe");
+            CollectionAssert.Contains(activeLog.Flags, "Critical");
+            ClassicAssert.AreEqual(200, activeLog.Damage);
+            ClassicAssert.IsFalse(caster.Buffs.Any(buff =>
+                buff.TargetStat == "CritDmg" && buff.IsOneTime && buff.SkillId == "pas_charge_action"));
+        }
+
+        [Test]
+        public void StepOneAction_RealPassiveJsonFormationCounter_RecoversAllyApAfterCost()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            repository.ActiveSkills["act_two_ap_probe"] = CreateTouchSkill();
+            repository.ActiveSkills["act_two_ap_probe"].Id = "act_two_ap_probe";
+            repository.ActiveSkills["act_two_ap_probe"].Name = "Two AP Probe";
+            repository.ActiveSkills["act_two_ap_probe"].ApCost = 2;
+            var activeUser = new BattleUnit(CreateStructuredLogCharacter("active_user", "act_two_ap_probe", hp: 300, str: 20, def: 0, spd: 30, ap: 4, pp: 0), repository, true)
+            {
+                Position = 1,
+                CurrentAp = 4
+            };
+            var giftUser = new BattleUnit(CreateStructuredLogCharacter("gift_user", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 1), repository, true)
+            {
+                Position = 2
+            };
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            activeUser.Strategies.Add(new Strategy { SkillId = "act_two_ap_probe" });
+            giftUser.EquippedPassiveSkillIds.Add("pas_formation_counter");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { activeUser, giftUser },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = _ => { } };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            ClassicAssert.AreEqual(3, activeUser.CurrentAp);
+            ClassicAssert.AreEqual(0, giftUser.CurrentPp);
+        }
+
+        [Test]
         public void StepOneAction_RealPassiveJsonPursuitSlash_RecoversPpAfterPendingCounterHits()
         {
             var repository = new GameDataRepository();
@@ -382,6 +468,127 @@ namespace BattleKing.Tests
             CollectionAssert.Contains(passiveLog.Flags, "PassiveTrigger");
             CollectionAssert.Contains(passiveLog.Flags, "Counter");
             CollectionAssert.Contains(passiveLog.Flags, "Hit");
+        }
+
+        [Test]
+        public void StepOneAction_WhenEarlierPendingCounterKillsTarget_LaterPendingCounterDoesNotSpendPp()
+        {
+            var repository = CreateStructuredLogRepository();
+            repository.ActiveSkills["act_touch"] = CreateTouchSkill();
+            repository.PassiveSkills["pas_first_counter"] = CreateQueuedCounterPassive("pas_first_counter", "First Counter");
+            repository.PassiveSkills["pas_second_counter"] = CreateQueuedCounterPassive("pas_second_counter", "Second Counter");
+            var attacker = new BattleUnit(CreateStructuredLogCharacter("attacker", "act_touch", hp: 100, str: 20, def: 0, spd: 30, ap: 1, pp: 0), repository, true)
+            {
+                Position = 1
+            };
+            var attackedAlly = new BattleUnit(CreateStructuredLogCharacter("attacked_ally", null, hp: 300, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            var firstCounter = new BattleUnit(CreateStructuredLogCharacter("first_counter", null, hp: 300, str: 200, def: 0, spd: 20, ap: 0, pp: 1), repository, false)
+            {
+                Position = 2
+            };
+            var secondCounter = new BattleUnit(CreateStructuredLogCharacter("second_counter", null, hp: 300, str: 200, def: 0, spd: 10, ap: 0, pp: 1), repository, false)
+            {
+                Position = 3
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_touch" });
+            firstCounter.EquippedPassiveSkillIds.Add("pas_first_counter");
+            secondCounter.EquippedPassiveSkillIds.Add("pas_second_counter");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { attackedAlly, firstCounter, secondCounter }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            ClassicAssert.AreEqual(0, firstCounter.CurrentPp);
+            ClassicAssert.AreEqual(1, secondCounter.CurrentPp);
+            ClassicAssert.AreEqual(0, attacker.CurrentHp);
+            ClassicAssert.AreEqual(1, engine.BattleLogEntries.Count(entry => entry.SkillId == "pas_first_counter"));
+            ClassicAssert.AreEqual(0, engine.BattleLogEntries.Count(entry => entry.SkillId == "pas_second_counter"));
+            Assert.That(logs, Has.Some.Contains("触发 First Counter"));
+            Assert.That(logs, Has.None.Contains("触发 Second Counter"));
+        }
+
+        [Test]
+        public void StepOneAction_WhenActiveAttackKillsTarget_QueuedOnlyAugmentPursuitDoesNotSpendPp()
+        {
+            var repository = CreateStructuredLogRepository();
+            repository.ActiveSkills["act_touch"] = CreateTouchSkill(power: 100);
+            repository.PassiveSkills["pas_follow_up_probe"] = new PassiveSkillData
+            {
+                Id = "pas_follow_up_probe",
+                Name = "Follow Up Probe",
+                PpCost = 1,
+                TriggerTiming = PassiveTriggerTiming.AllyOnActiveUse,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "AugmentCurrentAction",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            {
+                                "queuedActions",
+                                new List<SkillEffectData>
+                                {
+                                    new()
+                                    {
+                                        EffectType = "PursuitAttack",
+                                        Parameters = new Dictionary<string, object>
+                                        {
+                                            { "power", 100 },
+                                            { "hitRate", 1000 },
+                                            { "damageType", "Physical" },
+                                            { "attackType", "Melee" },
+                                            { "targetType", "SingleEnemy" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            var attacker = new BattleUnit(CreateStructuredLogCharacter("attacker", "act_touch", hp: 300, str: 200, def: 0, spd: 30, ap: 1, pp: 0), repository, true)
+            {
+                Position = 1
+            };
+            var pursuitUser = new BattleUnit(CreateStructuredLogCharacter("pursuit_user", null, hp: 300, str: 200, def: 0, spd: 10, ap: 0, pp: 1), repository, true)
+            {
+                Position = 2
+            };
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 50, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1
+            };
+            attacker.Strategies.Add(new Strategy { SkillId = "act_touch" });
+            pursuitUser.EquippedPassiveSkillIds.Add("pas_follow_up_probe");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker, pursuitUser },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            ClassicAssert.AreEqual(1, pursuitUser.CurrentPp);
+            ClassicAssert.AreEqual(0, enemy.CurrentHp);
+            ClassicAssert.AreEqual(0, engine.BattleLogEntries.Count(entry => entry.SkillId == "pas_follow_up_probe"));
+            Assert.That(logs, Has.None.Contains("触发 Follow Up Probe"));
         }
 
         [Test]
@@ -570,6 +777,33 @@ namespace BattleKing.Tests
                 }
             };
             return repository;
+        }
+
+        private static PassiveSkillData CreateQueuedCounterPassive(string id, string name)
+        {
+            return new PassiveSkillData
+            {
+                Id = id,
+                Name = name,
+                PpCost = 1,
+                TriggerTiming = PassiveTriggerTiming.AllyOnAttacked,
+                Effects = new List<SkillEffectData>
+                {
+                    new()
+                    {
+                        EffectType = "CounterAttack",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "target", "Attacker" },
+                            { "power", 100 },
+                            { "hitRate", 1000 },
+                            { "damageType", "Physical" },
+                            { "attackType", "Melee" },
+                            { "targetType", "SingleEnemy" }
+                        }
+                    }
+                }
+            };
         }
 
         private static BattleContext CreateApExhaustionContext(string? enemyPassiveId = null)
@@ -786,7 +1020,7 @@ namespace BattleKing.Tests
             return engine.BattleLogEntries.Single(entry => entry.SkillId == "pas_block_seal");
         }
 
-        private static ActiveSkillData CreateTouchSkill()
+        private static ActiveSkillData CreateTouchSkill(int power = 10)
         {
             return new ActiveSkillData
             {
@@ -795,7 +1029,7 @@ namespace BattleKing.Tests
                 ApCost = 1,
                 Type = SkillType.Physical,
                 AttackType = AttackType.Melee,
-                Power = 10,
+                Power = power,
                 HitRate = 1000,
                 TargetType = TargetType.SingleEnemy,
                 Effects = new List<SkillEffectData>()

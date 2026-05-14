@@ -15,6 +15,7 @@ namespace BattleKing.Pipeline
         public bool IsEvaded { get; }
         public BattleUnit ResolvedDefender { get; }
         public IReadOnlyList<StatusAilment> AppliedAilments { get; }
+        public IReadOnlyList<DamageHitResult> HitResults { get; }
 
         public DamageResult(
             int physicalDamage,
@@ -24,7 +25,8 @@ namespace BattleKing.Pipeline
             bool isBlocked,
             bool isEvaded,
             List<StatusAilment> appliedAilments,
-            BattleUnit resolvedDefender = null)
+            BattleUnit resolvedDefender = null,
+            IReadOnlyList<DamageHitResult> hitResults = null)
         {
             PhysicalDamage = physicalDamage;
             MagicalDamage = magicalDamage;
@@ -36,6 +38,9 @@ namespace BattleKing.Pipeline
             AppliedAilments = appliedAilments != null
                 ? new List<StatusAilment>(appliedAilments)
                 : new List<StatusAilment>();
+            HitResults = hitResults != null
+                ? new List<DamageHitResult>(hitResults)
+                : new List<DamageHitResult>();
         }
     }
 }

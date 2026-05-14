@@ -713,9 +713,9 @@ namespace BattleKing.Ui
                     && !string.Equals(strategy.SkillId, replacingId, StringComparison.OrdinalIgnoreCase))
                 .Select(strategy => _gameData.GetPassiveSkill(strategy.SkillId)?.PpCost ?? 0)
                 .Sum();
-            return usedPp + skill.PpCost <= _unit.MaxPp
+            return usedPp + skill.PpCost <= _unit.PassivePpBudget
                 ? null
-                : $"PP不足：需要 {usedPp + skill.PpCost}/{_unit.MaxPp}";
+                : $"PP不足：需要 {usedPp + skill.PpCost}/{_unit.PassivePpBudget}";
         }
 
         private void NormalizePassiveStrategies()

@@ -39,5 +39,25 @@ namespace BattleKing.Tests
             ClassicAssert.IsNull(unit.PassiveStrategies[0].Condition1);
             ClassicAssert.IsNull(unit.PassiveStrategies[0].Condition2);
         }
+
+        [Test]
+        public void EquipmentPpBonus_UpdatesPassiveBudgetForTwoPpPassive()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var service = new BattleSetupService(repository);
+            var unit = service.CreateUnit("fighter", isPlayer: true, position: 1, day: 6, isCc: true);
+            unit.EquippedPassiveSkillIds.Clear();
+            unit.PassiveStrategies.Clear();
+
+            int previousMaxHp = unit.GetCurrentStat("HP");
+            unit.Equipment.EquipToSlot("Accessory1", repository.Equipments["equ_pp_crystal_pendant"]);
+            unit.SyncResourceCapsFromStats(previousMaxHp);
+
+            ClassicAssert.GreaterOrEqual(unit.PassivePpBudget, 3);
+            ClassicAssert.AreEqual(BattleUnit.ResourceCap, unit.MaxPp);
+            ClassicAssert.AreEqual(unit.PassivePpBudget, unit.CurrentPp);
+            ClassicAssert.IsTrue(unit.CanEquipPassive("pas_hundred_crit"));
+        }
     }
 }

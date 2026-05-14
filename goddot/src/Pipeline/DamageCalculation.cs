@@ -34,6 +34,7 @@ namespace BattleKing.Pipeline
         public int MissedHits { get; set; }
         public int EvadedHits { get; set; }
         public int NullifiedHits { get; set; }
+        public List<DamageHitResult> HitResults { get; } = new List<DamageHitResult>();
 
         public List<StatusAilment> AppliedAilments { get; set; } = new List<StatusAilment>();
 
@@ -41,6 +42,9 @@ namespace BattleKing.Pipeline
 
         /// <summary>Force hit (skip hit check, but evasion skills still work)</summary>
         public bool ForceHit { get; set; } = false;
+
+        /// <summary>Force critical hit if the attacker is allowed to crit</summary>
+        public bool ForceCrit { get; set; } = false;
 
         /// <summary>Force evasion (skip hit, always evade)</summary>
         public bool ForceEvasion { get; set; } = false;
@@ -88,5 +92,24 @@ namespace BattleKing.Pipeline
 
         /// <summary>Effective skill power = base power + structured/counter bonuses.</summary>
         public float EffectivePower => Skill.Power + SkillPowerBonus + CounterPowerBonus;
+    }
+
+    public class DamageHitResult
+    {
+        public int HitIndex { get; set; }
+        public bool Landed { get; set; }
+        public bool Missed { get; set; }
+        public bool Evaded { get; set; }
+        public bool Nullified { get; set; }
+        public bool Critical { get; set; }
+        public bool Blocked { get; set; }
+        public float CritMultiplier { get; set; } = 1.0f;
+        public float BlockReduction { get; set; } = 0f;
+        public float BasePhysicalDamage { get; set; }
+        public float BaseMagicalDamage { get; set; }
+        public float PhysicalDamage { get; set; }
+        public float MagicalDamage { get; set; }
+        public float BaseTotalDamage => BasePhysicalDamage + BaseMagicalDamage;
+        public float TotalDamage => PhysicalDamage + MagicalDamage;
     }
 }

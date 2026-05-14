@@ -41,7 +41,7 @@ namespace BattleKing.Ui
         private VBoxContainer _detailPanel;
         private VBoxContainer _formationPanel;
         private VBoxContainer _abilityPanel;
-        private RichTextLabel _descriptionLabel;
+        private RichTextLabel _battleStatusLabel;
 
         private bool _selectedIsPlayer = true;
         private int _selectedIndex = -1;
@@ -87,10 +87,9 @@ namespace BattleKing.Ui
             _passiveProcessor = null;
             RebuildDraftUnits();
 
-            _rightPanel.AddChild(CreateTitle("当前说明"));
-            _descriptionLabel = BuildDescriptionLabel();
-            _rightPanel.AddChild(_descriptionLabel);
-            SetDescription("提示", "点击技能名或装备附带技能，这里会显示完整效果说明。");
+            _battleStatusLabel = BuildBattleStatusLabel();
+            _rightPanel.AddChild(_battleStatusLabel);
+            RefreshBattleStatusPanel();
 
             _rightPanel.AddChild(CreateTitle("战斗日志"));
             _moveLogToRightPanel();
@@ -158,9 +157,7 @@ namespace BattleKing.Ui
             var selectedUnit = GetSelectedUnit();
             if (selectedUnit == null)
             {
-                _detailPanel.AddChild(CreateTitle("测试场景"));
                 _detailPanel.AddChild(CreateLabel("从下面角色池拖角色到我方或敌方阵容槽，然后点击阵容里的角色。", BodyFontSize));
-                _detailPanel.AddChild(BuildBattleStatusPanel());
                 ApplySandboxFontRecursive(_detailPanel);
                 return;
             }
@@ -219,6 +216,7 @@ namespace BattleKing.Ui
                 {
                     RefreshAbilityPanel(unit, null);
                     RefreshDetailPanel();
+                    RefreshBattleStatusPanel();
                 },
                 ShowActiveSkillDetail,
                 ShowPassiveSkillDetail);
@@ -511,6 +509,7 @@ namespace BattleKing.Ui
                 RebuildDraftUnits();
                 RefreshDetailPanel();
                 RefreshFormationPanel();
+                RefreshBattleStatusPanel();
                 RefreshButtons();
             };
             configRow.AddChild(day);
@@ -529,6 +528,7 @@ namespace BattleKing.Ui
                 RebuildDraftUnits();
                 RefreshDetailPanel();
                 RefreshFormationPanel();
+                RefreshBattleStatusPanel();
                 RefreshButtons();
             };
             configRow.AddChild(cc);
@@ -647,14 +647,41 @@ namespace BattleKing.Ui
 
         private Control BuildBattleStatusPanel()
         {
+            var label = BuildBattleStatusLabel();
+            RenderBattleStatus(label);
+            return label;
+        }
+
+        private RichTextLabel BuildBattleStatusLabel()
+        {
             var label = new RichTextLabel
             {
                 BbcodeEnabled = true,
+                SelectionEnabled = true,
+                ContextMenuEnabled = true,
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-                SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-                CustomMinimumSize = new Vector2(0, 240)
+                CustomMinimumSize = new Vector2(0, 170),
+                AutowrapMode = TextServer.AutowrapMode.WordSmart
             };
             label.AddThemeFontSizeOverride("normal_font_size", BodyFontSize);
+            return label;
+        }
+
+        private void RefreshBattleStatusPanel()
+        {
+            if (_battleStatusLabel == null)
+                return;
+
+            RenderBattleStatus(_battleStatusLabel);
+            ApplySandboxFontRecursive(_battleStatusLabel);
+        }
+
+        private void RenderBattleStatus(RichTextLabel label)
+        {
+            if (label == null)
+                return;
+
+            label.Clear();
             label.AppendText("[color=cyan]我方[/color]\n");
             foreach (var unit in GetVisibleUnits(true))
                 BattleStatusHelper.AppendUnit(label, unit);
@@ -662,8 +689,6 @@ namespace BattleKing.Ui
             label.AppendText("\n[color=orange]敌方[/color]\n");
             foreach (var unit in GetVisibleUnits(false))
                 BattleStatusHelper.AppendUnit(label, unit);
-
-            return label;
         }
 
         private void HandleSlotDrop(bool targetIsPlayer, int targetIndex, string raw)
@@ -679,7 +704,12 @@ namespace BattleKing.Ui
                     return;
 
                 var sourceSlots = GetSlots(sourceIsPlayer);
+                var sourceUnits = GetDraftUnits(sourceIsPlayer);
+                var targetUnits = GetDraftUnits(targetIsPlayer);
                 (sourceSlots[sourceIndex], targetSlots[targetIndex]) = (targetSlots[targetIndex], sourceSlots[sourceIndex]);
+                (sourceUnits[sourceIndex], targetUnits[targetIndex]) = (targetUnits[targetIndex], sourceUnits[sourceIndex]);
+                SandboxDraftUnitState.MoveToSlot(sourceUnits[sourceIndex], sourceIsPlayer, sourceIndex);
+                SandboxDraftUnitState.MoveToSlot(targetUnits[targetIndex], targetIsPlayer, targetIndex);
             }
             else
             {
@@ -690,6 +720,7 @@ namespace BattleKing.Ui
             RebuildDraftUnits();
             SelectSlot(targetIsPlayer, targetIndex);
             RefreshFormationPanel();
+            RefreshBattleStatusPanel();
             RefreshButtons();
         }
 
@@ -709,6 +740,7 @@ namespace BattleKing.Ui
                 _selectedIndex = -1;
             RefreshDetailPanel();
             RefreshFormationPanel();
+            RefreshBattleStatusPanel();
             RefreshButtons();
         }
 
@@ -740,6 +772,7 @@ namespace BattleKing.Ui
 
             SelectSlot(isPlayer, index);
             RefreshFormationPanel();
+            RefreshBattleStatusPanel();
             RefreshButtons();
         }
 
@@ -767,10 +800,10 @@ namespace BattleKing.Ui
 
         private static int GetMaxHp(BattleUnit unit)
         {
-            if (unit?.Data?.BaseStats == null)
+            if (unit == null)
                 return 1;
 
-            return Math.Max(1, unit.Data.BaseStats.GetValueOrDefault("HP", 1));
+            return Math.Max(1, unit.GetCurrentStat("HP"));
         }
 
         private void SelectSlot(bool isPlayer, int index)
@@ -801,12 +834,7 @@ namespace BattleKing.Ui
                     continue;
                 }
 
-                if (existing != null
-                    && existing.Data.Id == characterId
-                    && existing.Position == i + 1
-                    && existing.IsPlayer == isPlayer
-                    && existing.IsCc == _selectedCc
-                    && existing.CurrentLevel == Math.Max(1, _selectedDay * 10))
+                if (SandboxDraftUnitState.MatchesSelection(existing, characterId, i + 1, isPlayer, _selectedCc, _selectedDay))
                 {
                     continue;
                 }
@@ -840,6 +868,7 @@ namespace BattleKing.Ui
                 _logLabel.Clear();
                 _engine.InitBattle();
                 RefreshDetailPanel();
+                RefreshBattleStatusPanel();
                 RefreshButtons();
             }
             catch (Exception ex)
@@ -875,8 +904,10 @@ namespace BattleKing.Ui
                 if (source == null)
                     continue;
 
+                int previousMaxHp = Math.Max(1, target.GetCurrentStat("HP"));
                 foreach (var slotName in BattleKing.Equipment.EquipmentSlot.GetSlotNames(target.Data, target.IsCc))
                     target.Equipment.EquipToSlot(slotName, source.Equipment.GetBySlot(slotName)?.Data);
+                target.SyncResourceCapsFromStats(previousMaxHp);
 
                 target.Strategies = source.Strategies
                     .Select(CloneStrategy)
@@ -939,6 +970,7 @@ namespace BattleKing.Ui
 
             var result = _engine.StepOneAction();
             RefreshDetailPanel();
+            RefreshBattleStatusPanel();
             if (IsTerminal(result))
                 FinishBattle(ToBattleResult(result));
         }
@@ -954,6 +986,7 @@ namespace BattleKing.Ui
                 if (IsTerminal(result))
                 {
                     RefreshDetailPanel();
+                    RefreshBattleStatusPanel();
                     FinishBattle(ToBattleResult(result));
                     return;
                 }
@@ -961,6 +994,7 @@ namespace BattleKing.Ui
 
             AppendLog("自动战斗超过 500 步，已停止。");
             RefreshDetailPanel();
+            RefreshBattleStatusPanel();
         }
 
         private void FinishBattle(BattleResult result)
@@ -1005,6 +1039,7 @@ namespace BattleKing.Ui
                 _logLabel.Clear();
                 RefreshDetailPanel();
                 RefreshFormationPanel();
+                RefreshBattleStatusPanel();
                 RefreshButtons();
             }));
 
@@ -1033,6 +1068,7 @@ namespace BattleKing.Ui
             _fontOffset = Math.Clamp(_fontOffset + delta, -4, 6);
             RefreshDetailPanel();
             RefreshFormationPanel();
+            RefreshBattleStatusPanel();
             RefreshButtons();
             ApplySandboxFontRecursive(_rightPanel);
         }
@@ -1091,22 +1127,6 @@ namespace BattleKing.Ui
             BattleLogTextRenderer.Append(_logLabel, message);
         }
 
-        private RichTextLabel BuildDescriptionLabel()
-        {
-            var label = new RichTextLabel
-            {
-                BbcodeEnabled = true,
-                SelectionEnabled = true,
-                ContextMenuEnabled = true,
-                FitContent = false,
-                AutowrapMode = TextServer.AutowrapMode.WordSmart,
-                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-                CustomMinimumSize = new Vector2(0, 170)
-            };
-            label.AddThemeFontSizeOverride("normal_font_size", BodyFontSize);
-            return label;
-        }
-
         private void ShowActiveSkillDetail(ActiveSkillData skill)
         {
             if (skill == null)
@@ -1125,13 +1145,7 @@ namespace BattleKing.Ui
 
         private void SetDescription(string title, string body)
         {
-            if (_descriptionLabel == null)
-                return;
-
-            _descriptionLabel.Clear();
-            _descriptionLabel.AppendText($"[color=yellow]{title ?? "说明"}[/color]\n");
-            _descriptionLabel.AddText(body ?? string.Empty);
-            ApplySandboxFontRecursive(_descriptionLabel);
+            // Right panel space is reserved for battlefield state; skill details stay available via tooltips.
         }
 
         private static string SkillSummary(string description)

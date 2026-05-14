@@ -51,6 +51,7 @@ namespace BattleKing.Pipeline
             int hitsMissed = 0;
             int hitsEvaded = 0;
             int hitsNullified = 0;
+            calc.HitResults.Clear();
 
             for (int hit = 0; hit < calc.HitCount; hit++)
             {
@@ -60,11 +61,18 @@ namespace BattleKing.Pipeline
                     hitPhysical = baseDmgPerHit * 0.7f;
                     hitMagical = baseDmgPerHit * 0.3f;
                 }
+                else if (skill.Data.Type == SkillType.Magical)
+                {
+                    hitPhysical = 0f;
+                    hitMagical = baseDmgPerHit;
+                }
                 else
                 {
                     hitPhysical = baseDmgPerHit;
                     hitMagical = 0f;
                 }
+                float baseHitPhysical = hitPhysical;
+                float baseHitMagical = hitMagical;
 
                 // Stage 7: Hit check (skip if ForceHit)
                 if (!calc.ForceHit)
@@ -73,6 +81,13 @@ namespace BattleKing.Pipeline
                     {
                         calc.IsHit = false;
                         hitsMissed++;
+                        calc.HitResults.Add(new DamageHitResult
+                        {
+                            HitIndex = hit + 1,
+                            Missed = true,
+                            BasePhysicalDamage = baseHitPhysical,
+                            BaseMagicalDamage = baseHitMagical
+                        });
                         continue;  // this hit missed, try next hit
                     }
                 }
@@ -83,15 +98,26 @@ namespace BattleKing.Pipeline
                     calc.IsEvaded = true;
                     anyEvaded = true;
                     hitsEvaded++;
+                    calc.HitResults.Add(new DamageHitResult
+                    {
+                        HitIndex = hit + 1,
+                        Evaded = true,
+                        BasePhysicalDamage = baseHitPhysical,
+                        BaseMagicalDamage = baseHitMagical
+                    });
                     continue;  // this hit evaded, try next hit
                 }
 
+                bool criticalThisHit = false;
+                float critMultiplierThisHit = 1.0f;
                 // Stage 9: Critical hit
-                if (RollCrit(attacker, defender, skill))
+                if (RollCrit(calc))
                 {
                     calc.IsCritical = true;
                     anyCritical = true;
                     calc.CritMultiplier = Math.Min(3.0f, 1.5f + attacker.Buffs.Where(b => b.TargetStat == "CritDmg").Sum(b => b.Ratio));
+                    criticalThisHit = true;
+                    critMultiplierThisHit = calc.CritMultiplier;
                     hitPhysical *= calc.CritMultiplier;
                     hitMagical *= calc.CritMultiplier;
                 }
@@ -113,20 +139,43 @@ namespace BattleKing.Pipeline
                     calc.IsBlocked = true;
 
                 // Damage immunity
+                bool nullifiedThisHit = false;
                 if (calc.NullifyPhysicalDamage) hitPhysical = 0f;
                 if (calc.NullifyMagicalDamage) hitMagical = 0f;
+                if (skill.Data.Type == SkillType.Magical
+                    && resolvedDefender.TryConsumeTemporal("MagicDamageNullify"))
+                {
+                    hitMagical = 0f;
+                    hitsNullified++;
+                    nullifiedThisHit = true;
+                }
                 if (skill.AttackType == AttackType.Melee
                     && skill.HasPhysicalComponent
                     && resolvedDefender.TryConsumeTemporal("MeleeHitNullify"))
                 {
                     hitPhysical = 0f;
                     hitsNullified++;
+                    nullifiedThisHit = true;
                 }
 
                 totalPhysical += hitPhysical;
                 totalMagical += hitMagical;
                 hitsLanded++;
                 anyHit = true;
+                calc.HitResults.Add(new DamageHitResult
+                {
+                    HitIndex = hit + 1,
+                    Landed = true,
+                    Critical = criticalThisHit,
+                    CritMultiplier = critMultiplierThisHit,
+                    Blocked = blockThisHit,
+                    BlockReduction = blockThisHit ? calc.BlockReduction : 0f,
+                    Nullified = nullifiedThisHit,
+                    BasePhysicalDamage = baseHitPhysical,
+                    BaseMagicalDamage = baseHitMagical,
+                    PhysicalDamage = hitPhysical,
+                    MagicalDamage = hitMagical
+                });
             }
 
             // Final damage multiplier
@@ -154,7 +203,8 @@ namespace BattleKing.Pipeline
                 calc.IsBlocked || anyBlocked,
                 anyEvaded,
                 calc.AppliedAilments,
-                resolvedDefender
+                resolvedDefender,
+                calc.HitResults
             );
         }
 
@@ -193,10 +243,14 @@ namespace BattleKing.Pipeline
             return 1.0f;  // TraitApplier.ApplyTraitsToDamage sets calc.CharacterTraitMultiplier directly
         }
 
-        private bool RollCrit(BattleUnit attacker, BattleUnit defender, ActiveSkill skill)
+        private bool RollCrit(DamageCalculation calc)
         {
+            var attacker = calc.Attacker;
             if (attacker.Ailments.Contains(StatusAilment.CritSeal))
                 return false;
+
+            if (calc.ForceCrit)
+                return true;
 
             int critRate = attacker.GetCurrentCritRate();
             return RandUtil.Roll100() < critRate;

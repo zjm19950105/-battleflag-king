@@ -12,7 +12,7 @@ namespace BattleKing.Equipment
 
             // Same skill and same stat pure buff/debuff -> skip duplicate.
             // Different stats from one skill, such as SpdDown + EvaDown, must coexist.
-            if (existing != null && newBuff.IsPureBuffOrDebuff)
+            if (existing != null && newBuff.IsPureBuffOrDebuff && !newBuff.CanStackWithSameSkill)
                 return;
 
             // Same effect different skills → stack

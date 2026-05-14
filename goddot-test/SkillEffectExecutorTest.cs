@@ -586,7 +586,8 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(AttackType.Melee, action.AttackType);
             CollectionAssert.AreEqual(new[] { firstEnemy }, action.Targets);
             CollectionAssert.Contains(action.Tags, "SureHit");
-            ClassicAssert.AreEqual(0, swordsman.CurrentPp);
+            ClassicAssert.AreEqual(1, action.SourcePpCost);
+            ClassicAssert.AreEqual(1, swordsman.CurrentPp);
         }
 
         [Test]

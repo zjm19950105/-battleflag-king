@@ -5,6 +5,7 @@ using BattleKing.Core;
 using BattleKing.Data;
 using BattleKing.Pipeline;
 using BattleKing.Skills;
+using BattleKing.Ui;
 
 namespace BattleKing.Tests
 {
@@ -16,6 +17,22 @@ namespace BattleKing.Tests
 
         [SetUp]
         public void SetUp() { _calc = new DamageCalculator(); _ctx = new BattleContext(null!); }
+
+        [Test]
+        public void ForceCrit_MakesZeroCritAttackCritical()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 60, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 10, block: 0);
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+            calc.ForceCrit = true;
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(result.IsHit);
+            ClassicAssert.IsTrue(result.IsCritical);
+            ClassicAssert.AreEqual(75, result.TotalDamage);
+        }
 
         // ────────── 基础物理伤害 ──────────
 
@@ -127,6 +144,79 @@ namespace BattleKing.Tests
             // 9hit, each: (40-10)=30, power=20/100=0.2 → 6 per hit max, 9×6=54 max, 1×6=6 min
             ClassicAssert.GreaterOrEqual(result.TotalDamage, 6);
             ClassicAssert.LessOrEqual(result.TotalDamage, 54);
+        }
+
+        [Test]
+        public void 多段攻击_记录每段暴击明细()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 60, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 10, block: 0);
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var c = TestDataFactory.CreateCalc(attacker, defender, skill);
+            c.HitCount = 3;
+            c.ForceCrit = true;
+
+            var result = _calc.Calculate(c);
+
+            ClassicAssert.AreEqual(3, result.HitResults.Count);
+            ClassicAssert.IsTrue(result.HitResults.All(hit => hit.Landed));
+            ClassicAssert.IsTrue(result.HitResults.All(hit => hit.Critical));
+            ClassicAssert.AreEqual(75f, result.HitResults[0].TotalDamage, 0.001f);
+            ClassicAssert.AreEqual(225, result.TotalDamage);
+        }
+
+        [Test]
+        public void 多段攻击日志_按真实HitBreakdown汇总普通与暴击段()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 65, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(hp: 500, def: 15, block: 0);
+            defender.CurrentHp = 380;
+            var skill = TestDataFactory.CreateSkill(power: 20, name: "陨石斩");
+            var c = TestDataFactory.CreateCalc(attacker, defender, skill);
+            c.HitCount = 9;
+            c.LandedHits = 9;
+            c.FinalAttackPower = 65;
+            c.FinalDefense = 15;
+            c.SkillPowerRatio = 0.2f;
+            c.CritMultiplier = 2.0f;
+            for (int i = 1; i <= 6; i++)
+            {
+                c.HitResults.Add(new DamageHitResult
+                {
+                    HitIndex = i,
+                    Landed = true,
+                    BasePhysicalDamage = 10,
+                    PhysicalDamage = 10
+                });
+            }
+            for (int i = 7; i <= 9; i++)
+            {
+                c.HitResults.Add(new DamageHitResult
+                {
+                    HitIndex = i,
+                    Landed = true,
+                    Critical = true,
+                    CritMultiplier = 2.0f,
+                    BasePhysicalDamage = 10,
+                    PhysicalDamage = 20
+                });
+            }
+            var result = new DamageResult(
+                120,
+                0,
+                isHit: true,
+                isCritical: true,
+                isBlocked: false,
+                isEvaded: false,
+                appliedAilments: new(),
+                resolvedDefender: defender,
+                hitResults: c.HitResults);
+
+            var lines = BattleLogHelper.FormatAttack(attacker, defender, skill, c, result, false, new());
+
+            Assert.That(lines, Has.Some.Contains("段数: 9 hit").And.Contains("暴击 3"));
+            Assert.That(lines, Has.Some.Contains("单段基础: (65-15=50) x 威力20% = 10"));
+            Assert.That(lines, Has.Some.Contains("合计: 普通6hit=60 + 暴击3hit x2.0=60 => 120"));
         }
 
         // ────────── 混合伤害 ──────────

@@ -10,16 +10,31 @@ namespace BattleKing.Core
 {
     public class BattleUnit
     {
+        public const int ResourceCap = 4;
+
         // Read-only template reference
         public CharacterData Data { get; private set; }
         public GameDataRepository GameData { get; private set; }
 
         // Runtime mutable state
         public int CurrentHp { get; set; }
-        public int CurrentAp { get; set; }
-        public int CurrentPp { get; set; }
-        public int MaxAp { get; private set; }
-        public int MaxPp { get; private set; }
+        private int _currentAp;
+        private int _currentPp;
+        public int CurrentAp
+        {
+            get => _currentAp;
+            set => _currentAp = ClampResource(value);
+        }
+        public int CurrentPp
+        {
+            get => _currentPp;
+            set => _currentPp = ClampResource(value);
+        }
+        public int MaxAp { get; private set; } = ResourceCap;
+        public int MaxPp { get; private set; } = ResourceCap;
+        public int InitialAp { get; private set; }
+        public int InitialPp { get; private set; }
+        public int PassivePpBudget => InitialPp;
         public int Position { get; set; }
         public bool IsFrontRow => Position <= 3;
         public bool IsAlive => CurrentHp > 0;
@@ -29,6 +44,7 @@ namespace BattleKing.Core
         public bool IsPlayer { get; set; }
         public bool IsCc { get; private set; }
         public int CurrentLevel { get; set; } = 1;
+        public int ActionOrderPriority { get; set; } = 0;
         public string ChargedSkillId { get; set; } = null;  // Module 6: Charge skill tracking  // 天数系统映射的等效等级
 
         public void SetCcState(bool isCc)
@@ -62,10 +78,12 @@ namespace BattleKing.Core
             IsPlayer = isPlayer;
             IsCc = isCc;
             CurrentHp = data.BaseStats.GetValueOrDefault("HP", 1);
-            CurrentAp = data.BaseStats.GetValueOrDefault("AP", 5);
-            CurrentPp = data.BaseStats.GetValueOrDefault("PP", 0);
-            MaxAp = CurrentAp;
-            MaxPp = CurrentPp;
+            InitialAp = ClampResource(data.BaseStats.GetValueOrDefault("AP", ResourceCap));
+            InitialPp = ClampResource(data.BaseStats.GetValueOrDefault("PP", 0));
+            CurrentAp = InitialAp;
+            CurrentPp = InitialPp;
+            MaxAp = ResourceCap;
+            MaxPp = ResourceCap;
         }
 
         /// <summary>Effective unit classes based on CC state (e.g. Lord→Cavalry after CC)</summary>
@@ -100,7 +118,8 @@ namespace BattleKing.Core
             int equipValue = Equipment.GetTotalStat(statName);
             float buffRatio = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
             int flatBuff = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.FlatAmount);
-            return (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
+            int value = (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
+            return IsResourceStat(statName) ? ClampResource(value) : value;
         }
 
         public int GetCurrentAttackPower(SkillType damageType)
@@ -238,7 +257,44 @@ namespace BattleKing.Core
         {
             if (EquippedPassiveSkillIds.Contains(skillId)) return false;
             if (!GameData.PassiveSkills.TryGetValue(skillId, out var skill)) return false;
-            return GetUsedPp() + skill.PpCost <= MaxPp;
+            return GetUsedPp() + skill.PpCost <= PassivePpBudget;
+        }
+
+        public void SyncResourceCapsFromStats(int previousMaxHp, bool preserveMissingHp = true)
+        {
+            int newMaxHp = Math.Max(1, GetCurrentStat("HP"));
+            int hpDelta = newMaxHp - Math.Max(1, previousMaxHp);
+            int oldInitialAp = InitialAp;
+            int oldInitialPp = InitialPp;
+
+            if (hpDelta > 0)
+            {
+                if (CurrentHp > 0)
+                    CurrentHp = Math.Min(newMaxHp, CurrentHp + hpDelta);
+            }
+            else if (hpDelta < 0)
+            {
+                CurrentHp = Math.Min(CurrentHp, newMaxHp);
+            }
+            else if (!preserveMissingHp)
+            {
+                CurrentHp = Math.Min(CurrentHp, newMaxHp);
+            }
+
+            MaxAp = ResourceCap;
+            MaxPp = ResourceCap;
+            InitialAp = GetCurrentStat("AP");
+            InitialPp = GetCurrentStat("PP");
+            if (InitialAp > oldInitialAp)
+                CurrentAp += InitialAp - oldInitialAp;
+            else if (InitialAp < oldInitialAp)
+                CurrentAp = Math.Min(CurrentAp, InitialAp);
+            if (InitialPp > oldInitialPp)
+                CurrentPp += InitialPp - oldInitialPp;
+            else if (InitialPp < oldInitialPp)
+                CurrentPp = Math.Min(CurrentPp, InitialPp);
+            CurrentAp = Math.Min(CurrentAp, MaxAp);
+            CurrentPp = Math.Min(CurrentPp, MaxPp);
         }
 
         public void ConsumeAp(int amount) => CurrentAp = Math.Max(0, CurrentAp - amount);
@@ -246,8 +302,22 @@ namespace BattleKing.Core
         public void RecoverAp(int amount) => CurrentAp = Math.Min(MaxAp, CurrentAp + amount);
         public void RecoverPp(int amount) => CurrentPp = Math.Min(MaxPp, CurrentPp + amount);
 
+        private static bool IsResourceStat(string statName)
+        {
+            return string.Equals(statName, "AP", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(statName, "PP", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int ClampResource(int value) => Math.Clamp(value, 0, ResourceCap);
+
         public void TakeDamage(int damage)
         {
+            if (damage >= CurrentHp && CurrentHp > 0 && TryConsumeTemporal("DeathResist"))
+            {
+                CurrentHp = 1;
+                return;
+            }
+
             CurrentHp = Math.Max(0, CurrentHp - damage);
             if (CurrentHp == 0) { /* OnKnockdownEvent published by BattleEngine */ }
         }

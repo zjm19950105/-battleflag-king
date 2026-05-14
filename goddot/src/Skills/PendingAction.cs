@@ -21,5 +21,7 @@ namespace BattleKing.Skills
         public List<string> Tags { get; set; } = new List<string>();
 
         public string SourcePassiveId { get; set; }
+        public int SourcePpCost { get; set; }
+        public string SourceTimingLabel { get; set; }
     }
 }

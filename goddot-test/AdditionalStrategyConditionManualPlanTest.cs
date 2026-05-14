@@ -259,8 +259,8 @@ namespace BattleKing.Tests
             var unit = statName switch
             {
                 "MaxHp" => TestDataFactory.CreateUnit(hp: value, isPlayer: false),
-                "MaxAp" => TestDataFactory.CreateUnit(ap: value, isPlayer: false),
-                "MaxPp" => TestDataFactory.CreateUnit(pp: value, isPlayer: false),
+                "MaxAp" => TestDataFactory.CreateUnit(ap: value / 10, isPlayer: false),
+                "MaxPp" => TestDataFactory.CreateUnit(pp: value / 10, isPlayer: false),
                 "HP" => TestDataFactory.CreateUnit(hp: 100, isPlayer: false),
                 "Str" => TestDataFactory.CreateUnit(str: value, isPlayer: false),
                 "Mag" => TestDataFactory.CreateUnit(mag: value, isPlayer: false),

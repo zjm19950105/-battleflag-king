@@ -26,7 +26,9 @@ namespace BattleKing.Core
 
             DayProgression.Apply(unit, day);
             unit.SetCcState(isCc);
+            int previousMaxHp = unit.GetCurrentStat("HP");
             ApplyInitialEquipment(unit);
+            unit.SyncResourceCapsFromStats(previousMaxHp);
             ApplyDefaultStrategies(unit);
             AutoEquipPassives(unit);
 
@@ -93,7 +95,7 @@ namespace BattleKing.Core
             var passive = availablePassiveSkillIds
                 .Select(id => _gameData.GetPassiveSkill(id))
                 .Where(skill => skill != null)
-                .Where(skill => skill.PpCost <= unit.MaxPp)
+                .Where(skill => skill.PpCost <= unit.PassivePpBudget)
                 .OrderBy(skill => skill.UnlockLevel ?? 0)
                 .ThenBy(skill => skill.PpCost)
                 .ThenBy(skill => availablePassiveSkillIds.IndexOf(skill.Id))
@@ -121,7 +123,7 @@ namespace BattleKing.Core
 
             foreach (var passive in available)
             {
-                if (usedPp + passive.PpCost > unit.MaxPp)
+                if (usedPp + passive.PpCost > unit.PassivePpBudget)
                     break;
 
                 unit.EquippedPassiveSkillIds.Add(passive.Id);

@@ -28,7 +28,7 @@ namespace BattleKing.Ui
 
         public string BuildStatusText(BattleUnit unit)
         {
-            return $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{BattleStatusHelper.StarStr(unit.GetUsedPp(), unit.MaxPp)}[/color]";
+            return $"▶  被动技能 [{unit.Data.Name}] — [color=blue]PP:{BattleStatusHelper.StarStr(unit.GetUsedPp(), unit.PassivePpBudget)}[/color]";
         }
 
         public void Show(

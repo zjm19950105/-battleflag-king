@@ -374,7 +374,23 @@
       "BlockUp50",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Block",
+          "amount": 50,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "ForcedTarget",
+        "parameters": {
+          "target": "Self"
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "先锋 Lv25",
     "unlockLevel": 25
@@ -415,7 +431,21 @@
       "Crit100Ally",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "calculationEffects": [
+            {
+              "effectType": "ModifyDamageCalc",
+              "parameters": {
+                "ForceCrit": true
+              }
+            }
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "士兵/军士 Lv15",
     "unlockLevel": 15
@@ -514,7 +544,16 @@
       "IgnoreBlockAll",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentOutgoingActions",
+        "parameters": {
+          "tags": [
+            "CannotBeBlocked"
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "维京 Lv25",
     "unlockLevel": 25
@@ -563,7 +602,28 @@
       "BlockUp20",
       "Stackable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Def",
+          "ratio": 0.2,
+          "turns": 1,
+          "stackPolicy": "Stack"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Block",
+          "ratio": 0.2,
+          "turns": 1,
+          "stackPolicy": "Stack"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "重装步兵/甲胄骑兵 Lv15",
     "unlockLevel": 15
@@ -613,7 +673,25 @@
     "tags": [
       "BlockSeal"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "tags": [
+            "BlockSeal"
+          ],
+          "onHitEffects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "BlockSeal"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "勇士/破坏者 Lv1",
     "unlockLevel": 1
@@ -632,7 +710,28 @@
       "HitUp20",
       "Stackable"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Str",
+          "ratio": 0.2,
+          "turns": 1,
+          "stackPolicy": "Stack"
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Hit",
+          "ratio": 0.2,
+          "turns": 1,
+          "stackPolicy": "Stack"
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "破坏者 Lv20",
     "unlockLevel": 20
@@ -704,7 +803,27 @@
     "tags": [
       "Pursuit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "queuedActions": [
+            {
+              "effectType": "PursuitAttack",
+              "parameters": {
+                "power": 75,
+                "damageType": "Physical",
+                "attackType": "Ranged",
+                "targetType": "SingleEnemy",
+                "tags": [
+                  "Pursuit"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "猎人/狙击手 Lv15",
     "unlockLevel": 15
@@ -722,7 +841,25 @@
       "Counter",
       "FlyingBonus100"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "CounterAttack",
+        "parameters": {
+          "target": "Attacker",
+          "power": 50,
+          "damageType": "Physical",
+          "attackType": "Ranged",
+          "targetType": "SingleEnemy"
+        }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Flying",
+          "SkillPowerBonus": 100
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "狙击手 Lv25",
     "unlockLevel": 25
@@ -765,7 +902,29 @@
       "Ranged",
       "Pursuit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "queuedActions": [
+            {
+              "effectType": "PursuitAttack",
+              "parameters": {
+                "power": 50,
+                "hitRate": 100,
+                "damageType": "Physical",
+                "attackType": "Ranged",
+                "targetType": "SingleEnemy",
+                "tags": [
+                  "Ranged",
+                  "Pursuit"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "射手/盾射手 Lv15",
     "unlockLevel": 15
@@ -929,7 +1088,30 @@
       "Pursuit",
       "Magical"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "requiresCurrentSkillType": "Magical",
+          "queuedActions": [
+            {
+              "effectType": "PursuitAttack",
+              "parameters": {
+                "power": 100,
+                "hitRate": 100,
+                "damageType": "Magical",
+                "attackType": "Magic",
+                "targetType": "SingleEnemy",
+                "tags": [
+                  "Pursuit",
+                  "Magical"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": false,
     "learnCondition": "术士 Lv20",
     "unlockLevel": 20
@@ -982,7 +1164,28 @@
       "MagicBlade",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "requiresCurrentSkillType": "Physical",
+          "queuedActions": [
+            {
+              "effectType": "PursuitAttack",
+              "parameters": {
+                "power": 50,
+                "damageType": "Magical",
+                "attackType": "Magic",
+                "targetType": "SingleEnemy",
+                "tags": [
+                  "MagicBlade"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "女巫/魔女 Lv1",
     "unlockLevel": 1
@@ -1026,7 +1229,24 @@
       "CritDown50",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "ActionOrderPriority",
+        "parameters": {
+          "target": "Self",
+          "mode": "Fastest"
+        }
+      },
+      {
+        "effectType": "AddDebuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Crit",
+          "amount": 50,
+          "turns": -1
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "魔女 Lv25",
     "unlockLevel": 25
@@ -1045,7 +1265,26 @@
       "AilmentNullify",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "Defender",
+          "key": "MagicDamageNullify",
+          "count": 1,
+          "requiresIncomingSkillType": "Magical"
+        }
+      },
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "Defender",
+          "key": "AilmentNullify",
+          "count": 1,
+          "requiresIncomingSkillType": "Magical"
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "白骑士/圣骑士 Lv1",
     "unlockLevel": 1
@@ -1090,7 +1329,26 @@
       "Row",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "RowAlliesOfTarget",
+          "key": "MagicDamageNullify",
+          "count": 1,
+          "requiresIncomingSkillType": "Magical"
+        }
+      },
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "RowAlliesOfTarget",
+          "key": "AilmentNullify",
+          "count": 1,
+          "requiresIncomingSkillType": "Magical"
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "圣骑士 Lv25",
     "unlockLevel": 25
@@ -1395,7 +1653,30 @@
       "DeathResist",
       "SimultaneousLimit"
     ],
-    "effects": [],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "target": "Self",
+          "amount": 1
+        }
+      },
+      {
+        "effectType": "PpDamage",
+        "parameters": {
+          "target": "Self",
+          "amount": "All"
+        }
+      },
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "Self",
+          "key": "DeathResist",
+          "count": 1
+        }
+      }
+    ],
     "hasSimultaneousLimit": true,
     "learnCondition": "狂战士 Lv25",
     "unlockLevel": 25

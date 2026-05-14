@@ -29,7 +29,8 @@ namespace BattleKing.Skills
             BattleUnit caster,
             IReadOnlyList<BattleUnit> targets,
             IReadOnlyList<SkillEffectData> effects,
-            string sourceSkillId)
+            string sourceSkillId,
+            DamageCalculation calculation = null)
         {
             var logs = new List<string>();
             foreach (var effect in effects ?? Array.Empty<SkillEffectData>())
@@ -37,7 +38,7 @@ namespace BattleKing.Skills
                 if (IsCalculationEffect(effect.EffectType) || IsPostDamageEffect(effect.EffectType))
                     continue;
 
-                ExecuteEffect(context, caster, targets, effect, sourceSkillId, null, null, logs);
+                ExecuteEffect(context, caster, targets, effect, sourceSkillId, calculation, null, logs);
             }
             return logs;
         }
@@ -160,6 +161,12 @@ namespace BattleKing.Skills
                 case "TemporalMark":
                     ApplyTemporalMark(context, caster, targets, parameters, sourceSkillId, calculation, logs);
                     break;
+                case "ForcedTarget":
+                    ApplyForcedTarget(context, caster, targets, parameters, sourceSkillId, calculation, logs);
+                    break;
+                case "ActionOrderPriority":
+                    ApplyActionOrderPriority(context, caster, targets, parameters, calculation, logs);
+                    break;
                 case "ModifyCounter":
                     ApplyModifyCounter(context, caster, targets, parameters, calculation, logs);
                     break;
@@ -176,6 +183,12 @@ namespace BattleKing.Skills
                 case "BattleEndAttack":
                 case "PendingAttack":
                     ApplyPendingActionEffect(caster, targets, parameters, sourceSkillId, effect.EffectType, logs);
+                    break;
+                case "AugmentCurrentAction":
+                    ApplyAugmentCurrentAction(context, caster, parameters, sourceSkillId, logs);
+                    break;
+                case "AugmentOutgoingActions":
+                    ApplyAugmentOutgoingActions(context, caster, parameters, sourceSkillId, logs);
                     break;
                 case "OnHitEffect":
                 case "OnKillEffect":
@@ -225,6 +238,12 @@ namespace BattleKing.Skills
             {
                 calculation.ForceHit = true;
                 logs.Add("ForceHit");
+            }
+
+            if (GetBool(parameters, "ForceCrit", false))
+            {
+                calculation.ForceCrit = true;
+                logs.Add("ForceCrit");
             }
 
             if (GetBool(parameters, "ForceEvasion", false))
@@ -428,6 +447,8 @@ namespace BattleKing.Skills
             }
             int turns = GetInt(parameters, "turns", 1);
             bool isOneTime = GetBool(parameters, "oneTime", false);
+            bool canStackWithSameSkill = IsStackPolicy(parameters, "Stack")
+                || GetBool(parameters, "stackable", false);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
             {
                 if (forceDebuff && target.TryConsumeTemporal("DebuffNullify"))
@@ -445,10 +466,17 @@ namespace BattleKing.Skills
                     FlatAmount = flatAmount,
                     RemainingTurns = turns,
                     IsOneTime = isOneTime,
-                    IsPureBuffOrDebuff = true
+                    IsPureBuffOrDebuff = true,
+                    CanStackWithSameSkill = canStackWithSameSkill
                 });
                 logs.Add($"{target.Data.Name}.{stat} {before}->{target.GetCurrentStat(stat)}");
             }
+        }
+
+        private static bool IsStackPolicy(Dictionary<string, object> parameters, string expected)
+        {
+            return TryGetString(parameters, "stackPolicy", out string policy)
+                && string.Equals(policy, expected, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ApplyAmplifyDebuffs(
@@ -536,9 +564,9 @@ namespace BattleKing.Skills
             DamageCalculation calculation,
             List<string> logs)
         {
-            int amount = GetInt(parameters, "amount", 1);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Target"))
             {
+                int amount = GetResourceAmount(parameters, target.CurrentAp);
                 int before = target.CurrentAp;
                 target.ConsumeAp(amount);
                 logs.Add($"{target.Data.Name}.AP {before}->{target.CurrentAp}");
@@ -570,9 +598,9 @@ namespace BattleKing.Skills
             DamageCalculation calculation,
             List<string> logs)
         {
-            int amount = GetInt(parameters, "amount", 1);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Target"))
             {
+                int amount = GetResourceAmount(parameters, target.CurrentPp);
                 int before = target.CurrentPp;
                 target.ConsumePp(amount);
                 logs.Add($"{target.Data.Name}.PP {before}->{target.CurrentPp}");
@@ -732,6 +760,12 @@ namespace BattleKing.Skills
 
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Target"))
             {
+                if (target.TryConsumeTemporal("AilmentNullify"))
+                {
+                    logs.Add($"{target.Data.Name}.AilmentNullified");
+                    continue;
+                }
+
                 if (!target.Ailments.Contains(ailment))
                     target.Ailments.Add(ailment);
                 if (ailment == StatusAilment.Stun)
@@ -758,6 +792,53 @@ namespace BattleKing.Skills
                 target.AddTemporal(key, count, turns, sourceSkillId);
                 logs.Add($"{target.Data.Name}.{key}={count}");
             }
+        }
+
+        private static void ApplyForcedTarget(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            string sourceSkillId,
+            DamageCalculation calculation,
+            List<string> logs)
+        {
+            string key = GetString(parameters, "key", "ForcedTarget");
+            int count = GetInt(parameters, "count", int.MaxValue);
+            int turns = GetInt(parameters, "turns", -1);
+            foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
+            {
+                target.AddTemporal(key, count, turns, sourceSkillId);
+                logs.Add($"{target.Data.Name}.{key}");
+            }
+        }
+
+        private static void ApplyActionOrderPriority(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            List<string> logs)
+        {
+            int priority = GetActionOrderPriority(parameters);
+            foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
+            {
+                int before = target.ActionOrderPriority;
+                target.ActionOrderPriority = Math.Max(target.ActionOrderPriority, priority);
+                logs.Add($"{target.Data.Name}.ActionOrderPriority {before}->{target.ActionOrderPriority}");
+            }
+        }
+
+        private static int GetActionOrderPriority(Dictionary<string, object> parameters)
+        {
+            if (TryGetString(parameters, "mode", out string mode)
+                && string.Equals(mode, "Fastest", StringComparison.OrdinalIgnoreCase))
+            {
+                return 1000;
+            }
+
+            return GetInt(parameters, "priority", 1);
         }
 
         private static void ApplyModifyCounter(
@@ -919,6 +1000,212 @@ namespace BattleKing.Skills
                 : $"{action.IgnoreDefenseRatio:0.##}";
         }
 
+        private static void ApplyAugmentCurrentAction(
+            BattleContext context,
+            BattleUnit caster,
+            Dictionary<string, object> parameters,
+            string sourceSkillId,
+            List<string> logs)
+        {
+            if (context == null)
+                return;
+
+            if (!CurrentActionRequirementMatches(parameters, context.CurrentActionSkill))
+            {
+                logs.Add($"AugmentCurrentAction source={sourceSkillId} skipped=currentAction");
+                return;
+            }
+
+            var augment = new CurrentActionAugment
+            {
+                Actor = caster,
+                SourcePassiveId = sourceSkillId,
+                CalculationEffects = GetEffectList(parameters, "calculationEffects"),
+                OnHitEffects = GetEffectList(parameters, "onHitEffects"),
+                QueuedActionEffects = GetEffectList(parameters, "queuedActions"),
+                Tags = GetStringList(parameters, "tags")
+            };
+
+            context.CurrentActionAugments.Add(augment);
+            logs.Add(
+                "AugmentCurrentAction"
+                + $" source={sourceSkillId}"
+                + $" calc={FormatEffectTypes(augment.CalculationEffects)}"
+                + $" onHit={FormatEffectTypes(augment.OnHitEffects)}"
+                + $" queued={FormatEffectTypes(augment.QueuedActionEffects)}"
+                + $" tags={FormatList(augment.Tags)}");
+        }
+
+        private static void ApplyAugmentOutgoingActions(
+            BattleContext context,
+            BattleUnit caster,
+            Dictionary<string, object> parameters,
+            string sourceSkillId,
+            List<string> logs)
+        {
+            if (context == null || caster == null)
+                return;
+
+            var augment = new OutgoingActionAugment
+            {
+                IsPlayerSide = caster.IsPlayer,
+                SourcePassiveId = sourceSkillId,
+                RequirementParameters = new Dictionary<string, object>(parameters),
+                CalculationEffects = GetEffectList(parameters, "calculationEffects"),
+                OnHitEffects = GetEffectList(parameters, "onHitEffects"),
+                Tags = GetStringList(parameters, "tags")
+            };
+
+            context.OutgoingActionAugments.Add(augment);
+            logs.Add(
+                "AugmentOutgoingActions"
+                + $" source={sourceSkillId}"
+                + $" side={(augment.IsPlayerSide ? "Player" : "Enemy")}"
+                + $" calc={FormatEffectTypes(augment.CalculationEffects)}"
+                + $" onHit={FormatEffectTypes(augment.OnHitEffects)}"
+                + $" tags={FormatList(augment.Tags)}");
+        }
+
+        internal static bool CurrentActionRequirementMatches(
+            Dictionary<string, object> parameters,
+            ActiveSkill currentActionSkill)
+        {
+            if (!TryGetString(parameters, "requiresCurrentSkillType", out string requiredSkillType)
+                && !TryGetString(parameters, "currentSkillType", out requiredSkillType))
+            {
+                requiredSkillType = null;
+            }
+
+            if (!TryGetString(parameters, "requiresCurrentAttackType", out string requiredAttackType)
+                && !TryGetString(parameters, "currentAttackType", out requiredAttackType))
+            {
+                requiredAttackType = null;
+            }
+
+            if (string.IsNullOrWhiteSpace(requiredSkillType)
+                && string.IsNullOrWhiteSpace(requiredAttackType))
+            {
+                return true;
+            }
+
+            if (currentActionSkill == null)
+                return false;
+
+            SkillType skillType = default;
+            if (!string.IsNullOrWhiteSpace(requiredSkillType)
+                && !Enum.TryParse(requiredSkillType, true, out skillType))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requiredSkillType)
+                && currentActionSkill.Data.Type != skillType)
+            {
+                return false;
+            }
+
+            AttackType attackType = default;
+            if (!string.IsNullOrWhiteSpace(requiredAttackType)
+                && !Enum.TryParse(requiredAttackType, true, out attackType))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requiredAttackType)
+                && currentActionSkill.Data.AttackType != attackType)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        internal static bool IncomingSkillRequirementMatches(
+            Dictionary<string, object> parameters,
+            ActiveSkill incomingSkill)
+        {
+            if (!TryGetIncomingRequirement(parameters, "SkillType", out string requiredSkillType)
+                && !TryGetIncomingRequirement(parameters, "DamageType", out requiredSkillType))
+            {
+                requiredSkillType = null;
+            }
+
+            if (!TryGetIncomingRequirement(parameters, "AttackType", out string requiredAttackType))
+            {
+                requiredAttackType = null;
+            }
+
+            if (string.IsNullOrWhiteSpace(requiredSkillType)
+                && string.IsNullOrWhiteSpace(requiredAttackType))
+            {
+                return true;
+            }
+
+            if (incomingSkill == null)
+                return false;
+
+            SkillType skillType = default;
+            if (!string.IsNullOrWhiteSpace(requiredSkillType)
+                && !Enum.TryParse(requiredSkillType, true, out skillType))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requiredSkillType)
+                && incomingSkill.Data.Type != skillType)
+            {
+                return false;
+            }
+
+            AttackType attackType = default;
+            if (!string.IsNullOrWhiteSpace(requiredAttackType)
+                && !Enum.TryParse(requiredAttackType, true, out attackType))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requiredAttackType)
+                && incomingSkill.Data.AttackType != attackType)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        internal static bool HasIncomingSkillRequirement(Dictionary<string, object> parameters)
+        {
+            return parameters != null
+                && (TryGetIncomingRequirement(parameters, "SkillType", out _)
+                    || TryGetIncomingRequirement(parameters, "DamageType", out _)
+                    || TryGetIncomingRequirement(parameters, "AttackType", out _));
+        }
+
+        private static bool TryGetIncomingRequirement(
+            Dictionary<string, object> parameters,
+            string suffix,
+            out string value)
+        {
+            return TryGetString(parameters, $"requiresIncoming{suffix}", out value)
+                || TryGetString(parameters, $"incoming{suffix}", out value);
+        }
+
+        private static List<SkillEffectData> GetEffectList(Dictionary<string, object> parameters, string key)
+        {
+            var effects = new List<SkillEffectData>();
+            AddNestedEffects(parameters, key, effects);
+            return effects.Where(effect => effect != null).ToList();
+        }
+
+        private static string FormatEffectTypes(IReadOnlyList<SkillEffectData> effects)
+        {
+            var names = effects?
+                .Select(effect => effect?.EffectType)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList() ?? new List<string>();
+            return FormatList(names);
+        }
+
         private static string FormatList(IReadOnlyList<string> values)
         {
             return values.Count == 0 ? "None" : string.Join("|", values);
@@ -949,6 +1236,7 @@ namespace BattleKing.Skills
                 "frontrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => u.IsFrontRow).ToList(),
                 "backrowallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => !u.IsFrontRow).ToList(),
                 "columnallies" => context.GetAliveUnits(caster.IsPlayer).Where(u => IsSameColumn(u.Position, caster.Position)).ToList(),
+                "rowalliesoftarget" => SelectRowAlliesOfTarget(context, targets, calculation),
                 "columnalliesoftarget" => SelectColumnAlliesOfTarget(context, targets, calculation),
                 "lowesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderBy(u => u.CurrentHp).Take(1).ToList(),
                 "highesthpally" => context.GetAliveUnits(caster.IsPlayer).OrderByDescending(u => u.CurrentHp).Take(1).ToList(),
@@ -981,6 +1269,23 @@ namespace BattleKing.Skills
 
             return selected
                 .Where(unit => unit.GetEffectiveClasses().Any(requiredClasses.Contains))
+                .ToList();
+        }
+
+        private static List<BattleUnit> SelectRowAlliesOfTarget(
+            BattleContext context,
+            IReadOnlyList<BattleUnit> targets,
+            DamageCalculation calculation)
+        {
+            var anchors = calculation?.Defender != null
+                ? new List<BattleUnit> { calculation.Defender }
+                : targets?.Where(t => t != null).ToList() ?? new List<BattleUnit>();
+
+            return anchors
+                .SelectMany(anchor => context.GetAliveUnits(anchor.IsPlayer)
+                    .Where(unit => unit.IsFrontRow == anchor.IsFrontRow))
+                .Distinct()
+                .OrderBy(unit => unit.Position)
                 .ToList();
         }
 
@@ -1176,7 +1481,20 @@ namespace BattleKing.Skills
         {
             if (parameters.TryGetValue(key, out var raw) && raw != null)
             {
-                value = raw is JsonElement element ? element.GetString() : raw.ToString();
+                if (raw is JsonElement element)
+                {
+                    value = element.ValueKind switch
+                    {
+                        JsonValueKind.String => element.GetString(),
+                        JsonValueKind.Null => null,
+                        JsonValueKind.Undefined => null,
+                        _ => element.ToString()
+                    };
+                }
+                else
+                {
+                    value = raw.ToString();
+                }
                 return !string.IsNullOrEmpty(value);
             }
             value = null;

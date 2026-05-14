@@ -225,8 +225,7 @@ namespace BattleKing.Ai
         private bool EvaluateSelfHp(Condition c, BattleUnit subject)
         {
             if (subject?.Data == null) return true;
-            int maxHp = subject.Data.BaseStats.ContainsKey("HP") ? subject.Data.BaseStats["HP"] : 1;
-            if (maxHp <= 0) maxHp = 1;
+            int maxHp = Math.Max(1, subject.GetCurrentStat("HP"));
             float hpRatio = (float)subject.CurrentHp / maxHp;
             return c.Operator switch
             {
@@ -292,9 +291,9 @@ namespace BattleKing.Ai
             if (string.Equals(statName, "MaxHp", StringComparison.OrdinalIgnoreCase))
                 return unit.GetCurrentStat("HP");
             if (string.Equals(statName, "MaxAp", StringComparison.OrdinalIgnoreCase))
-                return unit.MaxAp;
+                return unit.InitialAp;
             if (string.Equals(statName, "MaxPp", StringComparison.OrdinalIgnoreCase))
-                return unit.MaxPp;
+                return unit.InitialPp;
 
             return unit.GetCurrentStat(statName);
         }
@@ -382,8 +381,7 @@ namespace BattleKing.Ai
             if (unit?.Data == null)
                 return 0f;
 
-            int maxHp = unit.Data.BaseStats.ContainsKey("HP") ? unit.Data.BaseStats["HP"] : 1;
-            if (maxHp <= 0) maxHp = 1;
+            int maxHp = Math.Max(1, unit.GetCurrentStat("HP"));
             return (float)unit.CurrentHp / maxHp;
         }
 

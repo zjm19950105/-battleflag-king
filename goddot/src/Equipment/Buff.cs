@@ -8,6 +8,7 @@ namespace BattleKing.Equipment
         public int FlatAmount { get; set; }
         public bool IsOneTime { get; set; }
         public bool IsPureBuffOrDebuff { get; set; }
+        public bool CanStackWithSameSkill { get; set; }
         public int RemainingTurns { get; set; }
     }
 }

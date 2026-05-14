@@ -39,6 +39,8 @@ namespace BattleKing.Skills
         {
             _eventBus.Subscribe<BattleStartEvent>(OnBattleStart);
             _eventBus.Subscribe<BeforeActiveUseEvent>(OnBeforeActiveUse);
+            _eventBus.Subscribe<AfterActiveCostEvent>(OnAfterActiveCost);
+            _eventBus.Subscribe<BeforeAttackCalculationEvent>(OnBeforeAttackCalculation);
             _eventBus.Subscribe<BeforeHitEvent>(OnBeforeHit);
             _eventBus.Subscribe<AfterHitEvent>(OnAfterHit);
             _eventBus.Subscribe<AfterActiveUseEvent>(OnAfterActiveUse);
@@ -61,14 +63,28 @@ namespace BattleKing.Skills
         private void OnBeforeActiveUse(BeforeActiveUseEvent evt)
         {
             _ctx = evt.Context;
-            ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfOnActiveUse, "主动使用前", limitSimultaneous: false);
-            ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfBeforeAttack, "攻击前", limitSimultaneous: false);
+        }
 
-            var allies = GetAllies(evt.Caster, evt.Context);
-            ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeAttack, "友方攻击前",
-                limitSimultaneous: true, _allyBuffFired);
+        private void OnAfterActiveCost(AfterActiveCostEvent evt)
+        {
+            _ctx = evt.Context;
+            ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfOnActiveUse, "主动使用时", limitSimultaneous: false,
+                activeSkill: evt.Skill);
+
+            var allies = GetAllies(evt.Caster, evt.Context).Where(u => u != evt.Caster).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnActiveUse, "友方主动时",
-                limitSimultaneous: false, attacker: evt.Caster);
+                limitSimultaneous: false, attacker: evt.Caster, activeSkill: evt.Skill);
+        }
+
+        private void OnBeforeAttackCalculation(BeforeAttackCalculationEvent evt)
+        {
+            _ctx = evt.Context;
+            ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfBeforeAttack, "攻击前", limitSimultaneous: true,
+                activeSkill: evt.Skill);
+
+            var allies = GetAllies(evt.Caster, evt.Context).Where(u => u != evt.Caster).ToList();
+            ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeAttack, "友方攻击前",
+                limitSimultaneous: true, _allyBuffFired, activeSkill: evt.Skill);
         }
 
         private void OnBeforeHit(BeforeHitEvent evt)
@@ -126,10 +142,12 @@ namespace BattleKing.Skills
 
         private void ProcessForUnit(BattleUnit unit, PassiveTriggerTiming timing, string timingLabel,
             bool limitSimultaneous, DamageCalculation calc = null, BattleUnit attacker = null,
-            BattleUnit defender = null, BattleUnit knockoutVictim = null, BattleUnit knockoutKiller = null)
+            BattleUnit defender = null, BattleUnit knockoutVictim = null, BattleUnit knockoutKiller = null,
+            ActiveSkill activeSkill = null)
         {
             if (unit == null || !unit.IsAlive) return;
 
+            bool simultaneousFired = false;
             foreach (var row in unit.GetPassiveStrategiesInOrder())
             {
                 var skillId = row.SkillId;
@@ -137,7 +155,7 @@ namespace BattleKing.Skills
                     continue;
                 if (skillData.TriggerTiming != timing)
                     continue;
-                if (!PassiveMatchesBattleContext(skillData, calc))
+                if (!PassiveMatchesBattleContext(skillData, calc, activeSkill))
                     continue;
                 if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                     continue;
@@ -145,10 +163,21 @@ namespace BattleKing.Skills
                 // Check player-set passive condition
                 if (!CheckPassiveConditions(unit, row)) continue;
 
-                unit.ConsumePp(skillData.PpCost);
+                if (limitSimultaneous && skillData.HasSimultaneousLimit)
+                {
+                    if (simultaneousFired)
+                        continue;
+                    simultaneousFired = true;
+                }
 
-                _log?.Invoke($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 触发 {skillData.Name} ({timingLabel})");
-                ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
+                bool deferPp = ShouldDeferPpUntilPendingAction(skillData);
+                if (!deferPp)
+                {
+                    unit.ConsumePp(skillData.PpCost);
+                    _log?.Invoke($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 触发 {skillData.Name} ({timingLabel})");
+                }
+
+                ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller, deferPp, timingLabel);
             }
         }
 
@@ -174,7 +203,7 @@ namespace BattleKing.Skills
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
             bool limitSimultaneous, Dictionary<bool, HashSet<string>> firedSet = null, DamageCalculation calc = null,
             BattleUnit attacker = null, BattleUnit defender = null, BattleUnit knockoutVictim = null,
-            BattleUnit knockoutKiller = null)
+            BattleUnit knockoutKiller = null, ActiveSkill activeSkill = null)
         {
             if (candidates == null || candidates.Count == 0) return;
 
@@ -195,7 +224,7 @@ namespace BattleKing.Skills
                         continue;
                     if (skillData.TriggerTiming != timing)
                         continue;
-                    if (!PassiveMatchesBattleContext(skillData, calc))
+                    if (!PassiveMatchesBattleContext(skillData, calc, activeSkill))
                         continue;
                     if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                         continue;
@@ -211,16 +240,20 @@ namespace BattleKing.Skills
                         sideSet.Add(timingLabel);
                     }
 
-                    unit.ConsumePp(skillData.PpCost);
+                    bool deferPp = ShouldDeferPpUntilPendingAction(skillData);
+                    if (!deferPp)
+                    {
+                        unit.ConsumePp(skillData.PpCost);
+                        _log?.Invoke($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 触发 {skillData.Name} ({timingLabel})");
+                    }
 
-                    _log?.Invoke($"  [被动] {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 触发 {skillData.Name} ({timingLabel})");
-                    ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller);
+                    ExecuteEffect(unit, skillData, calc, attacker, defender, knockoutVictim, knockoutKiller, deferPp, timingLabel);
                     break;
                 }
             }
         }
 
-        private static bool PassiveMatchesBattleContext(PassiveSkillData skillData, DamageCalculation calc)
+        private static bool PassiveMatchesBattleContext(PassiveSkillData skillData, DamageCalculation calc, ActiveSkill activeSkill = null)
         {
             var tags = skillData.Tags ?? new List<string>();
             if (tags.Contains("RangedCover"))
@@ -229,12 +262,54 @@ namespace BattleKing.Skills
                     && calc.Skill.Data.AttackType == AttackType.Ranged;
             }
 
+            if (!IncomingSkillRequirementsMatch(skillData, calc))
+                return false;
+
+            if (!CurrentActionRequirementsMatch(skillData, activeSkill))
+                return false;
+
             return true;
+        }
+
+        private static bool IncomingSkillRequirementsMatch(PassiveSkillData skillData, DamageCalculation calc)
+        {
+            var effectsWithRequirements = skillData.Effects?
+                .Where(effect => effect != null
+                    && SkillEffectExecutor.HasIncomingSkillRequirement(effect.Parameters))
+                .ToList() ?? new List<SkillEffectData>();
+
+            return effectsWithRequirements.Count == 0
+                || effectsWithRequirements.Any(effect =>
+                    SkillEffectExecutor.IncomingSkillRequirementMatches(effect.Parameters, calc?.Skill));
+        }
+
+        private static bool CurrentActionRequirementsMatch(PassiveSkillData skillData, ActiveSkill activeSkill)
+        {
+            var augmentsWithRequirements = skillData.Effects?
+                .Where(effect => effect?.EffectType == "AugmentCurrentAction"
+                    && HasCurrentActionRequirement(effect.Parameters))
+                .ToList() ?? new List<SkillEffectData>();
+
+            return augmentsWithRequirements.Count == 0
+                || augmentsWithRequirements.Any(effect =>
+                    SkillEffectExecutor.CurrentActionRequirementMatches(effect.Parameters, activeSkill));
+        }
+
+        private static bool HasCurrentActionRequirement(Dictionary<string, object> parameters)
+        {
+            if (parameters == null)
+                return false;
+
+            return !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "requiresCurrentSkillType", ""))
+                || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "currentSkillType", ""))
+                || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "requiresCurrentAttackType", ""))
+                || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "currentAttackType", ""));
         }
 
         private void ExecuteEffect(BattleUnit unit, PassiveSkillData skillData,
             DamageCalculation calc, BattleUnit attacker, BattleUnit defender,
-            BattleUnit knockoutVictim, BattleUnit knockoutKiller)
+            BattleUnit knockoutVictim, BattleUnit knockoutKiller,
+            bool deferPpUntilPendingAction = false, string timingLabel = null)
         {
             var effects = new List<string>();
 
@@ -243,7 +318,8 @@ namespace BattleKing.Skills
             {
                 foreach (var effect in skillData.Effects)
                 {
-                    ExecuteStructuredEffect(unit, skillData, effect, calc, attacker, defender, effects);
+                    ExecuteStructuredEffect(unit, skillData, effect, calc, attacker, defender, effects,
+                        deferPpUntilPendingAction, timingLabel);
                 }
             }
             else
@@ -260,27 +336,91 @@ namespace BattleKing.Skills
         }
 
         private void ExecuteStructuredEffect(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
-            DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects)
+            DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects,
+            bool deferPpUntilPendingAction = false, string timingLabel = null)
         {
-            if (TryExecuteThroughSharedExecutor(unit, skillData, effect, calc, attacker, defender, effects))
+            if (TryExecuteThroughSharedExecutor(unit, skillData, effect, calc, attacker, defender, effects,
+                deferPpUntilPendingAction, timingLabel))
                 return;
 
             effects.Add($"{effect.EffectType}: unsupported");
         }
 
         private bool TryExecuteThroughSharedExecutor(BattleUnit unit, PassiveSkillData skillData, SkillEffectData effect,
-            DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects)
+            DamageCalculation calc, BattleUnit attacker, BattleUnit defender, List<string> effects,
+            bool deferPpUntilPendingAction = false, string timingLabel = null)
         {
             if (!CanExecuteThroughSharedExecutor(effect.EffectType))
                 return false;
 
             var targets = SelectExecutorFallbackTargets(unit, effect, attacker, defender);
+            int augmentCountBefore = _ctx?.CurrentActionAugments.Count ?? 0;
+            var executor = deferPpUntilPendingAction
+                ? new SkillEffectExecutor(action =>
+                {
+                    action.SourcePpCost = skillData.PpCost;
+                    action.SourceTimingLabel = timingLabel;
+                    _enqueueAction?.Invoke(action);
+                })
+                : _skillEffectExecutor;
             var state = new SkillEffectExecutionState();
             var logs = IsCalculationEffect(effect.EffectType)
-                ? _skillEffectExecutor.ExecuteCalculationEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id, calc, state)
-                : _skillEffectExecutor.ExecuteActionEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id);
+                ? executor.ExecuteCalculationEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id, calc, state)
+                : executor.ExecuteActionEffects(_ctx, unit, targets, new List<SkillEffectData> { effect }, skillData.Id, calc);
+            if (deferPpUntilPendingAction && effect.EffectType == "AugmentCurrentAction" && _ctx != null)
+            {
+                foreach (var augment in _ctx.CurrentActionAugments.Skip(augmentCountBefore)
+                    .Where(augment => string.Equals(augment.SourcePassiveId, skillData.Id, StringComparison.Ordinal)))
+                {
+                    augment.SourcePpCost = skillData.PpCost;
+                    augment.SourceTimingLabel = timingLabel;
+                }
+            }
             effects.AddRange(logs);
             return true;
+        }
+
+        private static bool ShouldDeferPpUntilPendingAction(PassiveSkillData skillData)
+        {
+            if (skillData?.Effects == null || skillData.Effects.Count == 0 || skillData.PpCost <= 0)
+                return false;
+
+            return skillData.Effects.Any(effect => IsDirectPendingActionEffect(effect?.EffectType)
+                || IsQueuedOnlyCurrentActionAugment(effect));
+        }
+
+        private static bool IsDirectPendingActionEffect(string effectType)
+        {
+            return effectType == "CounterAttack"
+                || effectType == "PursuitAttack"
+                || effectType == "PreemptiveAttack"
+                || effectType == "BattleEndAttack"
+                || effectType == "PendingAttack";
+        }
+
+        private static bool IsQueuedOnlyCurrentActionAugment(SkillEffectData effect)
+        {
+            if (effect?.EffectType != "AugmentCurrentAction")
+                return false;
+
+            var parameters = effect.Parameters;
+            if (parameters == null)
+                return false;
+
+            return HasNestedEffects(parameters, "queuedActions")
+                && !HasNestedEffects(parameters, "calculationEffects")
+                && !HasNestedEffects(parameters, "onHitEffects")
+                && !HasStringList(parameters, "tags");
+        }
+
+        private static bool HasNestedEffects(Dictionary<string, object> parameters, string key)
+        {
+            return parameters.TryGetValue(key, out var raw) && raw != null;
+        }
+
+        private static bool HasStringList(Dictionary<string, object> parameters, string key)
+        {
+            return parameters.TryGetValue(key, out var raw) && raw != null;
         }
 
         private void ExecuteLegacyTags(BattleUnit unit, PassiveSkillData skillData,
@@ -395,8 +535,9 @@ namespace BattleKing.Skills
             }
             if (tags.Contains("Heal25"))
             {
-                int heal = (int)(unit.Data.BaseStats.GetValueOrDefault("HP", 0) * 0.25f);
-                unit.CurrentHp = Math.Min(unit.Data.BaseStats.GetValueOrDefault("HP", 0), unit.CurrentHp + Math.Max(1, heal));
+                int maxHp = Math.Max(1, unit.GetCurrentStat("HP"));
+                int heal = (int)(maxHp * 0.25f);
+                unit.CurrentHp = Math.Min(maxHp, unit.CurrentHp + Math.Max(1, heal));
                 effects.Add($"HP回复{Math.Max(1, heal)}");
             }
             if (tags.Contains("HealAlly"))
@@ -426,11 +567,15 @@ namespace BattleKing.Skills
                 || effectType == "CoverAlly"
                 || effectType == "StatusAilment"
                 || effectType == "TemporalMark"
+                || effectType == "ForcedTarget"
+                || effectType == "ActionOrderPriority"
                 || effectType == "CounterAttack"
                 || effectType == "PursuitAttack"
                 || effectType == "PreemptiveAttack"
                 || effectType == "BattleEndAttack"
                 || effectType == "PendingAttack"
+                || effectType == "AugmentCurrentAction"
+                || effectType == "AugmentOutgoingActions"
                 || effectType == "OnHitEffect"
                 || effectType == "OnKillEffect";
         }
@@ -506,7 +651,7 @@ namespace BattleKing.Skills
         private static string DumpUnitBrief(BattleUnit u)
         {
             if (u == null || !u.IsAlive) return "[阵亡]";
-            string s = $"HP:{u.CurrentHp}/{u.Data.BaseStats.GetValueOrDefault("HP",0)} AP:{u.CurrentAp}";
+            string s = $"HP:{u.CurrentHp}/{Math.Max(1, u.GetCurrentStat("HP"))} AP:{u.CurrentAp}/{u.MaxAp} PP:{u.CurrentPp}/{u.MaxPp}";
             var buffs = u.Buffs.Where(b => b.Ratio != 0).Select(b => {
                 string sign = b.Ratio > 0 ? "+" : "";
                 return $"{b.TargetStat}{sign}{(int)(b.Ratio*100)}%";

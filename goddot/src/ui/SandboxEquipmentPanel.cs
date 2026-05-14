@@ -450,7 +450,9 @@ namespace BattleKing.Ui
             Action onPreviewCleared,
             Action onEquipmentChanged)
         {
+            int previousMaxHp = Math.Max(1, unit.GetCurrentStat("HP"));
             unit.Equipment.EquipToSlot(slotName, equipment);
+            unit.SyncResourceCapsFromStats(previousMaxHp);
             onPreviewCleared?.Invoke();
             _candidatePopup?.Hide();
             onEquipmentChanged?.Invoke();

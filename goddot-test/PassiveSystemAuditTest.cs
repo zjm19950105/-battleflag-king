@@ -322,6 +322,15 @@ namespace BattleKing.Tests
                     { "key", "AuditMark" },
                     { "count", 1 }
                 },
+                "ForcedTarget" => new()
+                {
+                    { "target", "Self" }
+                },
+                "ActionOrderPriority" => new()
+                {
+                    { "target", "Self" },
+                    { "mode", "Fastest" }
+                },
                 "ModifyCounter" => new()
                 {
                     { "target", "Self" },
@@ -338,6 +347,39 @@ namespace BattleKing.Tests
                 "PendingAttack" => new(PendingAttackParameters())
                 {
                     { "pendingActionType", "BattleEnd" }
+                },
+                "AugmentCurrentAction" => new()
+                {
+                    { "tags", new List<string> { "CannotBeBlocked" } },
+                    {
+                        "calculationEffects",
+                        new List<SkillEffectData>
+                        {
+                            new()
+                            {
+                                EffectType = "ModifyDamageCalc",
+                                Parameters = new Dictionary<string, object>
+                                {
+                                    { "ForceHit", true }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "onHitEffects",
+                        new List<SkillEffectData>
+                        {
+                            new()
+                            {
+                                EffectType = "StatusAilment",
+                                Parameters = new Dictionary<string, object>
+                                {
+                                    { "target", "Target" },
+                                    { "ailment", "BlockSeal" }
+                                }
+                            }
+                        }
+                    }
                 },
                 _ => new Dictionary<string, object>()
             };
