@@ -53,10 +53,18 @@ namespace BattleKing.Ui
         {
             return statName switch
             {
-                "Str" => GetCurrentStat(unit, slot, "Str") + slot.GetTotalStat("phys_atk"),
-                "Def" => GetCurrentStat(unit, slot, "Def") + slot.GetTotalStat("phys_def"),
-                "Mag" => GetCurrentStat(unit, slot, "Mag") + slot.GetTotalStat("mag_atk"),
-                "MDef" => GetCurrentStat(unit, slot, "MDef") + slot.GetTotalStat("mag_def"),
+                "Str" => BattleUnit.ClampCalculatedStat(
+                    "Str",
+                    GetCurrentStat(unit, slot, "Str") + slot.GetTotalStat("phys_atk")),
+                "Def" => BattleUnit.ClampCalculatedStat(
+                    "Def",
+                    GetCurrentStat(unit, slot, "Def") + slot.GetTotalStat("phys_def")),
+                "Mag" => BattleUnit.ClampCalculatedStat(
+                    "Mag",
+                    GetCurrentStat(unit, slot, "Mag") + slot.GetTotalStat("mag_atk")),
+                "MDef" => BattleUnit.ClampCalculatedStat(
+                    "MDef",
+                    GetCurrentStat(unit, slot, "MDef") + slot.GetTotalStat("mag_def")),
                 _ => GetCurrentStat(unit, slot, statName)
             };
         }
@@ -67,7 +75,8 @@ namespace BattleKing.Ui
             int equipValue = slot.GetTotalStat(statName);
             float buffRatio = unit.Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
             int flatBuff = unit.Buffs.Where(b => b.TargetStat == statName).Sum(b => b.FlatAmount);
-            return (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
+            int value = (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
+            return BattleUnit.ClampCalculatedStat(statName, value);
         }
     }
 

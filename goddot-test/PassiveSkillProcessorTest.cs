@@ -321,7 +321,7 @@ namespace BattleKing.Tests
                 Type = SkillType.Physical,
                 AttackType = AttackType.Melee,
                 Power = 10,
-                HitRate = 60,
+                HitRate = 250,
                 TargetType = TargetType.SingleEnemy,
                 Effects = new List<SkillEffectData>()
             };

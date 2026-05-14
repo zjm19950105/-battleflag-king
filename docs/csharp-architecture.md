@@ -188,6 +188,7 @@ Operator 约定：
 
 - 战斗中 AP/PP 的硬上限固定为 `BattleUnit.ResourceCap == 4`；`MaxAp` / `MaxPp` 用于显示和恢复 clamp，始终是 4。
 - `GetCurrentStat("AP" / "PP")` 会把基础值 + 装备值 clamp 到 0..4，并同步到 `InitialAp` / `InitialPp`；`InitialPp` 同时是 `PassivePpBudget`，用于被动装备 PP 成本预算。
+- `GetCurrentStat(...)` 会把普通运行时属性 clamp 到 0 以上；`Str` / `Mag` / `Def` / `MDef` / `Spd` / `Hit` / `Eva` / `Crit` / `Block` 等被 flat 或 ratio debuff 压低时，显示、条件排序和伤害/命中/暴击/格挡计算都不得出现负数。装备预览使用同一套 clamp；HP 相关 UI/比例仍按装备后最大 HP 再 `Math.Max(1, ...)` 处理。
 - 装备增加 HP 时，当前 HP 按最大 HP 差额增加，保留已损失量；装备增加 AP/PP 时，当前 AP/PP 按入场资源差额增加，但不超过 4。
 - 装备降低 HP 时，当前 HP clamp 到新最大 HP；装备降低 AP/PP 时，当前值 clamp 到新的入场 AP/PP。
 - HP=0 的单位不会因为换 HP 装备自动复活；正式复活应由未来复活技能/道具显式实现。
@@ -214,7 +215,9 @@ Operator 约定：
 
 状态语义：`CritSeal` 挂在攻击者身上时禁止暴击；防守者身上的 `CritSeal` 不会保护其免受暴击。`BlockSeal` 仍挂在防守者身上时禁止其格挡。`StatusAilment.Stun` 会同步设置 `UnitState.Stunned`，使目标下次行动跳过一次并恢复 `Normal`。
 
-`DamageCalculator` 负责把 `CoverTarget` 解析成 `ResolvedDefender`。之后所有实际承伤语义都使用 `DamageResult.ResolvedDefender`：扣 HP、AfterHit、OnKnockdown、结构化日志。
+命中率语义：`ActiveSkillData.HitRate` 是技能命中倍率，不是加值。普通命中公式为 `floor((攻击者命中 - 防守者回避) * 技能命中倍率 / 100)`，地上近接攻击飞行目标时先把 `(攻击者命中 - 防守者回避)` 半减，再乘技能命中倍率，最终 clamp 到 0..100。`BattleLogHelper` 通过 `HitChanceCalculator` 显示同一套公式，避免日志和真实判定分裂。
+
+`DamageCalculator` 负责把 `CoverTarget` 解析成 `ResolvedDefender`。之后所有实际承伤语义都使用 `DamageResult.ResolvedDefender`：扣 HP、AfterHit、OnKnockdown、结构化日志。`BattleEngine` 在实际扣血阶段会调用 `DamageResult.RecordHpChange(...)`，把实际承伤者的 `DamageReceiverHpBefore`、`DamageReceiverHpAfter`、`AppliedHpDamage` 和 `LethalDamageResisted` 写回结果；日志和未来动画不要再用 `CurrentHp + TotalDamage` 反推扣血前 HP。
 `ForceEvasion` 只回避多段攻击的第 1 hit；`MeleeHitNullify` 这类 temporal state 只无效下一段命中的近接物理伤害。多段攻击即使部分 hit 被回避/无效，剩余命中段仍要正常扣血。
 带 `RangedCover` tag 的被动是额外上下文限制：只允许在远程物理 `BeforeHit` 中触发；结构化效果仍用 `CoverAlly` + `ModifyDamageCalc.NullifyPhysicalDamage` 表达实际掩护/无效化。
 同一技能可以同时挂多个不同属性的纯 buff/debuff；`BuffManager` 默认只把“同一技能 + 同一属性”的纯 buff/debuff 视作重复。结构化 `AddBuff` / `AddDebuff` 可使用 `stackPolicy: "Stack"`（或兼容布尔 `stackable: true`）允许同技能同属性重复堆叠，当前用于 `pas_hawk_eye`、`pas_emergency_cover` 这类原版 Stackable 被动。
@@ -260,14 +263,15 @@ BattleEnd 常用 structured effects：
 - `PendingAttack`: 通用入队攻击，额外用 `pendingActionType` 指定 `Counter` / `Pursuit` / `Preemptive` / `BattleEnd`。
 - Pending action 的 `targetType: Row` / `Column` 在 `BattleEngine.ProcessPendingActions()` 里以已入队目标为锚点展开同阵营同排/同列目标；`ignoreDefenseRatio` 只修改 pending action 自己的 `DamageCalculation`，如果同时设置 `ignoreDefenseTargetClass`，只在实际目标拥有该 `UnitClass` 时生效。
 - 直接 pending attack 被动（`CounterAttack` / `PursuitAttack` / `PreemptiveAttack` / `BattleEndAttack` / `PendingAttack`），以及只有 `queuedActions` 的 `AugmentCurrentAction` 追击类被动，PP 消耗延迟到 `ProcessPendingActions()` 真正结算前。若入队目标已死亡或没有有效目标，该 pending action 不发动、不消耗 PP，也不写结构化伤害日志；这匹配原版多个追击/反击排队时前一个击杀目标后，后续追击不再触发的语义。
-- `RecoverHp` / `RecoverAp` / `RecoverPp`: 直接恢复资源，按 target DSL 选目标；AP/PP 恢复最多到固定硬上限 4，而不是角色入场 AP/PP。
+- 当前主动行动触发的 pending action 会在该主动单位“行动结束”日志前由 `ProcessPendingActions()` 结算；`StepOneAction()` 里仍保留一次兜底 drain，供 BattleStart/BattleEnd 或其它路径入队的 pending action 使用。pending 旧字符串日志会显示真实 `hp=before->after(-lost)`，不要再用 `CurrentHp + damage` 反推。
+- `RecoverHp` / `RecoverAp` / `RecoverPp`: 直接恢复资源，按 target DSL 选目标；HP 恢复按目标装备后的 `GetCurrentStat("HP")` 计算和 clamp，AP/PP 恢复最多到固定硬上限 4，而不是角色入场 AP/PP。
 - `ApDamage` / `PpDamage`: 扣除资源，按 target DSL 选目标；`amount` 支持整数或 `"All"`。
 - `OnHitEffect`: 伤害判定命中后执行嵌套 `effects`；可选 `requireDamage`、`requireUnblocked` / `requireNotBlocked`、`chance` 进一步限制。`chance` 支持 `0..1` 比例或 `0..100` 百分比，表示命中后整组 nested effects 的触发率。主动攻击和 pending attack 共用 `SkillEffectExecutor.ExecutePostDamageEffects(...)`。
 - `OnKillEffect`: 本次伤害击倒实际承伤者后执行嵌套 `effects`；击倒判断使用 `DamageResult.ResolvedDefender` 对应的扣血结果。
 - `AugmentCurrentAction`: `SelfBeforeAttack` / `AllyBeforeAttack` 等主动行动前被动可把 `calculationEffects`、`onHitEffects`、`queuedActions`、`tags` 附着到当前主动行动。`queuedActions` 使用普通 pending attack effect（如 `PursuitAttack` / `PendingAttack`）参数，并在当前主动攻击结算后以当前主动目标入队，actor 为触发该被动的单位，source passive id 保留为该被动 id。`requiresCurrentSkillType` / `requiresCurrentAttackType` 可限制当前主动技能类型；`PassiveSkillProcessor` 会在消耗 PP 前检查这些条件。`BattleContext.CurrentActionAugments` 只在当前 active action 内有效；`BattleEngine` 会对每个目标逐目标执行 calculation / on-hit 增强，并在 `AfterActiveUseEvent` 前清理。结构化日志会把来源 passive id 记为 `Augment:<passiveId>` flag，旧字符串日志会输出 augment source/tags。
 - `AugmentOutgoingActions`: `BattleStart` 等被动可登记 battle-long 阵营光环，把 `calculationEffects`、`onHitEffects`、`tags` 附着到该阵营后续主动行动。当前用于 `pas_calm_cover`，让己方主动攻击带 `CannotBeBlocked`；不会影响敌方行动，新 `BattleContext` / 新战斗初始化会清空旧光环。
 - `TransferResource`: 在选中的 `from` 与 `to` 目标之间转移资源，参数包括 `resource` (`AP` / `PP`)、`amount`（整数或 `"All"`）、`from`、`to`。当前用于命中后偷取 PP。
-- `HealRatio`: 按最大 HP 比例治疗；可选 `lowHpThreshold` + `lowHpMultiplier` 表示低血量目标治疗倍率。
+- `HealRatio`: 按目标装备后的 `GetCurrentStat("HP")` 比例治疗并 clamp；可选 `lowHpThreshold` + `lowHpMultiplier` 也使用同一个装备后最大 HP 判断低血量目标治疗倍率。
 - `AmplifyDebuffs`: 放大选中目标身上已有的纯 debuff（`IsPureBuffOrDebuff` 且 `Ratio < 0` 或 `FlatAmount < 0`），只乘以负向数值；不影响正向 buff，不创建新 debuff。参数：`target`、`multiplier`。
 - `TemporalMark`: 给目标添加一次性/限时标记。当前 `DebuffNullify` 会在下一次结构化 `AddDebuff` 时被消费并阻止该 debuff；`AilmentNullify` 会在下一次结构化 `StatusAilment` 时被消费并阻止该异常；`MagicDamageNullify` 会在 `DamageCalculator` 中的下一次魔法命中伤害段被消费并无效魔法伤害；`DeathResist` 会在下一次致死伤害时被消费，并让目标保留 1 HP。
 - `ActionOrderPriority`: BattleStart 行动顺序修正；`mode: "Fastest"` 给目标写入高优先级，`BattleEngine` 排序时先按该优先级，再按当前 `Spd`，同级仍随机打散。
@@ -297,14 +301,14 @@ BattleEnd 常用 structured effects：
 - `OnBattleLogEntry`: 结构化日志回调。
 - `BattleLogEntries`: 已收集日志。
 
-`BattleLogEntry` 当前字段：`Turn`, `ActorId`, `SkillId`, `TargetIds`, `Damage`, `Flags`, `Text`。
+`BattleLogEntry` 当前字段：`Turn`, `ActorId`, `SkillId`, `TargetIds`, `Damage`, `HpBefore`, `HpAfter`, `HpLost`, `Flags`, `Text`。`Damage` 是公式伤害，`HpLost` 是实际 HP 下降量；`DeathResist` 等保命效果会让两者不同。
 
 当前覆盖：主动攻击、pending passive attack、BattleEnd。回放 UI 尚未实现。
 
 当前日志状态与风险：
 
-- Pending action（`Counter` / `Pursuit`）会在主动单位“行动结束”之后由 `ProcessPendingActions()` 结算，旧字符串日志容易让玩家误以为反击/追击没有生效。后续应把 pending action 的 HP 变化、死亡和来源被动写成更明确的多行日志，或在主动行动结束前后加清楚的“追加行动结算”分隔。
-- `BattleLogHelper` 目前用 `damageReceiver.CurrentHp + result.TotalDamage` 反推 hpBefore。遇到 `DeathResist` 这种“致死但保留 1 HP”的语义时，会显示类似 `HP:109->1(-108)`，看起来像先回血再掉血。后续应让伤害结算/扣血阶段把真实扣血前 HP 传给日志，供未来动画系统使用。
+- Pending action（`Counter` / `Pursuit`）已在当前主动单位“行动结束”前结算并显示真实 HP 变化；如后续继续强化可读性，优先改善文本格式，不要改变 PP 延迟消耗和死亡目标跳过语义。
+- `BattleLogHelper` 优先使用 `DamageResult` 在扣血阶段记录的真实 HP 前后值。遇到 `DeathResist` 这种“致死但保留 1 HP”的语义时，HP 行显示实际 `HpBefore->HpAfter(-HpLost)`，并在结构化日志 flags 中标记 `DeathResist`。
 - 多段攻击日志已使用 per-hit breakdown：`DamageCalculator` 逐 hit 写入 `DamageHitResult`，`BattleLogHelper` 在多段时输出 hit 数、暴击/格挡/未命中/回避/无效计数、单段基础和按普通/暴击/格挡分组的合计。后续调整多段规则时必须同步 `DamageHitResult`，不要只改聚合字段。
 
 ## 当前风险
@@ -312,7 +316,7 @@ BattleEnd 常用 structured effects：
 - active legacy tag-only allowlist 已清空；passive legacy tag-only allowlist 也已清空。`act_line_defense`、`act_frontline_heavy_bolt`、`act_curse_disaster` 以及剩余 15 个 passive 均已迁移到 structured effects。
 - `AugmentCurrentAction` 已用于 `pas_rapid_reload`、`pas_quick_reload`、`pas_magic_blade`、`pas_muscle_swelling`；后续迁移 `SelfBeforeAttack` / `AllyBeforeAttack` 类被动时优先复用该机制，不要新增 skill-id 特判。
 - Godot UI 尚无自动化冒烟；当前已修正战斗日志初始化后被清空、返回按钮重复添加、沙盒战场状态布局、沙盒详情复用草稿状态、装备 HP/AP/PP 资源同步等问题，仍需要人工 F5 覆盖启动、选队、进战斗、下一步、结果页和沙盒装备/策略刷新。
-- 手测新风险：命中率日志公式可能把技能命中/威力概念混淆；简易效果降低属性应 clamp 到 0；`列治愈` 曾因治疗 clamp 到基础 HP 而显示 HP 下降，相关治疗路径必须全部使用装备后最大 HP 复查；`DeathResist` 日志仍需真实扣血前 HP；pending action 日志顺序仍容易让玩家误解；追击、反击、列屏障、守护者/暴怒等需要用手测日志复现，判断是真未实现还是日志表达不清。
+- 手测新风险：追击、反击、列屏障、守护者/暴怒等需要用手测日志复现，判断是真未实现还是日志表达不清。
 - `Main.cs` 已抽出阶段导航、通用面板/按钮流程和拖拽布阵视图，但具体装备、被动、策略 UI 仍偏大；后续拆分要继续保持不改变流程顺序。
 - `SkillEffectExecutor.cs`、`PassiveSkillProcessor.cs` 偏大，下一步是有测试地拆分。
 - 测试项目有 nullable/Godot source generator 警告；游戏项目 build 应保持 0 警告。

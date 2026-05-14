@@ -11,7 +11,7 @@ namespace BattleKing.Tests
     {
         public static BattleUnit CreateUnit(
             int hp = 100, int str = 50, int def = 30, int mag = 20, int mdef = 20,
-            int hit = 100, int eva = 10, int crit = 5, int block = 3, int spd = 20,
+            int hit = 100, int eva = 0, int crit = 5, int block = 3, int spd = 20,
             int ap = 3, int pp = 2, bool isPlayer = true, List<UnitClass> classes = null)
         {
             var data = new CharacterData

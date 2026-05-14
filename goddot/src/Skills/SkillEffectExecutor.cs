@@ -683,7 +683,7 @@ namespace BattleKing.Skills
             int percent = GetInt(parameters, "amount", 25);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
             {
-                int maxHp = target.Data.BaseStats.GetValueOrDefault("HP", 1);
+                int maxHp = GetMaxHp(target);
                 int before = target.CurrentHp;
                 int heal = Math.Max(1, (int)(maxHp * percent / 100f));
                 target.CurrentHp = Math.Min(maxHp, target.CurrentHp + heal);
@@ -702,7 +702,7 @@ namespace BattleKing.Skills
             float ratio = NormalizeRatio(GetFloat(parameters, "ratio", 0.25f));
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
             {
-                int maxHp = target.Data.BaseStats.GetValueOrDefault("HP", 1);
+                int maxHp = GetMaxHp(target);
                 int before = target.CurrentHp;
                 float effectiveRatio = ratio;
                 if (TryGetFloat(parameters, "lowHpThreshold", out float lowHpThreshold)
@@ -1328,10 +1328,15 @@ namespace BattleKing.Skills
 
         private static float GetHpRatio(BattleUnit unit)
         {
-            int maxHp = unit.Data.BaseStats.GetValueOrDefault("HP", 1);
+            int maxHp = GetMaxHp(unit);
             if (maxHp <= 0)
                 return 0f;
             return (float)unit.CurrentHp / maxHp;
+        }
+
+        private static int GetMaxHp(BattleUnit unit)
+        {
+            return Math.Max(1, unit?.GetCurrentStat("HP") ?? 1);
         }
 
         private static bool IsSameColumn(int a, int b)

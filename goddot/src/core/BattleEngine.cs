@@ -442,13 +442,7 @@ namespace BattleKing.Core
                 var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
                 calc.ResolvedDefender = damageReceiver;
 
-				bool killed = false;
-				if (result.IsHit && result.TotalDamage > 0)
-				{
-					int hpBefore = damageReceiver.CurrentHp;
-					damageReceiver.TakeDamage(result.TotalDamage);
-					killed = !damageReceiver.IsAlive;
-				}
+				bool killed = ApplyDamageAndRecordHp(result, damageReceiver);
 
 				var logLines = BattleKing.Ui.BattleLogHelper.FormatAttack(unit, target, skill, calc, result, killed, result.AppliedAilments.ToList());
 				foreach (var l in logLines) Log(l);
@@ -500,6 +494,7 @@ namespace BattleKing.Core
             _ctx.CurrentActionAugments.Clear();
             _ctx.CurrentActionSkill = null;
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
+            ProcessPendingActions();
 
             Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 行动结束: {DumpUnitBrief(unit)}");
         }
@@ -583,6 +578,16 @@ namespace BattleKing.Core
             }
 
             return logs;
+        }
+
+        private static bool ApplyDamageAndRecordHp(DamageResult result, BattleUnit damageReceiver)
+        {
+            int hpBefore = damageReceiver.CurrentHp;
+            if (result.IsHit && result.TotalDamage > 0)
+                damageReceiver.TakeDamage(result.TotalDamage);
+
+            result.RecordHpChange(hpBefore, damageReceiver.CurrentHp);
+            return result.IsHit && result.TotalDamage > 0 && !damageReceiver.IsAlive;
         }
 
         private List<string> ExecuteCurrentActionAugmentQueuedActions(IReadOnlyList<BattleUnit> targets)
@@ -731,22 +736,15 @@ namespace BattleKing.Core
                     var result = _damageCalculator.Calculate(calc);
                     var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
                     calc.ResolvedDefender = damageReceiver;
-                    bool killed = false;
-
-                    if (result.IsHit && result.TotalDamage > 0)
+                    bool killed = ApplyDamageAndRecordHp(result, damageReceiver);
+                    if (killed)
                     {
-                        damageReceiver.TakeDamage(result.TotalDamage);
-                        killed = !damageReceiver.IsAlive;
-
-                        if (killed)
+                        _eventBus.Publish(new OnKnockdownEvent
                         {
-                            _eventBus.Publish(new OnKnockdownEvent
-                            {
-                                Victim = damageReceiver,
-                                Killer = action.Actor,
-                                Context = _ctx
-                            });
-                        }
+                            Victim = damageReceiver,
+                            Killer = action.Actor,
+                            Context = _ctx
+                        });
                     }
 
                     var postEffectLogs = _skillEffectExecutor.ExecutePostDamageEffects(
@@ -766,6 +764,8 @@ namespace BattleKing.Core
                         action.Type.ToString(),
                         BuildPendingActionFlags(action, calc)));
 
+                    Log(pendingLogText);
+
                     _eventBus.Publish(new AfterHitEvent
                     {
                         Attacker = action.Actor,
@@ -775,8 +775,6 @@ namespace BattleKing.Core
                         IsHit = result.IsHit,
                         Context = _ctx
                     });
-
-                    Log(pendingLogText);
                 }
             }
         }
@@ -991,6 +989,8 @@ namespace BattleKing.Core
                 flags.Add("Critical");
             if (result.IsBlocked)
                 flags.Add("Blocked");
+            if (result.LethalDamageResisted)
+                flags.Add("DeathResist");
             if (killed)
                 flags.Add("Knockdown");
             flags.AddRange(result.AppliedAilments.Select(a => a.ToString()));
@@ -1004,6 +1004,11 @@ namespace BattleKing.Core
                 SkillId = skillId ?? "",
                 TargetIds = damageReceiver == null ? new List<string>() : new List<string> { damageReceiver.Data.Id },
                 Damage = result.TotalDamage,
+                HpBefore = result.DamageReceiverHpBefore,
+                HpAfter = result.DamageReceiverHpAfter,
+                HpLost = result.DamageReceiverHpBefore.HasValue && result.DamageReceiverHpAfter.HasValue
+                    ? (int?)result.AppliedHpDamage
+                    : null,
                 Flags = flags.Distinct().ToList(),
                 Text = text ?? ""
             };
@@ -1022,6 +1027,7 @@ namespace BattleKing.Core
                 + $" target={BattleKing.Ui.BattleLogHelper.FormatUnitName(declaredTarget)}"
                 + $" receiver={BattleKing.Ui.BattleLogHelper.FormatUnitName(damageReceiver)}"
                 + $" damage={result.TotalDamage}"
+                + FormatPendingHpChange(result)
                 + $" hit={result.IsHit}"
                 + $" blocked={result.IsBlocked}"
                 + $" critical={result.IsCritical}"
@@ -1032,6 +1038,17 @@ namespace BattleKing.Core
                 + $" ailments={FormatAilments(result.AppliedAilments)}"
                 + $" temporary=actor:{FormatTemporalStates(action.Actor)};receiver:{FormatTemporalStates(damageReceiver)}"
                 + $" tags={FormatTags(action.Tags)}";
+        }
+
+        private static string FormatPendingHpChange(DamageResult result)
+        {
+            if (!result.DamageReceiverHpBefore.HasValue || !result.DamageReceiverHpAfter.HasValue)
+                return "";
+
+            string text = $" hp={result.DamageReceiverHpBefore.Value}->{result.DamageReceiverHpAfter.Value}(-{result.AppliedHpDamage})";
+            if (result.LethalDamageResisted)
+                text += " deathResist=true";
+            return text;
         }
 
         private string GetPassiveDisplayName(string passiveId)

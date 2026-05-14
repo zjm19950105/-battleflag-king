@@ -31,22 +31,21 @@ namespace BattleKing.Ui
             if (damageReceiver != defender)
                 lines.Add("  Cover: " + FormatUnitName(defender) + " -> " + FormatUnitName(damageReceiver));
 
-            int atkHit = attacker.GetCurrentStat("Hit");
-            int defEva = defender.GetCurrentStat("Eva");
-            int skillHit = skill.Data.HitRate ?? 100;
-            int rawHitChance = skillHit + atkHit - defEva;
-            int modifiedHitChance = rawHitChance;
-            string hitFormula = $"技能{skillHit} + {FormatUnitName(attacker)}命中{atkHit} - {FormatUnitName(defender)}回避{defEva}";
-            bool defIsFlying = defender.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true;
-            bool atkIsGrounded = attacker.GetEffectiveClasses()?.Contains(UnitClass.Flying) != true;
-            if (defIsFlying && atkIsGrounded && skill.AttackType == AttackType.Melee)
-            {
-                modifiedHitChance /= 2;
-                hitFormula = "(" + hitFormula + ") / 2(飞行防御)";
-            }
-            int hitChance = Math.Clamp(modifiedHitChance, 0, 100);
-            string clampNote = modifiedHitChance != hitChance ? $"，显示上限/下限后 {hitChance}%" : $"，最终 {hitChance}%";
-            lines.Add("  命中率: " + hitFormula + " = " + modifiedHitChance + "%" + clampNote);
+            var hitChance = HitChanceCalculator.Calculate(attacker, defender, skill);
+            string hitFormula = "(" + FormatUnitName(attacker) + "命中" + hitChance.AttackerHit
+                + " - " + FormatUnitName(defender) + "回避" + hitChance.DefenderEvasion + ")";
+            if (hitChance.FlyingPenaltyApplied)
+                hitFormula = "(" + hitFormula + " / 2(飞行防御))";
+            hitFormula += " x 技能命中倍率" + hitChance.SkillHitRate + "%";
+            string clampNote;
+            if (hitChance.RawChance < 0f || hitChance.RawChance > 100f)
+                clampNote = "，显示上限/下限后 " + hitChance.FinalChance + "%";
+            else if (Math.Abs(hitChance.RawChance - hitChance.FinalChance) > 0.001f)
+                clampNote = "，向下取整后 " + hitChance.FinalChance + "%";
+            else
+                clampNote = "，最终 " + hitChance.FinalChance + "%";
+            lines.Add("  命中率: " + hitFormula + " = " + FormatNumber(hitChance.RawChance) + "%" + clampNote);
+            int defEva = hitChance.DefenderEvasion;
             lines.Add("  判定数据: " + FormatUnitName(defender) + "回避 " + defEva + "% | " + FormatUnitName(damageReceiver) + "格挡 " + damageReceiver.GetCurrentBlockRate() + "% | " + FormatUnitName(attacker) + "暴击 " + attacker.GetCurrentCritRate() + "%");
             var hitResults = result.HitResults.Count > 0 ? result.HitResults : calc.HitResults;
             if (calc.HitCount > 1)
@@ -100,14 +99,18 @@ namespace BattleKing.Ui
                 lines.Add(formula);
             }
 
-            int hpBefore = damageReceiver.CurrentHp + result.TotalDamage;
-            int maxHp = Math.Max(1, damageReceiver.GetCurrentStat("HP"));
-            if (hpBefore > maxHp)
-                hpBefore = maxHp;
-            int hpAfter = damageReceiver.CurrentHp;
+            bool hasRecordedHp = result.DamageReceiverHpBefore.HasValue && result.DamageReceiverHpAfter.HasValue;
+            int hpBefore = hasRecordedHp
+                ? result.DamageReceiverHpBefore.Value
+                : damageReceiver.CurrentHp;
+            int hpAfter = hasRecordedHp
+                ? result.DamageReceiverHpAfter.Value
+                : damageReceiver.CurrentHp;
+            int hpLost = hasRecordedHp ? result.AppliedHpDamage : 0;
             string killStr = killed ? " [Knockdown]" : "";
+            string deathResistStr = result.LethalDamageResisted ? " [DeathResist]" : "";
             string ailStr = appliedAilments.Count > 0 ? " | Ailments:" + string.Join(",", appliedAilments) : "";
-            lines.Add("  * " + FormatUnitName(damageReceiver) + " HP:" + hpBefore + "->" + hpAfter + "(-" + result.TotalDamage + ")" + killStr + ailStr);
+            lines.Add("  * " + FormatUnitName(damageReceiver) + " HP:" + hpBefore + "->" + hpAfter + "(-" + hpLost + ")" + deathResistStr + killStr + ailStr);
 
             return lines;
         }

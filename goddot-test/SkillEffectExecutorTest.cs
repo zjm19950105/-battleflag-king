@@ -229,6 +229,41 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void HealEffects_UseEquipmentAdjustedMaxHpForAmountClampAndLowHpThreshold()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var caster = TestDataFactory.CreateUnit();
+            var target = TestDataFactory.CreateUnit(hp: 200, isPlayer: false);
+            EquipHpBonus(target, 200);
+            target.CurrentHp = 180;
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "HealRatio",
+                    Parameters = new()
+                    {
+                        { "target", "Target" },
+                        { "ratio", 0.1 },
+                        { "lowHpThreshold", 0.5 },
+                        { "lowHpMultiplier", 2 }
+                    }
+                },
+                new SkillEffectData
+                {
+                    EffectType = "RecoverHp",
+                    Parameters = new() { { "target", "Target" }, { "amount", 25 } }
+                }
+            });
+
+            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+
+            ClassicAssert.AreEqual(400, target.GetCurrentStat("HP"));
+            ClassicAssert.AreEqual(360, target.CurrentHp);
+        }
+
+        [Test]
         public void AddBuff_TargetAllAllies_BuffsOnlyCasterSideAliveUnits()
         {
             var executor = new SkillEffectExecutor();
@@ -642,8 +677,9 @@ namespace BattleKing.Tests
             var wounded = new BattleUnit(CreateCharacter("wounded", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
             {
                 Position = 2,
-                CurrentHp = 50
             };
+            EquipHpBonus(wounded, 200);
+            wounded.CurrentHp = 180;
             medic.EquippedPassiveSkillIds.Add("pas_give_ap");
             var context = new BattleContext(repository)
             {
@@ -657,7 +693,8 @@ namespace BattleKing.Tests
 
             ClassicAssert.IsNotEmpty(passive.Effects);
             CollectionAssert.IsEmpty(passive.Tags);
-            ClassicAssert.AreEqual(100, wounded.CurrentHp);
+            ClassicAssert.AreEqual(400, wounded.GetCurrentStat("HP"));
+            ClassicAssert.AreEqual(280, wounded.CurrentHp);
             ClassicAssert.AreEqual(200, medic.CurrentHp);
         }
 
@@ -675,8 +712,9 @@ namespace BattleKing.Tests
             var backRowAlly = new BattleUnit(CreateCharacter("backRowAlly", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
             {
                 Position = 5,
-                CurrentHp = 40
             };
+            EquipHpBonus(backRowAlly, 200);
+            backRowAlly.CurrentHp = 180;
             var frontRowAlly = new BattleUnit(CreateCharacter("frontRowAlly", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
             {
                 Position = 1,
@@ -695,7 +733,8 @@ namespace BattleKing.Tests
 
             ClassicAssert.IsNotEmpty(passive.Effects);
             CollectionAssert.IsEmpty(passive.Tags);
-            ClassicAssert.AreEqual(100, backRowAlly.CurrentHp);
+            ClassicAssert.AreEqual(400, backRowAlly.GetCurrentStat("HP"));
+            ClassicAssert.AreEqual(300, backRowAlly.CurrentHp);
             ClassicAssert.AreEqual(40, frontRowAlly.CurrentHp);
         }
 
@@ -1358,7 +1397,8 @@ namespace BattleKing.Tests
             {
                 Position = 2
             };
-            sameRowAlly.CurrentHp = 130;
+            EquipHpBonus(sameRowAlly, 100);
+            sameRowAlly.CurrentHp = 230;
             var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 200, str: 10, def: 0, spd: 1), repository, false)
             {
                 Position = 1
@@ -1375,7 +1415,8 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
             ClassicAssert.AreEqual(180, frontAlly.CurrentHp);
-            ClassicAssert.AreEqual(200, sameRowAlly.CurrentHp);
+            ClassicAssert.AreEqual(300, sameRowAlly.GetCurrentStat("HP"));
+            ClassicAssert.AreEqual(300, sameRowAlly.CurrentHp);
             ClassicAssert.AreEqual(200, enemy.CurrentHp);
         }
 
@@ -2107,6 +2148,17 @@ namespace BattleKing.Tests
                     { "PP", pp }
                 }
             };
+        }
+
+        private static void EquipHpBonus(BattleUnit unit, int hpBonus)
+        {
+            int previousMaxHp = Math.Max(1, unit.GetCurrentStat("HP"));
+            unit.Equipment.EquipToSlot("Accessory1", TestDataFactory.CreateEquipment(
+                $"eq_hp_bonus_{hpBonus}",
+                "HP Bonus",
+                EquipmentCategory.Accessory,
+                new Dictionary<string, int> { { "HP", hpBonus } }));
+            unit.SyncResourceCapsFromStats(previousMaxHp);
         }
 
         private static GameDataRepository LoadRepositoryWithPassive(PassiveSkillData passive)

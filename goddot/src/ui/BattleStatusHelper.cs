@@ -45,21 +45,22 @@ namespace BattleKing.Ui
             int bEva = u.Data.BaseStats.GetValueOrDefault("Eva", 0);
             int bCrit = u.Data.BaseStats.GetValueOrDefault("Crit", 0);
             int bBlock = u.Data.BaseStats.GetValueOrDefault("Block", 0);
-            int eqPAtk = u.Equipment.GetTotalStat("phys_atk");
-            int eqPDef = u.Equipment.GetTotalStat("phys_def");
-            int eqMAtk = u.Equipment.GetTotalStat("mag_atk");
-            int eqMDef = u.Equipment.GetTotalStat("mag_def");
-            int eqHit = u.Equipment.GetTotalStat("Hit");
-            int eqEva = u.Equipment.GetTotalStat("Eva");
-            int eqCrit = u.Equipment.GetTotalStat("Crit");
-            int eqBlock = u.Equipment.GetTotalStat("Block");
-            int eqSpd = u.Equipment.GetTotalStat("Spd");
+            int bSpd = u.Data.BaseStats.GetValueOrDefault("Spd", 0);
+            int eqPAtk = u.GetCurrentAttackPower(SkillType.Physical) - bStr;
+            int eqPDef = u.GetCurrentDefense(SkillType.Physical) - bDef;
+            int eqMAtk = u.GetCurrentAttackPower(SkillType.Magical) - bMag;
+            int eqMDef = u.GetCurrentDefense(SkillType.Magical) - bMDef;
+            int eqHit = u.GetCurrentHitRate() - bHit;
+            int eqEva = u.GetCurrentEvasion() - bEva;
+            int eqCrit = u.GetCurrentCritRate() - bCrit;
+            int eqBlock = u.GetCurrentBlockRate() - bBlock;
+            int eqSpd = spd - bSpd;
 
-            string atkStr = eqPAtk != 0 ? "(" + bStr + "+" + eqPAtk + ")" : "(" + bStr + ")";
-            string defStr = eqPDef != 0 ? "(" + bDef + "+" + eqPDef + ")" : "(" + bDef + ")";
-            string magStr = eqMAtk != 0 ? "(" + bMag + "+" + eqMAtk + ")" : "(" + bMag + ")";
-            string mdefStr = eqMDef != 0 ? "(" + bMDef + "+" + eqMDef + ")" : "(" + bMDef + ")";
-            string spdStr = eqSpd != 0 ? "(" + (spd - eqSpd) + "+" + eqSpd + ")" : "(" + spd + ")";
+            string atkStr = FormatStatBreakdown(bStr, eqPAtk);
+            string defStr = FormatStatBreakdown(bDef, eqPDef);
+            string magStr = FormatStatBreakdown(bMag, eqMAtk);
+            string mdefStr = FormatStatBreakdown(bMDef, eqMDef);
+            string spdStr = FormatStatBreakdown(bSpd, eqSpd);
 
             label.AppendText("    SPD" + spdStr + " | 物攻" + (bStr + eqPAtk) + atkStr + " | 物防" + (bDef + eqPDef) + defStr + " | 魔攻" + (bMag + eqMAtk) + magStr + " | 魔防" + (bMDef + eqMDef) + mdefStr + "\n");
             label.AppendText("    命中" + (bHit + eqHit) + "(" + bHit + "+" + eqHit + ") | 回避" + (bEva + eqEva) + "(" + bEva + "+" + eqEva + ") | 会心" + (bCrit + eqCrit) + "%(" + bCrit + "+" + eqCrit + ") | 格挡" + (bBlock + eqBlock) + "%(" + bBlock + "+" + eqBlock + ")\n");
@@ -113,6 +114,13 @@ namespace BattleKing.Ui
             for (int i = 0; i < current; i++) s += "★";
             for (int i = current; i < max; i++) s += "☆";
             return s;
+        }
+
+        private static string FormatStatBreakdown(int baseValue, int delta)
+        {
+            if (delta > 0) return $"({baseValue}+{delta})";
+            if (delta < 0) return $"({baseValue}{delta})";
+            return $"({baseValue})";
         }
     }
 }

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using System.Collections.Generic;
 using System.Linq;
 using BattleKing.Core;
 using BattleKing.Data;
@@ -217,6 +218,66 @@ namespace BattleKing.Tests
             Assert.That(lines, Has.Some.Contains("段数: 9 hit").And.Contains("暴击 3"));
             Assert.That(lines, Has.Some.Contains("单段基础: (65-15=50) x 威力20% = 10"));
             Assert.That(lines, Has.Some.Contains("合计: 普通6hit=60 + 暴击3hit x2.0=60 => 120"));
+        }
+
+        [Test]
+        public void 命中率_技能命中字段作为倍率而不是加值()
+        {
+            var attacker = TestDataFactory.CreateUnit(hit: 120);
+            var defender = TestDataFactory.CreateUnit(eva: 40);
+            var skill = TestDataFactory.CreateSkill(hitRate: 75);
+
+            var chance = HitChanceCalculator.Calculate(attacker, defender, skill);
+
+            ClassicAssert.AreEqual(80, chance.BaseAccuracy);
+            ClassicAssert.AreEqual(60, chance.FinalChance);
+        }
+
+        [Test]
+        public void 命中率_地面对飞行近战先半减再向下取整()
+        {
+            var attacker = TestDataFactory.CreateUnit(
+                hit: 128,
+                classes: new() { UnitClass.Infantry });
+            var defender = TestDataFactory.CreateUnit(
+                eva: 105,
+                classes: new() { UnitClass.Flying });
+            var skill = TestDataFactory.CreateSkill(hitRate: 100, attackType: AttackType.Melee);
+
+            var chance = HitChanceCalculator.Calculate(attacker, defender, skill);
+
+            ClassicAssert.IsTrue(chance.FlyingPenaltyApplied);
+            ClassicAssert.AreEqual(11.5f, chance.RawChance, 0.001f);
+            ClassicAssert.AreEqual(11, chance.FinalChance);
+        }
+
+        [Test]
+        public void 命中率日志_显示技能命中倍率公式()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 65, hit: 120, crit: 0);
+            var defender = TestDataFactory.CreateUnit(hp: 200, def: 15, eva: 40, block: 0);
+            defender.CurrentHp = 190;
+            var skill = TestDataFactory.CreateSkill(power: 100, hitRate: 75, name: "倍率测试");
+            var c = TestDataFactory.CreateCalc(attacker, defender, skill);
+            c.FinalAttackPower = 65;
+            c.FinalDefense = 15;
+            c.SkillPowerRatio = 1f;
+            var result = new DamageResult(
+                50,
+                0,
+                isHit: true,
+                isCritical: false,
+                isBlocked: false,
+                isEvaded: false,
+                appliedAilments: new(),
+                resolvedDefender: defender,
+                hitResults: new List<DamageHitResult>());
+
+            var lines = BattleLogHelper.FormatAttack(attacker, defender, skill, c, result, false, new());
+
+            Assert.That(lines, Has.Some.Contains("命中率:")
+                .And.Contains("x 技能命中倍率75%")
+                .And.Contains("= 60%"));
         }
 
         // ────────── 混合伤害 ──────────

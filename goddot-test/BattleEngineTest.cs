@@ -117,9 +117,10 @@ namespace BattleKing.Tests
                 EnemyUnits = new List<BattleUnit> { enemy }
             };
             var callbackEntries = new List<BattleLogEntry>();
+            var logs = new List<string>();
             var engine = new BattleEngine(context)
             {
-                OnLog = _ => { },
+                OnLog = logs.Add,
                 OnBattleLogEntry = callbackEntries.Add
             };
             var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
@@ -137,6 +138,9 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual("act_log_strike", active.SkillId);
             CollectionAssert.AreEqual(new[] { "enemy" }, active.TargetIds);
             ClassicAssert.AreEqual(50, active.Damage);
+            ClassicAssert.AreEqual(100, active.HpBefore.GetValueOrDefault());
+            ClassicAssert.AreEqual(50, active.HpAfter.GetValueOrDefault());
+            ClassicAssert.AreEqual(50, active.HpLost.GetValueOrDefault());
 
             var passive = engine.BattleLogEntries[1];
             CollectionAssert.Contains(passive.Flags, "PassiveTrigger");
@@ -145,11 +149,59 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual("pas_log_counter", passive.SkillId);
             CollectionAssert.AreEqual(new[] { "player" }, passive.TargetIds);
             ClassicAssert.AreEqual(30, passive.Damage);
+            ClassicAssert.AreEqual(100, passive.HpBefore.GetValueOrDefault());
+            ClassicAssert.AreEqual(70, passive.HpAfter.GetValueOrDefault());
+            ClassicAssert.AreEqual(30, passive.HpLost.GetValueOrDefault());
+            Assert.That(passive.Text, Does.Contain("hp=100->70(-30)"));
+
+            int pendingLogIndex = logs.FindIndex(line => line.Contains("[Counter]"));
+            int actionEndIndex = logs.FindIndex(line => line.Contains("行动结束"));
+            ClassicAssert.GreaterOrEqual(pendingLogIndex, 0);
+            ClassicAssert.GreaterOrEqual(actionEndIndex, 0);
+            ClassicAssert.Less(pendingLogIndex, actionEndIndex);
 
             var battleEnd = engine.BattleLogEntries[2];
             CollectionAssert.Contains(battleEnd.Flags, "BattleEnd");
             CollectionAssert.Contains(battleEnd.Flags, "PlayerWin");
             ClassicAssert.AreEqual(0, battleEnd.Damage);
+        }
+
+        [Test]
+        public void StepOneAction_DeathResistLogUsesRecordedHpBefore()
+        {
+            var repository = CreateStructuredLogRepository();
+            var player = new BattleUnit(CreateStructuredLogCharacter("player", "act_log_strike", hp: 100, str: 150, def: 0, spd: 20, ap: 1, pp: 0), repository, true)
+            {
+                Position = 1
+            };
+            var enemy = new BattleUnit(CreateStructuredLogCharacter("enemy", null, hp: 100, str: 10, def: 0, spd: 1, ap: 0, pp: 0), repository, false)
+            {
+                Position = 1,
+                CurrentHp = 37
+            };
+            enemy.AddTemporal("DeathResist", 1);
+            player.Strategies.Add(new Strategy { SkillId = "act_log_strike" });
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { player },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            engine.InitBattle();
+            engine.StepOneAction();
+
+            ClassicAssert.AreEqual(1, enemy.CurrentHp);
+            var entry = engine.BattleLogEntries.Single(e => e.SkillId == "act_log_strike");
+            ClassicAssert.AreEqual(150, entry.Damage);
+            ClassicAssert.AreEqual(37, entry.HpBefore.GetValueOrDefault());
+            ClassicAssert.AreEqual(1, entry.HpAfter.GetValueOrDefault());
+            ClassicAssert.AreEqual(36, entry.HpLost.GetValueOrDefault());
+            CollectionAssert.Contains(entry.Flags, "DeathResist");
+            Assert.That(entry.Flags, Does.Not.Contain("Knockdown"));
+            Assert.That(logs, Has.Some.Contains("HP:37->1(-36)").And.Contains("DeathResist"));
+            Assert.That(logs, Has.None.Contains("HP:100->1"));
         }
 
         [Test]

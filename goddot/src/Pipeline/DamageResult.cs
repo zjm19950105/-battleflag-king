@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using BattleKing.Core;
 using BattleKing.Data;
@@ -16,6 +17,12 @@ namespace BattleKing.Pipeline
         public BattleUnit ResolvedDefender { get; }
         public IReadOnlyList<StatusAilment> AppliedAilments { get; }
         public IReadOnlyList<DamageHitResult> HitResults { get; }
+        public int? DamageReceiverHpBefore { get; private set; }
+        public int? DamageReceiverHpAfter { get; private set; }
+        public int AppliedHpDamage => DamageReceiverHpBefore.HasValue && DamageReceiverHpAfter.HasValue
+            ? Math.Max(0, DamageReceiverHpBefore.Value - DamageReceiverHpAfter.Value)
+            : TotalDamage;
+        public bool LethalDamageResisted { get; private set; }
 
         public DamageResult(
             int physicalDamage,
@@ -41,6 +48,17 @@ namespace BattleKing.Pipeline
             HitResults = hitResults != null
                 ? new List<DamageHitResult>(hitResults)
                 : new List<DamageHitResult>();
+        }
+
+        public void RecordHpChange(int hpBefore, int hpAfter)
+        {
+            DamageReceiverHpBefore = hpBefore;
+            DamageReceiverHpAfter = hpAfter;
+            LethalDamageResisted = IsHit
+                && TotalDamage >= hpBefore
+                && hpBefore > 0
+                && hpAfter == 1
+                && AppliedHpDamage < TotalDamage;
         }
     }
 }

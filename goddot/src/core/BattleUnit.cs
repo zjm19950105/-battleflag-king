@@ -119,21 +119,21 @@ namespace BattleKing.Core
             float buffRatio = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.Ratio);
             int flatBuff = Buffs.Where(b => b.TargetStat == statName).Sum(b => b.FlatAmount);
             int value = (int)((baseValue + equipValue) * (1 + buffRatio)) + flatBuff;
-            return IsResourceStat(statName) ? ClampResource(value) : value;
+            return ClampCalculatedStat(statName, value);
         }
 
         public int GetCurrentAttackPower(SkillType damageType)
         {
             string stat = damageType == SkillType.Magical ? "Mag" : "Str";
             string equipmentStat = damageType == SkillType.Magical ? "mag_atk" : "phys_atk";
-            return GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat);
+            return Math.Max(0, GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat));
         }
 
         public int GetCurrentDefense(SkillType damageType)
         {
             string stat = damageType == SkillType.Magical ? "MDef" : "Def";
             string equipmentStat = damageType == SkillType.Magical ? "mag_def" : "phys_def";
-            return GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat);
+            return Math.Max(0, GetCurrentStat(stat) + Equipment.GetTotalStat(equipmentStat));
         }
 
         public int GetCurrentSpeed() => GetCurrentStat("Spd");
@@ -309,6 +309,13 @@ namespace BattleKing.Core
         }
 
         private static int ClampResource(int value) => Math.Clamp(value, 0, ResourceCap);
+
+        public static int ClampCalculatedStat(string statName, int value)
+        {
+            return IsResourceStat(statName)
+                ? ClampResource(value)
+                : Math.Max(0, value);
+        }
 
         public void TakeDamage(int damage)
         {

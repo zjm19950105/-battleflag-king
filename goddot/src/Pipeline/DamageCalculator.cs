@@ -273,17 +273,7 @@ namespace BattleKing.Pipeline
             if (attacker.Ailments.Contains(StatusAilment.Darkness))
                 return false;
 
-            int skillHitRate = skill.Data.HitRate ?? 100;
-            int hitRate = skillHitRate + attacker.GetCurrentHitRate() - defender.GetCurrentEvasion();
-
-            // 飞行系防御特性：地上近接攻击命中率半减
-            bool defenderIsFlying = defender?.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true;
-            bool attackerIsGrounded = attacker?.GetEffectiveClasses()?.Contains(UnitClass.Flying) != true;
-            bool isMelee = skill.AttackType == AttackType.Melee;
-            if (defenderIsFlying && attackerIsGrounded && isMelee)
-                hitRate /= 2;
-
-            hitRate = Math.Clamp(hitRate, 0, 100);
+            int hitRate = HitChanceCalculator.Calculate(attacker, defender, skill).FinalChance;
             return RandUtil.Roll100() < hitRate;
         }
 
@@ -294,7 +284,7 @@ namespace BattleKing.Pipeline
             // Handled in Calculate() before calling this method
 
             // Normal evasion is already factored into hit rate formula:
-            //   hitRate = skillHit + attacker.Hit - defender.Eva
+            //   hitRate = (attacker.Hit - defender.Eva) * skillHitRate / 100
             // So no separate evasion roll needed here.
 
             return false;
