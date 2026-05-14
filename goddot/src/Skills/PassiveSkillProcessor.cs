@@ -148,6 +148,7 @@ namespace BattleKing.Skills
             ActiveSkill activeSkill = null, BattleActionSourceKind sourceKind = BattleActionSourceKind.ActiveAttack)
         {
             if (unit == null || !unit.IsAlive) return;
+            if (unit.Ailments.Contains(StatusAilment.PassiveSeal)) return;
 
             bool simultaneousFired = false;
             foreach (var row in unit.GetPassiveStrategiesInOrder())
@@ -219,6 +220,7 @@ namespace BattleKing.Skills
             foreach (var unit in ordered)
             {
                 if (!unit.IsAlive) continue;
+                if (unit.Ailments.Contains(StatusAilment.PassiveSeal)) continue;
 
                 foreach (var row in unit.GetPassiveStrategiesInOrder())
                 {

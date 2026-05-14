@@ -8,6 +8,7 @@ namespace BattleKing.Data
         Frozen,     // 冻结（无法行动，受击解除，回避率=0）
         Darkness,   // 黑暗（下次攻击命中率0）
         BlockSeal,  // 格挡封印
-        CritSeal    // 无法暴击
+        CritSeal,   // 无法暴击
+        PassiveSeal // 被动封印
     }
 }

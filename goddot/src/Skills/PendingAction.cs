@@ -11,6 +11,7 @@ namespace BattleKing.Skills
         public List<BattleUnit> Targets { get; set; } = new List<BattleUnit>();
 
         public int Power { get; set; }
+        public int HitCount { get; set; } = 1;
         public int? HitRate { get; set; }
         public SkillType DamageType { get; set; }
         public AttackType AttackType { get; set; }

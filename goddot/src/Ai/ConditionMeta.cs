@@ -66,7 +66,7 @@ namespace BattleKing.Ai
             ConditionCategory.ApPp => op == "最低" || op == "最高"
                 ? new() { "AP", "PP" }
                 : new() { "1", "2", "3", "4" },
-            ConditionCategory.Status => new() { "buff", "debuff", "异常", "无状态", "毒", "炎上", "冻结", "气绝", "黑暗", "被动封印", "格挡封印", "非毒", "非炎上", "非冻结", "非气绝", "非黑暗" },
+            ConditionCategory.Status => new() { "buff", "debuff", "异常", "无状态", "毒", "炎上", "冻结", "气绝", "黑暗", "被动封印", "格挡封印", "非毒", "非炎上", "非冻结", "非气绝", "非黑暗", "非被动封印", "非格挡封印" },
             ConditionCategory.AttackAttribute => new() { "物理", "魔法", "近接", "远程", "横排", "纵列", "前后排", "全体" },
             ConditionCategory.TeamSize => op == "以上"
                 ? new() { "敌2体", "敌3体", "敌4体", "敌5体", "友2体", "友3体", "友4体", "友5体" }
@@ -180,7 +180,7 @@ namespace BattleKing.Ai
             "冻结" => "Freeze",
             "气绝" => "Stun",
             "黑暗" => "Darkness",
-            "被动封印" => "CritSeal",
+            "被动封印" => "PassiveSeal",
             "格挡封印" => "BlockSeal",
             "异常" => "ailment",
             "无状态" => "none",
@@ -189,6 +189,8 @@ namespace BattleKing.Ai
             "非冻结" => "not:Freeze",
             "非气绝" => "not:Stun",
             "非黑暗" => "not:Darkness",
+            "非被动封印" => "not:PassiveSeal",
+            "非格挡封印" => "not:BlockSeal",
             _ => label
         };
 

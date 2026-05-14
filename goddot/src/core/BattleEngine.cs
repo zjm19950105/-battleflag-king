@@ -705,7 +705,7 @@ namespace BattleKing.Core
                         Attacker = action.Actor,
                         Defender = target,
                         Skill = tempSkill,
-                        HitCount = 1
+                        HitCount = Math.Max(1, action.HitCount)
                     };
 
                     // Apply tags from the pending action
@@ -1035,6 +1035,7 @@ namespace BattleKing.Core
                 + $" target={FormatPendingUnit(declaredTarget)}"
                 + $" receiver={FormatPendingUnit(damageReceiver)}"
                 + $" damage={result.TotalDamage}"
+                + $" hitCount={Math.Max(1, action.HitCount)}"
                 + FormatPendingHpChange(result)
                 + $" hit={result.IsHit}"
                 + $" blocked={result.IsBlocked}"
@@ -1102,6 +1103,8 @@ namespace BattleKing.Core
                 flags.Add("CannotBeCovered");
             if (calc.IgnoreDefenseRatio > 0f)
                 flags.Add($"IgnoreDefense={calc.IgnoreDefenseRatio:0.##}");
+            if (action.HitCount > 1)
+                flags.Add($"HitCount={action.HitCount}");
             flags.AddRange(action.Tags ?? new List<string>());
             return flags;
         }

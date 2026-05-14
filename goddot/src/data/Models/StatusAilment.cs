@@ -8,6 +8,7 @@ namespace BattleKing.Data
         Darkness,   // 黑暗：下次攻击命中率0
         Stun,       // 气绝：跳过一次行动
         BlockSeal,  // 格挡封印
-        CritSeal    // 无法暴击
+        CritSeal,   // 无法暴击
+        PassiveSeal // 被动封印
     }
 }

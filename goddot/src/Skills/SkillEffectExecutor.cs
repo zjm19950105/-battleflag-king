@@ -127,6 +127,8 @@ namespace BattleKing.Skills
             List<string> logs)
         {
             var parameters = effect.Parameters ?? new Dictionary<string, object>();
+            if (!EffectConditionsMatch(parameters, caster, targets, calculation))
+                return;
 
             switch (effect.EffectType)
             {
@@ -356,6 +358,9 @@ namespace BattleKing.Skills
             if (GetBool(parameters, "targetHasDebuff", false) && !HasDebuff(calculation.Defender))
                 return false;
 
+            if (!TargetAilmentConditionMatches(parameters, calculation.Defender))
+                return false;
+
             if (GetBool(parameters, "casterHasBuff", false) && !HasBuff(caster))
                 return false;
 
@@ -370,12 +375,85 @@ namespace BattleKing.Skills
                 return false;
 
             if (TryGetFloat(parameters, "casterHpRatioMin", out float casterHpRatioMin)
-                && GetHpRatio(caster) < casterHpRatioMin)
+                && GetHpRatio(caster) < NormalizeRatio(casterHpRatioMin))
                 return false;
 
             if (TryGetFloat(parameters, "casterHpRatioMax", out float casterHpRatioMax)
-                && GetHpRatio(caster) > casterHpRatioMax)
+                && GetHpRatio(caster) > NormalizeRatio(casterHpRatioMax))
                 return false;
+
+            return true;
+        }
+
+        private static bool EffectConditionsMatch(
+            Dictionary<string, object> parameters,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            DamageCalculation calculation)
+        {
+            if (TryGetFloat(parameters, "casterHpRatioMin", out float casterHpRatioMin)
+                && GetHpRatio(caster) < NormalizeRatio(casterHpRatioMin))
+                return false;
+
+            if (TryGetFloat(parameters, "casterHpRatioMax", out float casterHpRatioMax)
+                && GetHpRatio(caster) > NormalizeRatio(casterHpRatioMax))
+                return false;
+
+            var target = GetPrimaryTargetForCondition(targets, calculation);
+            if (TryGetFloat(parameters, "targetHpRatioMin", out float targetHpRatioMin)
+                && GetHpRatio(target) < NormalizeRatio(targetHpRatioMin))
+                return false;
+
+            if (TryGetFloat(parameters, "targetHpRatioMax", out float targetHpRatioMax)
+                && GetHpRatio(target) > NormalizeRatio(targetHpRatioMax))
+                return false;
+
+            if (!TargetAilmentConditionMatches(parameters, target))
+                return false;
+
+            if (GetBool(parameters, "targetHasDebuff", false) && !HasDebuff(target))
+                return false;
+
+            if (GetBool(parameters, "targetHasBuff", false) && !HasBuff(target))
+                return false;
+
+            return true;
+        }
+
+        private static BattleUnit GetPrimaryTargetForCondition(
+            IReadOnlyList<BattleUnit> targets,
+            DamageCalculation calculation)
+        {
+            return calculation?.ResolvedDefender
+                ?? calculation?.Defender
+                ?? targets?.FirstOrDefault(target => target != null);
+        }
+
+        private static bool TargetAilmentConditionMatches(
+            Dictionary<string, object> parameters,
+            BattleUnit target)
+        {
+            var requiredAilments = GetStringList(parameters, "targetHasAilments");
+            if (TryGetString(parameters, "targetHasAilment", out string targetHasAilment))
+                requiredAilments.Add(targetHasAilment);
+
+            foreach (var required in requiredAilments)
+            {
+                if (!Enum.TryParse<StatusAilment>(required, true, out var ailment)
+                    || target?.Ailments.Contains(ailment) != true)
+                    return false;
+            }
+
+            var forbiddenAilments = GetStringList(parameters, "targetLacksAilments");
+            if (TryGetString(parameters, "targetLacksAilment", out string targetLacksAilment))
+                forbiddenAilments.Add(targetLacksAilment);
+
+            foreach (var forbidden in forbiddenAilments)
+            {
+                if (Enum.TryParse<StatusAilment>(forbidden, true, out var ailment)
+                    && target?.Ailments.Contains(ailment) == true)
+                    return false;
+            }
 
             return true;
         }
@@ -1009,6 +1087,7 @@ namespace BattleKing.Skills
                 Actor = caster,
                 Targets = pendingTargets,
                 Power = GetInt(parameters, "power", 75),
+                HitCount = Math.Max(1, GetInt(parameters, "HitCount", GetInt(parameters, "hitCount", 1))),
                 HitRate = parameters.ContainsKey("hitRate") ? GetInt(parameters, "hitRate", 100) : null,
                 DamageType = ParseEnum(GetString(parameters, "damageType", "Physical"), SkillType.Physical),
                 AttackType = ParseEnum(GetString(parameters, "attackType", "Melee"), AttackType.Melee),
@@ -1040,6 +1119,7 @@ namespace BattleKing.Skills
                 + $" passive={action.SourcePassiveId}"
                 + $" targets={FormatList(targets)}"
                 + $" power={action.Power}"
+                + $" hitCount={action.HitCount}"
                 + $" hitRate={hitRate}"
                 + $" damageType={action.DamageType}"
                 + $" attackType={action.AttackType}"
@@ -1426,9 +1506,17 @@ namespace BattleKing.Skills
             bool requireDamage = GetBool(parameters, "requireDamage", false);
             bool requireUnblocked = GetBool(parameters, "requireUnblocked", false)
                 || GetBool(parameters, "requireNotBlocked", false);
+            bool requireFirstHitUnblocked = GetBool(parameters, "requireFirstHitUnblocked", false);
             return (!requireDamage || result.TotalDamage > 0)
                 && (!requireUnblocked || !result.IsBlocked)
+                && (!requireFirstHitUnblocked || FirstHitWasNotBlocked(result))
                 && ChanceMatches(parameters);
+        }
+
+        private static bool FirstHitWasNotBlocked(DamageResult result)
+        {
+            var firstHit = result?.HitResults?.OrderBy(hit => hit.HitIndex).FirstOrDefault();
+            return firstHit == null || !firstHit.Blocked;
         }
 
         private static bool ChanceMatches(Dictionary<string, object> parameters)

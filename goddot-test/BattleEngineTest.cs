@@ -388,7 +388,7 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(1, hache.Caster.CurrentPp);
             ClassicAssert.IsTrue(hache.Enemy.IsAlive);
 
-            var holyBlade = RunRealActiveSkillScenario("act_holy_blade", enemyHp: 300, casterAp: 1, casterPp: 1, currentPp: 0);
+            var holyBlade = RunRealActiveSkillScenario("act_holy_blade", enemyHp: 500, casterAp: 1, casterPp: 1, currentPp: 0);
             ClassicAssert.AreEqual(1, holyBlade.Caster.CurrentPp);
             ClassicAssert.IsTrue(holyBlade.Enemy.IsAlive);
         }

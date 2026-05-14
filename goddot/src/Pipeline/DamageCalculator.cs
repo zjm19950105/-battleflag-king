@@ -139,16 +139,26 @@ namespace BattleKing.Pipeline
 
                 // Damage immunity
                 bool nullifiedThisHit = false;
+                bool consumedGeneralNullify = false;
                 if (calc.NullifyPhysicalDamage) hitPhysical = 0f;
                 if (calc.NullifyMagicalDamage) hitMagical = 0f;
-                if (skill.Data.Type == SkillType.Magical
+                if (resolvedDefender.TryConsumeTemporal("DamageNullify"))
+                {
+                    hitPhysical = 0f;
+                    hitMagical = 0f;
+                    hitsNullified++;
+                    nullifiedThisHit = true;
+                    consumedGeneralNullify = true;
+                }
+                else if (skill.Data.Type == SkillType.Magical
                     && resolvedDefender.TryConsumeTemporal("MagicDamageNullify"))
                 {
                     hitMagical = 0f;
                     hitsNullified++;
                     nullifiedThisHit = true;
                 }
-                if (skill.AttackType == AttackType.Melee
+                if (!consumedGeneralNullify
+                    && skill.AttackType == AttackType.Melee
                     && skill.HasPhysicalComponent
                     && resolvedDefender.TryConsumeTemporal("MeleeHitNullify"))
                 {

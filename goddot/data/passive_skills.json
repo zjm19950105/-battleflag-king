@@ -252,6 +252,14 @@
           "turns": -1,
           "target": "Self"
         }
+      },
+      {
+        "effectType": "RecoverPp",
+        "parameters": {
+          "target": "Self",
+          "amount": 1,
+          "casterHpRatioMax": 0.5
+        }
       }
     ],
     "hasSimultaneousLimit": false,
@@ -274,6 +282,22 @@
       {
         "effectType": "CoverAlly",
         "parameters": {}
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "ForceBlock": true,
+          "BlockReduction": 0.5
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Defender",
+          "stat": "Def",
+          "ratio": 0.2,
+          "turns": -1
+        }
       }
     ],
     "hasSimultaneousLimit": false,
@@ -521,12 +545,26 @@
     ],
     "effects": [
       {
-        "effectType": "AddBuff",
+        "effectType": "CounterAttack",
         "parameters": {
-          "stat": "Def",
-          "ratio": 0.2,
-          "turns": -1,
-          "target": "Self"
+          "power": 50,
+          "hitRate": 100
+        }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "AddDebuff",
+              "parameters": {
+                "target": "Target",
+                "stat": "Def",
+                "ratio": 0.15,
+                "turns": -1
+              }
+            }
+          ]
         }
       }
     ],
@@ -1027,6 +1065,7 @@
         "parameters": {
           "power": 50,
           "hitRate": 100,
+          "HitCount": 2,
           "tags": [
             "SureHit",
             "CannotBeBlocked",
@@ -1043,6 +1082,13 @@
               "parameters": {
                 "target": "Target",
                 "ailment": "BlockSeal"
+              }
+            },
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "PassiveSeal"
               }
             }
           ]
@@ -1316,6 +1362,14 @@
         "parameters": {
           "ForceBlock": true,
           "BlockReduction": 0.5
+        }
+      },
+      {
+        "effectType": "TemporalMark",
+        "parameters": {
+          "target": "Self",
+          "key": "DebuffNullify",
+          "count": 1
         }
       }
     ],

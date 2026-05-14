@@ -1105,7 +1105,7 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(30, preDebuffed.Damage);
             ClassicAssert.AreEqual(70, clean.Defender.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(70, preDebuffed.Defender.GetCurrentStat("Def"));
-            Assert.That(preDebuffed.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+            Assert.That(preDebuffed.Logs, Has.Some.Contains("PowerBonus=50"));
             Assert.That(preDebuffed.Logs, Has.Some.Contains("post effects:").And.Contains("Def"));
         }
 
@@ -1117,11 +1117,11 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(20, healthy.Damage);
             ClassicAssert.AreEqual(30, lowHp.Damage);
-            Assert.That(lowHp.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+            Assert.That(lowHp.Logs, Has.Some.Contains("PowerBonus=50"));
         }
 
         [TestCase("act_accumulate", 20, 30)]
-        [TestCase("act_full_assault", 30, 45)]
+        [TestCase("act_full_assault", 30, 40)]
         public void BattleEngine_RealActiveJsonFullHpDamageSkills_BonusOnlyAtFullHp(
             string skillId,
             int normalDamage,
@@ -1132,7 +1132,7 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(normalDamage, wounded.Damage);
             ClassicAssert.AreEqual(fullHpDamage, fullHp.Damage);
-            Assert.That(fullHp.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+            Assert.That(fullHp.Logs, Has.Some.Contains("PowerBonus=50"));
         }
 
         [Test]
@@ -1180,7 +1180,7 @@ namespace BattleKing.Tests
                 Assert.That(matching.Logs, Has.Some.Contains("CannotBeBlocked"));
             else
                 Assert.That(matching.Logs, Has.None.Contains("CannotBeBlocked"));
-            Assert.That(infantry.Logs, Has.None.Contains("PowerMultiplier=1.5"));
+            Assert.That(infantry.Logs, Has.None.Contains("PowerBonus=50"));
             Assert.That(infantry.Logs, Has.None.Contains("CannotBeBlocked"));
         }
 
@@ -1222,9 +1222,9 @@ namespace BattleKing.Tests
                 defenderBlock: 100);
 
             ClassicAssert.AreEqual(26, unbuffedInfantry.Damage);
-            ClassicAssert.AreEqual(39, buffedInfantry.Damage);
+            ClassicAssert.AreEqual(36, buffedInfantry.Damage);
             ClassicAssert.AreEqual(26, cavalry.Damage);
-            Assert.That(buffedInfantry.Logs, Has.Some.Contains("PowerMultiplier=1.5"));
+            Assert.That(buffedInfantry.Logs, Has.Some.Contains("PowerBonus=50"));
             Assert.That(cavalry.Logs, Has.Some.Contains("CannotBeBlocked"));
         }
 
