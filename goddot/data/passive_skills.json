@@ -1,7 +1,8 @@
 [
   {
     "id": "pas_quick_strike",
-    "name": "快速打击",
+    "englishName": "Hastened Strike",
+    "name": "先制打击",
     "ppCost": 1,
     "triggerTiming": "BattleStart",
     "type": "Physical",
@@ -35,7 +36,8 @@
   },
   {
     "id": "pas_parry",
-    "name": "招架",
+    "englishName": "Parry",
+    "name": "格挡还击",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeMeleeHit",
     "type": "Physical",
@@ -69,6 +71,7 @@
   },
   {
     "id": "pas_charge_action",
+    "englishName": "Charged Action",
     "name": "蓄力行动",
     "ppCost": 2,
     "triggerTiming": "SelfOnActiveUse",
@@ -105,7 +108,8 @@
   },
   {
     "id": "pas_pursuit_slash",
-    "name": "追击斩",
+    "englishName": "Following Slash",
+    "name": "追随斩",
     "ppCost": 1,
     "triggerTiming": "AllyOnAttacked",
     "type": "Physical",
@@ -151,6 +155,7 @@
   },
   {
     "id": "pas_vengeance_guard",
+    "englishName": "Vengeful Guard",
     "name": "复仇守护",
     "ppCost": 1,
     "triggerTiming": "SelfBeforePhysicalHit",
@@ -187,6 +192,7 @@
   },
   {
     "id": "pas_brute_force",
+    "englishName": "Brute Force",
     "name": "蛮力",
     "ppCost": 2,
     "triggerTiming": "SelfOnActiveUse",
@@ -232,7 +238,8 @@
   },
   {
     "id": "pas_noble_block",
-    "name": "贵族守护",
+    "englishName": "Noble Guard",
+    "name": "高贵守护",
     "ppCost": 1,
     "triggerTiming": "SelfBeforePhysicalHit",
     "type": "Physical",
@@ -276,6 +283,7 @@
   },
   {
     "id": "pas_fluorescent_cover",
+    "englishName": "Luminous Cover",
     "name": "光辉掩护",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeHit",
@@ -315,7 +323,8 @@
   },
   {
     "id": "pas_rapid_order",
-    "name": "快速命令",
+    "englishName": "Rapid Order",
+    "name": "快速号令",
     "ppCost": 1,
     "triggerTiming": "BattleStart",
     "type": "Assist",
@@ -343,6 +352,7 @@
   },
   {
     "id": "pas_cheer_shout",
+    "englishName": "Arrow Cover",
     "name": "箭矢掩护",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeHit",
@@ -373,7 +383,8 @@
   },
   {
     "id": "pas_end_heal25",
-    "name": "快速守护",
+    "englishName": "Quick Guard",
+    "name": "快速格挡",
     "ppCost": 1,
     "triggerTiming": "SelfBeforePhysicalHit",
     "type": "Physical",
@@ -398,6 +409,7 @@
   },
   {
     "id": "pas_hundred_crit",
+    "englishName": "Provoke",
     "name": "吸引",
     "ppCost": 1,
     "triggerTiming": "BattleStart",
@@ -434,6 +446,7 @@
   },
   {
     "id": "pas_give_ap",
+    "englishName": "First Aid",
     "name": "急救",
     "ppCost": 1,
     "triggerTiming": "BattleEnd",
@@ -458,7 +471,8 @@
   },
   {
     "id": "pas_muscle_swelling",
-    "name": "锐利呐喊",
+    "englishName": "Keen Call",
+    "name": "锐利呼唤",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeAttack",
     "type": "Assist",
@@ -491,6 +505,7 @@
   },
   {
     "id": "pas_formation_counter",
+    "englishName": "Active Gift",
     "name": "主动礼物",
     "ppCost": 2,
     "triggerTiming": "AllyOnActiveUse",
@@ -516,7 +531,8 @@
   },
   {
     "id": "pas_rampage",
-    "name": "终结打击",
+    "englishName": "Parting Blow",
+    "name": "告别一击",
     "ppCost": 1,
     "triggerTiming": "BattleEnd",
     "type": "Physical",
@@ -545,7 +561,8 @@
   },
   {
     "id": "pas_iron_guard",
-    "name": "狂暴",
+    "englishName": "Frenzied Strike",
+    "name": "狂暴打击",
     "ppCost": 1,
     "triggerTiming": "AllyOnAttacked",
     "type": "Physical",
@@ -591,6 +608,7 @@
   },
   {
     "id": "pas_calm_cover",
+    "englishName": "Battle Horn",
     "name": "战斗号角",
     "ppCost": 2,
     "triggerTiming": "BattleStart",
@@ -619,7 +637,8 @@
   },
   {
     "id": "pas_line_cover",
-    "name": "重掩护",
+    "englishName": "Heavy Cover",
+    "name": "重装掩护",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeHit",
     "type": "Physical",
@@ -650,6 +669,7 @@
   },
   {
     "id": "pas_hawk_eye",
+    "englishName": "Guardian",
     "name": "守护者",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
@@ -692,6 +712,7 @@
   },
   {
     "id": "pas_pursuit",
+    "englishName": "Line Cover",
     "name": "列掩护",
     "ppCost": 2,
     "triggerTiming": "AllyBeforeHit",
@@ -726,7 +747,8 @@
   },
   {
     "id": "pas_rapid_reload",
-    "name": "格挡封缚",
+    "englishName": "Binding Guard",
+    "name": "封印格挡",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
     "type": "Assist",
@@ -761,7 +783,8 @@
   },
   {
     "id": "pas_emergency_cover",
-    "name": "暴怒",
+    "englishName": "Enrage",
+    "name": "激怒",
     "ppCost": 1,
     "triggerTiming": "AllyOnAttacked",
     "type": "Assist",
@@ -801,7 +824,8 @@
   },
   {
     "id": "pas_block_seal",
-    "name": "重装反击",
+    "englishName": "Heavy Counter",
+    "name": "重反击",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
     "type": "Physical",
@@ -837,6 +861,7 @@
   },
   {
     "id": "pas_unstoppable_rage",
+    "englishName": "Eagle Eye",
     "name": "鹰眼",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
@@ -868,6 +893,7 @@
   },
   {
     "id": "pas_cut_grass",
+    "englishName": "Pursuit",
     "name": "追击",
     "ppCost": 1,
     "triggerTiming": "AllyOnActiveUse",
@@ -906,6 +932,7 @@
   },
   {
     "id": "pas_fervor",
+    "englishName": "Aerial Snipe",
     "name": "空中狙击",
     "ppCost": 1,
     "triggerTiming": "AllyOnAttacked",
@@ -943,6 +970,7 @@
   },
   {
     "id": "pas_battle_horn",
+    "englishName": "Medical Aid",
     "name": "医疗援助",
     "ppCost": 2,
     "triggerTiming": "BattleEnd",
@@ -968,6 +996,7 @@
   },
   {
     "id": "pas_quick_reload",
+    "englishName": "Quick Reload",
     "name": "快速装填",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
@@ -1008,6 +1037,7 @@
   },
   {
     "id": "pas_aid_cover",
+    "englishName": "Aid Cover",
     "name": "援助掩护",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeHit",
@@ -1046,6 +1076,7 @@
   },
   {
     "id": "pas_dodge_step",
+    "englishName": "Evade",
     "name": "闪避",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeHit",
@@ -1070,6 +1101,7 @@
   },
   {
     "id": "pas_quick_action",
+    "englishName": "Quick Action",
     "name": "快速行动",
     "ppCost": 1,
     "triggerTiming": "AllyOnActiveUse",
@@ -1095,6 +1127,7 @@
   },
   {
     "id": "pas_shadow_step",
+    "englishName": "Shadowstep",
     "name": "暗影步",
     "ppCost": 2,
     "triggerTiming": "SelfBeforeAttack",
@@ -1132,6 +1165,7 @@
   },
   {
     "id": "pas_stealth_blade",
+    "englishName": "Sneaking Edge",
     "name": "潜行利刃",
     "ppCost": 1,
     "triggerTiming": "BattleStart",
@@ -1149,10 +1183,10 @@
     "effects": [
       {
         "effectType": "PreemptiveAttack",
-          "parameters": {
-            "power": 50,
-            "damageType": "Physical",
-            "attackType": "Ranged",
+        "parameters": {
+          "power": 50,
+          "damageType": "Physical",
+          "attackType": "Ranged",
           "targetType": "SingleEnemy",
           "tags": [
             "Ranged",
@@ -1188,7 +1222,8 @@
   },
   {
     "id": "pas_magic_counter",
-    "name": "反击魔法",
+    "englishName": "Magick Counter",
+    "name": "魔法反击",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
     "type": "Magical",
@@ -1220,6 +1255,7 @@
   },
   {
     "id": "pas_concentration",
+    "englishName": "Concentration",
     "name": "专注",
     "ppCost": 1,
     "triggerTiming": "SelfOnActiveUse",
@@ -1253,7 +1289,8 @@
   },
   {
     "id": "pas_magic_pursuit",
-    "name": "追击魔法",
+    "englishName": "Magick Pursuit",
+    "name": "魔法追击",
     "ppCost": 1,
     "triggerTiming": "AllyOnActiveUse",
     "type": "Magical",
@@ -1295,7 +1332,8 @@
   },
   {
     "id": "pas_magic_blade",
-    "name": "魔法剑刃",
+    "englishName": "Magick Conferral",
+    "name": "魔法赋予",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeAttack",
     "type": "Magical",
@@ -1327,7 +1365,8 @@
   },
   {
     "id": "pas_focus",
-    "name": "聚焦",
+    "englishName": "Focus Sight",
+    "name": "精准瞄准",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeAttack",
     "type": "Assist",
@@ -1354,6 +1393,7 @@
   },
   {
     "id": "pas_quick_cast",
+    "englishName": "Quick Cast",
     "name": "快速施法",
     "ppCost": 2,
     "triggerTiming": "BattleStart",
@@ -1391,6 +1431,7 @@
   },
   {
     "id": "pas_magic_barrier",
+    "englishName": "Magick Barrier",
     "name": "魔法屏障",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeHit",
@@ -1429,6 +1470,7 @@
   },
   {
     "id": "pas_holy_guard",
+    "englishName": "Holy Guard",
     "name": "神圣守护",
     "ppCost": 1,
     "triggerTiming": "SelfBeforePhysicalHit",
@@ -1463,6 +1505,7 @@
   },
   {
     "id": "pas_row_barrier",
+    "englishName": "Row Barrier",
     "name": "列屏障",
     "ppCost": 2,
     "triggerTiming": "AllyBeforeHit",
@@ -1504,6 +1547,7 @@
   },
   {
     "id": "pas_griffin_guard",
+    "englishName": "Gryphon Glide",
     "name": "狮鹫滑翔",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeHit",
@@ -1541,7 +1585,8 @@
   },
   {
     "id": "pas_griffin_wing_rest",
-    "name": "羽翼休憩",
+    "englishName": "Wing Rest",
+    "name": "羽翼休息",
     "ppCost": 1,
     "triggerTiming": "BattleEnd",
     "type": "Assist",
@@ -1572,7 +1617,8 @@
   },
   {
     "id": "pas_griffin_wing_stroke",
-    "name": "羽翼轻抚",
+    "englishName": "Feathering",
+    "name": "羽饰",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
     "type": "Assist",
@@ -1597,6 +1643,7 @@
   },
   {
     "id": "pas_quick_curse",
+    "englishName": "Quick Curse",
     "name": "快速诅咒",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeHit",
@@ -1641,6 +1688,7 @@
   },
   {
     "id": "pas_curse_swamp",
+    "englishName": "Cursed Swamp",
     "name": "诅咒沼泽",
     "ppCost": 2,
     "triggerTiming": "BattleStart",
@@ -1689,7 +1737,8 @@
   },
   {
     "id": "pas_healing_touch",
-    "name": "治愈之触",
+    "englishName": "Curing Heal",
+    "name": "治愈治疗",
     "ppCost": 1,
     "triggerTiming": "AllyOnAttacked",
     "type": "Assist",
@@ -1721,7 +1770,8 @@
   },
   {
     "id": "pas_spirit_guard",
-    "name": "精灵加护",
+    "englishName": "Boon of the Faeries",
+    "name": "精灵恩惠",
     "ppCost": 2,
     "triggerTiming": "BattleStart",
     "type": "Assist",
@@ -1764,7 +1814,8 @@
   },
   {
     "id": "pas_elemental_action",
-    "name": "元素行动",
+    "englishName": "Elemental Impetus",
+    "name": "元素推动",
     "ppCost": 1,
     "triggerTiming": "SelfOnActiveUse",
     "type": "Assist",
@@ -1797,7 +1848,8 @@
   },
   {
     "id": "pas_bounce",
-    "name": "弹跳",
+    "englishName": "Bulk Up",
+    "name": "自我恢复",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
     "type": "Physical",
@@ -1823,7 +1875,8 @@
   },
   {
     "id": "pas_wide_counter",
-    "name": "广域反击",
+    "englishName": "Wide Counter",
+    "name": "横扫反击",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
     "type": "Physical",
@@ -1853,7 +1906,8 @@
   },
   {
     "id": "pas_berserk",
-    "name": "狂暴",
+    "englishName": "Berserk",
+    "name": "狂化",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
     "type": "Physical",

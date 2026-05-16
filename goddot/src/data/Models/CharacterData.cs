@@ -5,6 +5,9 @@ namespace BattleKing.Data
     public class CharacterData
     {
         public string Id { get; set; }
+        /// <summary>Canonical English class name from the datamine source; Id remains the stable reference key.</summary>
+        public string EnglishName { get; set; }
+        /// <summary>Current Chinese display name shown in UI/logs.</summary>
         public string Name { get; set; }
         public List<UnitClass> Classes { get; set; } = new();
         public List<EquipmentCategory> EquippableCategories { get; set; } = new();
@@ -20,6 +23,9 @@ namespace BattleKing.Data
 
         // CC (Class Change) data
         public string CcClassId { get; set; }
+        /// <summary>Canonical English class-change name from the datamine source.</summary>
+        public string CcEnglishName { get; set; }
+        /// <summary>Current Chinese display name for the class-change class.</summary>
         public string CcName { get; set; }
         public List<UnitClass> CcClasses { get; set; } = new();  // CC后兵种变化(如领主→骑兵)
         public List<EquipmentCategory> CcEquippableCategories { get; set; } = new();

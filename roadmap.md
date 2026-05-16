@@ -29,6 +29,8 @@
 - BattleEnd 被动结果语义已落地：BattleEnd 后治疗、HP 改变和 pending action 会参与最终胜负重算。
 - `pas_rampage`、`pas_give_ap`、`pas_battle_horn` 已迁移到 structured `effects`，不再依赖 legacy tags。
 - 结构化日志、金样例测试、数据契约、合规扫描已建立。
+- 资料源和命名基线已调整：技能以 `UnicornOverlord-Skills-Datamine-CN.md` 为准，`unicorn-overlord-class-compendium.md` 只保留职业描述；角色/技能数据已补 datamine 英文名字段，中文显示名暂按 datamine 口径维护。
+- 现有 18 个角色的定位描述已结构化，正文使用 `{char:ID}` / `{class:ID}` token，改名只改显示名映射或角色显示名字段。
 
 ## 下一阶段：Phase 1.4-B
 
@@ -38,7 +40,7 @@
 | --- | --- | --- |
 | P1 | Main.cs 第二次拆分 | UI 阶段流或控件构造离开巨型入口，行为不变。 |
 | P1 | Effect/Passive 代码收敛 | 在测试保护下减少巨型 switch 的认知负担。 |
-| P1 | 角色描述 token 化收口 | 现有 18 个角色的 `character_role_descriptions.json` 均从 `unicorn-overlord-class-compendium.md` 抽取；正文使用 `{char:ID}` / `{class:ID}`，改名只改显示名映射。 |
+| P1 | 新增角色前资料审计 | 新角色/新技能先按 `docs/naming-and-source-of-truth-plan.md` 和 `docs/skill-and-character-authoring-guide.md` 对齐 datamine、英文名、中文显示名、角色描述 token，不再参考旧 active/passive 技能文档。 |
 | P1 | UI 冒烟验证 | 至少覆盖启动、选队、进战斗、下一步。 |
 | P2 | 金样例快照战斗 | 进入 6v6 前有稳定整场战斗快照。 |
 

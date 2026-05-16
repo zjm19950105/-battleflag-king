@@ -858,7 +858,12 @@ namespace BattleKing.Skills
                 int before = target.CurrentHp;
                 int heal = Math.Max(1, (int)(maxHp * percent / 100f));
                 target.CurrentHp = HealWithoutLoweringCurrentHp(target.CurrentHp, heal, maxHp);
-                logs.Add($"{target.Data.Name}.HP {before}->{target.CurrentHp}");
+                logs.Add(FormatHealLog(
+                    target,
+                    before,
+                    target.CurrentHp,
+                    heal,
+                    $"最大HP{maxHp} x{percent}%"));
             }
         }
 
@@ -876,16 +881,43 @@ namespace BattleKing.Skills
                 int maxHp = GetMaxHp(target);
                 int before = target.CurrentHp;
                 float effectiveRatio = ratio;
+                float appliedMultiplier = 1f;
                 if (TryGetFloat(parameters, "lowHpThreshold", out float lowHpThreshold)
                     && TryGetFloat(parameters, "lowHpMultiplier", out float lowHpMultiplier)
                     && GetHpRatio(target) <= NormalizeRatio(lowHpThreshold))
                 {
+                    appliedMultiplier = lowHpMultiplier;
                     effectiveRatio *= lowHpMultiplier;
                 }
                 int heal = Math.Max(1, (int)(maxHp * effectiveRatio));
                 target.CurrentHp = HealWithoutLoweringCurrentHp(target.CurrentHp, heal, maxHp);
-                logs.Add($"{target.Data.Name}.HP {before}->{target.CurrentHp}");
+                string formula = $"最大HP{maxHp} x{FormatPercent(ratio)}";
+                if (Math.Abs(appliedMultiplier - 1f) > 0.001f)
+                    formula += $" x{FormatMultiplier(appliedMultiplier)}";
+                logs.Add(FormatHealLog(target, before, target.CurrentHp, heal, formula));
             }
+        }
+
+        private static string FormatHealLog(
+            BattleUnit target,
+            int before,
+            int after,
+            int formulaHeal,
+            string formula)
+        {
+            int applied = Math.Max(0, after - before);
+            return $"{target.Data.Name}.HP {before}->{after} (+{applied}; {formula}={formulaHeal})";
+        }
+
+        private static string FormatPercent(float ratio)
+        {
+            float percent = ratio * 100f;
+            return percent.ToString(Math.Abs(percent - MathF.Round(percent)) < 0.01f ? "F0" : "0.#") + "%";
+        }
+
+        private static string FormatMultiplier(float multiplier)
+        {
+            return multiplier.ToString(Math.Abs(multiplier - MathF.Round(multiplier)) < 0.01f ? "F0" : "0.##");
         }
 
         private static int HealWithoutLoweringCurrentHp(int currentHp, int heal, int maxHp)

@@ -5,6 +5,9 @@ namespace BattleKing.Data
     public class PassiveSkillData
     {
         public string Id { get; set; }
+        /// <summary>Canonical English skill name from the datamine source; Id remains the stable reference key.</summary>
+        public string EnglishName { get; set; }
+        /// <summary>Current Chinese display name shown in UI/logs.</summary>
         public string Name { get; set; }
         public int PpCost { get; set; }
         public PassiveTriggerTiming TriggerTiming { get; set; }

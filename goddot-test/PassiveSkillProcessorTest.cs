@@ -79,6 +79,7 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(65, ally.CurrentHp);
             ClassicAssert.AreEqual(0, ally.Buffs.Count(b => b.Ratio < 0));
             ClassicAssert.IsNotEmpty(logs);
+            Assert.That(logs, Has.Some.Contains("ally.HP 40->65 (+25; 最大HP100 x25%=25)"));
         }
 
         [Test]

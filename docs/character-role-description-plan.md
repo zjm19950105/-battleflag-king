@@ -8,7 +8,8 @@
 
 ## 唯一资料源
 
-- 角色、兵种、角色定位、特点、技能：`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\unicorn-overlord-class-compendium.md`
+- 角色描述、兵种、角色定位、特点：`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\unicorn-overlord-class-compendium.md`
+- 技能名、技能英文名、技能效果和隐藏机制：`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\UnicornOverlord-Skills-Datamine-CN.md`
 - 禁止作为技能或角色描述依据：`unicorn-overlord-active-skills.md`、`unicorn-overlord-passive-skills.md`、`unicorn-overlord-active-skills-by-type.md`、`unicorn-overlord-passive-skills-by-timing.md`
 - 字段规范和测试规范：`docs/skill-and-character-authoring-guide.md`
 

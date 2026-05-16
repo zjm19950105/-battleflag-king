@@ -85,15 +85,15 @@ GameDataRepository.LoadAll(dataPath)
 
 | 文件 | 内容 |
 | --- | --- |
-| `goddot/data/characters.json` | 角色模板、基础属性、兵种、CC、初始装备、技能池 |
-| `goddot/data/active_skills.json` | 主动技能、AP、目标类型、结构化 effects；`type` 表示攻击/技能类别，`damageType` 表示单段伤害结算类型，混合伤害技能可额外配置 `physicalPower` / `magicalPower`，当前行动追加魔法段用 `ModifyDamageCalc.AdditionalMagicalPower` |
-| `goddot/data/passive_skills.json` | 被动技能、PP、触发时机、结构化 effects / legacy tags |
+| `goddot/data/characters.json` | 角色模板、基础属性、兵种、CC、初始装备、技能池；`englishName` / `ccEnglishName` 保存 datamine 英文名，`name` / `ccName` 是当前中文显示名 |
+| `goddot/data/active_skills.json` | 主动技能、AP、目标类型、结构化 effects；`englishName` 保存 datamine 英文名，`name` 是当前中文显示名；`type` 表示攻击/技能类别，`damageType` 表示单段伤害结算类型，混合伤害技能可额外配置 `physicalPower` / `magicalPower`，当前行动追加魔法段用 `ModifyDamageCalc.AdditionalMagicalPower` |
+| `goddot/data/passive_skills.json` | 被动技能、PP、触发时机、结构化 effects / legacy tags；`englishName` 保存 datamine 英文名，`name` 是当前中文显示名 |
 | `goddot/data/equipments.json` | 装备类别、属性、赋予技能、限制 |
 | `goddot/data/strategy_presets.json` | 旧策略预设，条件值必须是 canonical value；新角色初始策略不再填满 8 条 |
 | `goddot/data/class_display_names.json` | 职业显示名映射，用于未来原创化/本地化 |
 | `goddot/data/character_role_descriptions.json` | 从职业图鉴抽取的角色定位；正文用 `{char:ID}` / `{class:ID}` 引用可改名对象 |
 
-录入或修正角色/技能时，先读 `docs/skill-and-character-authoring-guide.md`。它集中说明资料来源、角色 CC 装备槽、主动/被动技能字段、`ratio`/`amount`/`hitRate` 语义和测试要求，避免数据靠猜。
+录入或修正角色/技能时，先读 `docs/skill-and-character-authoring-guide.md`。它集中说明资料来源、角色 CC 装备槽、主动/被动技能字段、`ratio`/`amount`/`hitRate` 语义和测试要求，避免数据靠猜。技能资料以 `UnicornOverlord-Skills-Datamine-CN.md` 为准；`unicorn-overlord-class-compendium.md` 只保留职业描述/定位用途。
 
 角色描述结构化方案见 `docs/character-role-description-plan.md`。新增角色前要先保证现有 18 个角色描述完成 token 化：正文不写死会被改名的角色/兵种显示名，展示层再通过稳定 ID 映射解析。
 
@@ -256,7 +256,7 @@ Pending attacks (`CounterAttack` / `PursuitAttack` / `PreemptiveAttack` / `Battl
 
 不要重新引入旧的 `ISkillEffect.Apply()` / `SkillEffectFactory` / `Skills/Effects/*`。
 
-`SkillType.Assist` 的自施辅助主动技（例如 `act_great_shield` / `act_formation_breaker`）把 `AddBuff`、`RecoverPp`、`HealRatio` 直接写在顶层 `effects`。当前非 Heal 的 Assist 仍会进入一次 0 威力命中/伤害流程；新增测试应断言只影响自身资源/面板，不对敌方造成伤害或附加副作用。
+`SkillType.Assist` 的自施辅助主动技（例如 `act_great_shield` / `act_formation_breaker`）把 `AddBuff`、`RecoverPp`、`HealRatio` 直接写在顶层 `effects`。没有物理/魔法伤害成分的 Assist / Heal / Debuff 主动技执行完顶层 effects 后直接结束，不进入命中/伤害流程，也不会发布 `BeforeHitEvent` / `AfterHitEvent`；因此它们不会误触发掩护、格挡、反击、追击等“被攻击/命中”被动。只有 `type` 为 Physical/Magical，或显式带 `physicalPower` / `magicalPower` 的技能，才进入伤害流水线。
 
 `SkillType.Debuff` 的纯妨害主动技（例如 `act_passive_curse` / `act_attack_curse` / `act_defense_curse` / `act_curse_disaster`）应把 `PpDamage`、`AddDebuff`、`AmplifyDebuffs`、`StatusAilment` 等直接写在顶层 `effects`。这些 action effects 在 `DamageCalculator` 命中/回避判定前执行，不受随机命中影响；只有“伤害命中后才附加”的异常/减益才用 `OnHitEffect` 包裹。
 

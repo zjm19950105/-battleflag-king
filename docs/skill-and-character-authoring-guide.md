@@ -8,14 +8,15 @@
 
 录入前必须逐项对照资料，不允许只按中文短描述猜：
 
-- 当前唯一可信技能/职业资料：`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\unicorn-overlord-class-compendium.md`
+- 当前唯一可信技能资料：`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\UnicornOverlord-Skills-Datamine-CN.md`
+- 职业描述/角色定位资料：`C:\Users\ASUS\Music\圣兽之王资料整理\有用的资料\unicorn-overlord-class-compendium.md`，只用于 `兵种`、`角色定位`、`主要角色`、`特点`。
 - 过时且禁止作为技能依据：`unicorn-overlord-active-skills.md`、`unicorn-overlord-passive-skills.md`、`unicorn-overlord-active-skills-by-type.md`、`unicorn-overlord-passive-skills-by-timing.md`
 
-资料冲突时，不要自行发挥。以 `unicorn-overlord-class-compendium.md` 为准；如果它仍与游戏实测或截图冲突，把冲突写进审计记录或 TODO，并补一个失败测试/待确认测试保护当前假设。
+资料冲突时，不要自行发挥。技能名、技能英文名、技能效果和隐藏机制以 datamine 文档为准；如果它仍与游戏实测或截图冲突，把冲突写进审计记录或 TODO，并补一个失败测试/待确认测试保护当前假设。
 
 ## 角色描述录入清单
 
-角色描述同样只从 `unicorn-overlord-class-compendium.md` 抽取，不从旧主动/被动技能文档补：
+角色描述只从 `unicorn-overlord-class-compendium.md` 抽取职业定位，不从旧主动/被动技能文档补；如果角色描述中出现技能名，使用 datamine 文档里的技能翻译：
 
 - 角色标题来自职业段标题，例如 `射手 / 盾射手 (Shooter / Shield Shooter)`。
 - 兵种来自该段 `| 兵种 | ... |`。
@@ -49,6 +50,7 @@
 - `effects`：只表达资料写明的附加效果。例：Mega Slash 资料只有威力 150，就不能附加骑兵特攻、封印或偷 AP。
 
 远隔战斗语义由 `attackType: "Ranged"` 驱动，不由普通 `Ranged` tag 驱动。当前目标选择、远程掩护、飞行命中惩罚和攻击属性条件都读取 `attackType`；`Ranged` tag 只作为资料标签/日志标记保留，不能替代 `attackType`，也不需要为每个远隔主动技额外补齐。飞行特攻不由远隔 tag 触发，而是由角色 trait（例如 `BowVsFlying`）和 `attackType: "Ranged"` 共同决定；没有该 trait 的远隔技能不会自动对飞行双倍伤害。伤害结算只看 `damageType` 或 `physicalPower` / `magicalPower`，所以“物理攻击形态造成魔法伤害”不是写成 `type: "Magical"`，而是保持 `type: "Physical"` 并补 `damageType: "Magical"`。不要录入没有执行语义或资料来源的补丁 tag，例如 `FlyingNoHitPenalty`。
+没有物理/魔法伤害成分的辅助、治疗、妨害主动技只执行顶层 `effects`，不会进入命中/伤害流程，也不会触发掩护、反击、追击等“被攻击/命中”被动。不要为了让这类技能“有日志”而写 `power: 0` 的假攻击；如果资料明确是带伤害的妨害或辅助攻击，必须用 `type: "Physical"` / `"Magical"`，或显式写 `physicalPower` / `magicalPower`。
 
 ## 被动技能字段清单
 

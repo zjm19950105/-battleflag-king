@@ -295,11 +295,12 @@ namespace BattleKing.Tests
                 }
             });
 
-            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+            var logs = executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
 
             ClassicAssert.AreEqual(1, target.CurrentAp);
             ClassicAssert.AreEqual(1, target.CurrentPp);
             ClassicAssert.AreEqual(130, target.CurrentHp);
+            Assert.That(logs, Has.Some.EqualTo("TestUnit.HP 80->130 (+50; 最大HP200 x25%=50)"));
         }
 
         [Test]
@@ -331,10 +332,12 @@ namespace BattleKing.Tests
                 }
             });
 
-            executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
+            var logs = executor.ExecuteActionEffects(context, caster, new List<BattleUnit> { target }, skill.Data.Effects, skill.Data.Id);
 
             ClassicAssert.AreEqual(400, target.GetCurrentStat("HP"));
             ClassicAssert.AreEqual(360, target.CurrentHp);
+            Assert.That(logs, Has.Some.EqualTo("TestUnit.HP 180->260 (+80; 最大HP400 x10% x2=80)"));
+            Assert.That(logs, Has.Some.EqualTo("TestUnit.HP 260->360 (+100; 最大HP400 x25%=100)"));
         }
 
         [Test]
@@ -1499,6 +1502,64 @@ namespace BattleKing.Tests
                 casterCurrentPp: 3);
 
             ClassicAssert.AreEqual(4, capped.Caster.CurrentPp);
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonGreatShield_DoesNotPublishBeforeHitOrTriggerCover()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var caster = new BattleUnit(
+                CreateCharacter("caster", "act_great_shield", hp: 1000, str: 10, def: 100, spd: 100, ap: 2, pp: 2),
+                repository,
+                true)
+            {
+                Position = 1,
+                CurrentLevel = 30,
+                CurrentAp = 2,
+                CurrentPp = 0
+            };
+            var coverUser = new BattleUnit(
+                CreateCharacter("cover_user", null, hp: 1000, str: 10, def: 100, spd: 50, ap: 0, pp: 1),
+                repository,
+                true)
+            {
+                Position = 4,
+                CurrentLevel = 30,
+                CurrentPp = 1
+            };
+            var enemy = new BattleUnit(
+                CreateCharacter("enemy", null, hp: 1000, str: 10, def: 100, spd: 1, ap: 0, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_great_shield" });
+            coverUser.EquippedPassiveSkillIds.Add("pas_line_cover");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster, coverUser },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            int beforeHitEvents = 0;
+            engine.EventBus.Subscribe<BeforeHitEvent>(_ => beforeHitEvents++);
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(0, beforeHitEvents);
+            ClassicAssert.AreEqual(2, caster.CurrentPp);
+            ClassicAssert.AreEqual(1, caster.CurrentAp);
+            ClassicAssert.AreEqual(150, caster.GetCurrentStat("Def"));
+            ClassicAssert.AreEqual(1, coverUser.CurrentPp);
+            Assert.That(logs, Has.None.Contains("重掩护"));
+            Assert.That(logs, Has.None.Contains("Cover="));
+            Assert.That(engine.BattleLogEntries, Has.None.Matches<BattleLogEntry>(entry => entry.SkillId == "act_great_shield"));
         }
 
         [Test]

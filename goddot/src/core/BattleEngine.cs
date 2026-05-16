@@ -425,7 +425,9 @@ namespace BattleKing.Core
             }
 
             _eventBus.Publish(new AfterActiveCostEvent { Caster = unit, Skill = skill, Context = _ctx });
-            _eventBus.Publish(new BeforeAttackCalculationEvent { Caster = unit, Skill = skill, Context = _ctx });
+            bool requiresDamagePipeline = RequiresDamagePipeline(skill);
+            if (requiresDamagePipeline)
+                _eventBus.Publish(new BeforeAttackCalculationEvent { Caster = unit, Skill = skill, Context = _ctx });
 
             Log($"--- {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 发动 {skill.Data.Name} (AP{skill.ApCost} 威力{skill.Power}) [{DumpUnitBrief(unit)}] ---");
 
@@ -435,11 +437,9 @@ namespace BattleKing.Core
             if (actionEffectLogs.Count > 0)
                 Log($"  effects: {string.Join(", ", actionEffectLogs)}");
 
-            if (skill.Type == SkillType.Heal)
+            if (!requiresDamagePipeline)
             {
-                _ctx.CurrentActionAugments.Clear();
-                _ctx.CurrentActionSkill = null;
-                _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
+                CompleteActiveUse(unit, skill);
                 return;
             }
 
@@ -546,12 +546,22 @@ namespace BattleKing.Core
             if (augmentQueuedActionLogs.Count > 0)
                 Log($"  augment queued actions: {string.Join(", ", augmentQueuedActionLogs)}");
 
+            CompleteActiveUse(unit, skill);
+        }
+
+        private void CompleteActiveUse(BattleUnit unit, BattleKing.Skills.ActiveSkill skill)
+        {
             _ctx.CurrentActionAugments.Clear();
             _ctx.CurrentActionSkill = null;
             _eventBus.Publish(new AfterActiveUseEvent { Caster = unit, Skill = skill, Context = _ctx });
             ProcessPendingActions();
 
             Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 行动结束: {DumpUnitBrief(unit)}");
+        }
+
+        private static bool RequiresDamagePipeline(BattleKing.Skills.ActiveSkill skill)
+        {
+            return skill?.HasPhysicalComponent == true || skill?.HasMagicalComponent == true;
         }
 
         private static void ApplyActiveRowCover(

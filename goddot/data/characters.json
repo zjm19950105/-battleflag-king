@@ -1,6 +1,7 @@
 [
   {
     "id": "swordsman",
+    "englishName": "Swordfighter",
     "name": "剑士",
     "classes": [
       "Infantry"
@@ -10,15 +11,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_sharp_slash",
-      "act_pierce"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_quick_strike",
-      "pas_parry"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 60,
       "Str": 45,
@@ -33,17 +25,27 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "平衡型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_sharp_slash",
+      "act_pierce"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_quick_strike",
+      "pas_parry"
+    ],
     "initialEquipmentIds": [
       "equ_recruit_sword"
     ],
+    "ccClassId": "swordmaster",
+    "ccEnglishName": "Sword Master",
+    "ccName": "剑圣",
+    "innateValorSkillIds": [],
+    "growthType": "平衡型",
+    "traits": [],
     "ccInitialEquipmentIds": [
       "equ_recruit_sword",
       "equ_recruit_sword"
     ],
-    "ccClassId": "swordmaster",
-    "ccName": "剑圣",
     "ccEquippableCategories": [
       "Sword",
       "Sword",
@@ -59,6 +61,7 @@
   },
   {
     "id": "mercenary",
+    "englishName": "Sellsword",
     "name": "佣兵",
     "classes": [
       "Infantry"
@@ -68,14 +71,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_mega_slash",
-      "act_kill_chain"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_pursuit_slash"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 104,
       "Str": 79,
@@ -90,17 +85,26 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "攻击特化型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_mega_slash",
+      "act_kill_chain"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_pursuit_slash"
+    ],
     "initialEquipmentIds": [
       "equ_recruit_sword"
     ],
+    "ccClassId": "landsknecht",
+    "ccEnglishName": "Landsknecht",
+    "ccName": "佣兵队长",
+    "innateValorSkillIds": [],
+    "growthType": "攻击特化型",
+    "traits": [],
     "ccInitialEquipmentIds": [
       "equ_recruit_sword",
       "equ_mercenary_wood_shield"
     ],
-    "ccClassId": "landsknecht",
-    "ccName": "兰茨克内希特",
     "ccEquippableCategories": [
       "Sword",
       "Shield",
@@ -117,6 +121,7 @@
   },
   {
     "id": "lord",
+    "englishName": "Lord",
     "name": "领主",
     "classes": [
       "Infantry"
@@ -126,15 +131,6 @@
       "Shield",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_lord_slash",
-      "act_cavalry_bane"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_noble_block",
-      "pas_fluorescent_cover"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 104,
       "Str": 45,
@@ -149,15 +145,25 @@
       "AP": 2,
       "PP": 2
     },
-    "growthType": "平衡型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_lord_slash",
+      "act_cavalry_bane"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_noble_block",
+      "pas_fluorescent_cover"
+    ],
     "initialEquipmentIds": [
       "equ_lord_sword",
       "equ_lord_shield"
     ],
-    "note": "领主数据在参考文档中未找到独立章节，当前为占位数据，需补充来源",
     "ccClassId": "high_lord",
+    "ccEnglishName": "High Lord",
     "ccName": "高阶领主",
+    "innateValorSkillIds": [],
+    "growthType": "平衡型",
+    "traits": [],
+    "note": "领主数据在参考文档中未找到独立章节，当前为占位数据，需补充来源",
     "ccEquippableCategories": [
       "Sword",
       "Shield",
@@ -186,6 +192,7 @@
   },
   {
     "id": "fighter",
+    "englishName": "Fighter",
     "name": "战士",
     "classes": [
       "Infantry",
@@ -196,15 +203,6 @@
       "Shield",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_arrow_cover",
-      "act_shield_bash"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_cheer_shout",
-      "pas_end_heal25"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 88,
       "Str": 43,
@@ -219,14 +217,24 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "防御型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_arrow_cover",
+      "act_shield_bash"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_cheer_shout",
+      "pas_end_heal25"
+    ],
     "initialEquipmentIds": [
       "equ_bronze_sword",
       "equ_fighter_shield"
     ],
     "ccClassId": "vanguard",
+    "ccEnglishName": "Vanguard",
     "ccName": "先锋",
+    "innateValorSkillIds": [],
+    "growthType": "防御型",
+    "traits": [],
     "ccEquippableCategories": [
       "Sword",
       "Shield",
@@ -243,6 +251,7 @@
   },
   {
     "id": "soldier",
+    "englishName": "Soldier",
     "name": "士兵",
     "classes": [
       "Infantry"
@@ -252,15 +261,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_enhanced_spear",
-      "act_spear_pierce"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_give_ap",
-      "pas_muscle_swelling"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 84,
       "Str": 47,
@@ -275,13 +275,23 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "平衡型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_enhanced_spear",
+      "act_spear_pierce"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_give_ap",
+      "pas_muscle_swelling"
+    ],
     "initialEquipmentIds": [
       "equ_soldier_spear"
     ],
     "ccClassId": "sergeant",
+    "ccEnglishName": "Sergeant",
     "ccName": "军士",
+    "innateValorSkillIds": [],
+    "growthType": "平衡型",
+    "traits": [],
     "ccEquippableCategories": [
       "Spear",
       "Accessory",
@@ -298,6 +308,7 @@
   },
   {
     "id": "huskarl",
+    "englishName": "Housecarl",
     "name": "家臣",
     "classes": [
       "Infantry"
@@ -307,15 +318,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_smash",
-      "act_whirlwind_slash"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_rampage",
-      "pas_iron_guard"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 76,
       "Str": 59,
@@ -330,13 +332,23 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "攻击型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_smash",
+      "act_whirlwind_slash"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_rampage",
+      "pas_iron_guard"
+    ],
     "initialEquipmentIds": [
       "equ_huskarl_axe"
     ],
     "ccClassId": "viking",
+    "ccEnglishName": "Viking",
     "ccName": "维京",
+    "innateValorSkillIds": [],
+    "growthType": "攻击型",
+    "traits": [],
     "ccEquippableCategories": [
       "Axe",
       "Shield",
@@ -356,6 +368,7 @@
   },
   {
     "id": "hoplite",
+    "englishName": "Hoplite",
     "name": "重装步兵",
     "classes": [
       "Infantry",
@@ -366,14 +379,6 @@
       "GreatShield",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_spike"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_line_cover",
-      "pas_hawk_eye"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 100,
       "Str": 39,
@@ -388,14 +393,23 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "防御型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_spike"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_line_cover",
+      "pas_hawk_eye"
+    ],
     "initialEquipmentIds": [
       "equ_hoplite_spear",
       "equ_hoplite_greatshield"
     ],
     "ccClassId": "cataphract",
-    "ccName": "甲胄骑兵",
+    "ccEnglishName": "Legionnaire",
+    "ccName": "军团兵",
+    "innateValorSkillIds": [],
+    "growthType": "防御型",
+    "traits": [],
     "ccEquippableCategories": [
       "Spear",
       "GreatShield",
@@ -413,7 +427,8 @@
   },
   {
     "id": "gladiator",
-    "name": "角斗士",
+    "englishName": "Gladiator",
+    "name": "斗士",
     "classes": [
       "Infantry"
     ],
@@ -422,13 +437,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_full_assault"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_wide_counter"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 148,
       "Str": 55,
@@ -443,13 +451,21 @@
       "AP": 2,
       "PP": 2
     },
-    "growthType": "AllRounder",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_full_assault"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_wide_counter"
+    ],
     "initialEquipmentIds": [
       "equ_gladiator_axe"
     ],
     "ccClassId": "berserker",
+    "ccEnglishName": "Berserker",
     "ccName": "狂战士",
+    "innateValorSkillIds": [],
+    "growthType": "AllRounder",
+    "traits": [],
     "ccClasses": [],
     "ccTraits": [],
     "ccEquippableCategories": [
@@ -470,6 +486,7 @@
   },
   {
     "id": "warrior",
+    "englishName": "Warrior",
     "name": "勇士",
     "classes": [
       "Infantry"
@@ -479,14 +496,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_heavy_slayer",
-      "act_charge_strike"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_rapid_reload"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 96,
       "Str": 71,
@@ -501,13 +510,22 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "攻击型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_heavy_slayer",
+      "act_charge_strike"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_rapid_reload"
+    ],
     "initialEquipmentIds": [
       "equ_warrior_axe"
     ],
     "ccClassId": "breaker",
+    "ccEnglishName": "Breaker",
     "ccName": "破坏者",
+    "innateValorSkillIds": [],
+    "growthType": "攻击型",
+    "traits": [],
     "ccEquippableCategories": [
       "Axe",
       "Accessory",
@@ -525,6 +543,7 @@
   },
   {
     "id": "hunter",
+    "englishName": "Hunter",
     "name": "猎人",
     "classes": [
       "Infantry",
@@ -535,15 +554,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_single_shot",
-      "act_dual_shot"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_unstoppable_rage",
-      "pas_cut_grass"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 72,
       "Str": 47,
@@ -558,17 +568,27 @@
       "AP": 2,
       "PP": 1
     },
+    "innateActiveSkillIds": [
+      "act_single_shot",
+      "act_dual_shot"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_unstoppable_rage",
+      "pas_cut_grass"
+    ],
+    "initialEquipmentIds": [
+      "equ_hunter_bow"
+    ],
+    "ccClassId": "sniper",
+    "ccEnglishName": "Sniper",
+    "ccName": "狙击手",
+    "innateValorSkillIds": [],
     "growthType": "命中型",
     "traits": [
       {
         "traitType": "BowVsFlying"
       }
     ],
-    "initialEquipmentIds": [
-      "equ_hunter_bow"
-    ],
-    "ccClassId": "sniper",
-    "ccName": "狙击手",
     "ccEquippableCategories": [
       "Bow",
       "Accessory",
@@ -585,7 +605,8 @@
   },
   {
     "id": "shooter",
-    "name": "射手",
+    "englishName": "Arbalist",
+    "name": "弩手",
     "classes": [
       "Infantry"
     ],
@@ -594,15 +615,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_heavy_bolt",
-      "act_poison_bolt"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_battle_horn",
-      "pas_quick_reload"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 80,
       "Str": 59,
@@ -617,21 +629,31 @@
       "AP": 2,
       "PP": 1
     },
+    "innateActiveSkillIds": [
+      "act_heavy_bolt",
+      "act_poison_bolt"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_battle_horn",
+      "pas_quick_reload"
+    ],
+    "initialEquipmentIds": [
+      "equ_shooter_bow"
+    ],
+    "ccClassId": "shield_shooter",
+    "ccEnglishName": "Shieldshooter",
+    "ccName": "盾弓",
+    "innateValorSkillIds": [],
     "growthType": "攻击型",
     "traits": [
       {
         "traitType": "BowVsFlying"
       }
     ],
-    "initialEquipmentIds": [
-      "equ_shooter_bow"
-    ],
     "ccInitialEquipmentIds": [
       "equ_shooter_bow",
       "equ_shooter_greatshield"
     ],
-    "ccClassId": "shield_shooter",
-    "ccName": "盾射手",
     "ccEquippableCategories": [
       "Bow",
       "GreatShield",
@@ -647,6 +669,7 @@
   },
   {
     "id": "thief",
+    "englishName": "Thief",
     "name": "盗贼",
     "classes": [
       "Infantry",
@@ -657,14 +680,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_passive_steal",
-      "act_poison_throw"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_dodge_step"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 52,
       "Str": 31,
@@ -679,13 +694,22 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "速度型",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_passive_steal",
+      "act_poison_throw"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_dodge_step"
+    ],
     "initialEquipmentIds": [
       "equ_thief_dagger"
     ],
     "ccClassId": "rogue",
-    "ccName": "潜行者",
+    "ccEnglishName": "Rogue",
+    "ccName": "游荡者",
+    "innateValorSkillIds": [],
+    "growthType": "速度型",
+    "traits": [],
     "ccEquippableCategories": [
       "Sword",
       "Accessory",
@@ -703,6 +727,7 @@
   },
   {
     "id": "wizard",
+    "englishName": "Wizard",
     "name": "巫师",
     "classes": [
       "Mage",
@@ -713,14 +738,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_fireball",
-      "act_thunderstorm"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_magic_counter"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 60,
       "Str": 11,
@@ -735,13 +752,22 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "AllRounder",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_fireball",
+      "act_thunderstorm"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_magic_counter"
+    ],
     "initialEquipmentIds": [
       "equ_apprentice_staff"
     ],
     "ccClassId": "warlock",
+    "ccEnglishName": "Warlock",
     "ccName": "术士",
+    "innateValorSkillIds": [],
+    "growthType": "AllRounder",
+    "traits": [],
     "ccClasses": [],
     "ccTraits": [],
     "ccEquippableCategories": [
@@ -761,6 +787,7 @@
   },
   {
     "id": "witch",
+    "englishName": "Witch",
     "name": "女巫",
     "classes": [
       "Mage",
@@ -771,15 +798,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_freeze_arrow",
-      "act_magic_missile"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_magic_blade",
-      "pas_focus"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 56,
       "Str": 7,
@@ -794,13 +812,23 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "AllRounder",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_freeze_arrow",
+      "act_magic_missile"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_magic_blade",
+      "pas_focus"
+    ],
     "initialEquipmentIds": [
       "equ_ice_staff"
     ],
     "ccClassId": "sorceress",
-    "ccName": "魔女",
+    "ccEnglishName": "Sorceress",
+    "ccName": "女术士",
+    "innateValorSkillIds": [],
+    "growthType": "AllRounder",
+    "traits": [],
     "ccClasses": [],
     "ccTraits": [],
     "ccEquippableCategories": [
@@ -819,7 +847,8 @@
   },
   {
     "id": "white_knight",
-    "name": "白骑士",
+    "englishName": "Radiant Knight",
+    "name": "圣骑士",
     "classes": [
       "Cavalry",
       "Mage"
@@ -830,14 +859,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_hache",
-      "act_row_heal"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_magic_barrier"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 100,
       "Str": 39,
@@ -852,14 +873,23 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "AllRounder",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_hache",
+      "act_row_heal"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_magic_barrier"
+    ],
     "initialEquipmentIds": [
       "equ_lord_sword",
       "equ_bronze_shield"
     ],
     "ccClassId": "saint_knight",
-    "ccName": "圣骑士",
+    "ccEnglishName": "Sainted Knight",
+    "ccName": "圣殿骑士",
+    "innateValorSkillIds": [],
+    "growthType": "AllRounder",
+    "traits": [],
     "ccClasses": [],
     "ccTraits": [],
     "ccEquippableCategories": [
@@ -879,6 +909,7 @@
   },
   {
     "id": "griffin_knight",
+    "englishName": "Gryphon Knight",
     "name": "狮鹫骑士",
     "classes": [
       "Flying"
@@ -888,16 +919,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_griffin_slash",
-      "act_griffin_quick_action"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_griffin_guard",
-      "pas_griffin_wing_stroke",
-      "pas_griffin_wing_rest"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 76,
       "Str": 49,
@@ -912,6 +933,22 @@
       "AP": 2,
       "PP": 1
     },
+    "innateActiveSkillIds": [
+      "act_griffin_slash",
+      "act_griffin_quick_action"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_griffin_guard",
+      "pas_griffin_wing_stroke",
+      "pas_griffin_wing_rest"
+    ],
+    "initialEquipmentIds": [
+      "equ_iron_axe"
+    ],
+    "ccClassId": "griffin_ruler",
+    "ccEnglishName": "Gryphon Master",
+    "ccName": "狮鹫大师",
+    "innateValorSkillIds": [],
     "growthType": "AllRounder",
     "traits": [
       {
@@ -921,11 +958,6 @@
         "traitType": "PhysAtkVsCavalry2x"
       }
     ],
-    "initialEquipmentIds": [
-      "equ_iron_axe"
-    ],
-    "ccClassId": "griffin_ruler",
-    "ccName": "狮鹫统治者",
     "ccClasses": [
       "Flying"
     ],
@@ -944,6 +976,7 @@
   },
   {
     "id": "shaman",
+    "englishName": "Shaman",
     "name": "萨满",
     "classes": [
       "Mage",
@@ -954,14 +987,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_passive_curse",
-      "act_attack_curse"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_quick_curse"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 100,
       "Str": 37,
@@ -976,13 +1001,22 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "AllRounder",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_passive_curse",
+      "act_attack_curse"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_quick_curse"
+    ],
     "initialEquipmentIds": [
       "equ_cursed_staff"
     ],
     "ccClassId": "druid",
+    "ccEnglishName": "Druid",
     "ccName": "德鲁伊",
+    "innateValorSkillIds": [],
+    "growthType": "AllRounder",
+    "traits": [],
     "ccClasses": [],
     "ccTraits": [],
     "ccEquippableCategories": [
@@ -1002,7 +1036,8 @@
   },
   {
     "id": "elf_sibyl",
-    "name": "精灵女先知",
+    "englishName": "Elven Sibyl",
+    "name": "精灵女祭司",
     "classes": [
       "Mage",
       "Infantry"
@@ -1013,17 +1048,6 @@
       "Accessory",
       "Accessory"
     ],
-    "innateActiveSkillIds": [
-      "act_primal_edge",
-      "act_fairy_heal",
-      "act_elemental_roar"
-    ],
-    "innatePassiveSkillIds": [
-      "pas_healing_touch",
-      "pas_spirit_guard",
-      "pas_elemental_action"
-    ],
-    "innateValorSkillIds": [],
     "baseStats": {
       "HP": 64,
       "Str": 39,
@@ -1038,13 +1062,25 @@
       "AP": 2,
       "PP": 1
     },
-    "growthType": "AllRounder",
-    "traits": [],
+    "innateActiveSkillIds": [
+      "act_primal_edge",
+      "act_fairy_heal",
+      "act_elemental_roar"
+    ],
+    "innatePassiveSkillIds": [
+      "pas_healing_touch",
+      "pas_spirit_guard",
+      "pas_elemental_action"
+    ],
     "initialEquipmentIds": [
       "equ_holy_spear"
     ],
     "ccClassId": null,
+    "ccEnglishName": null,
     "ccName": null,
+    "innateValorSkillIds": [],
+    "growthType": "AllRounder",
+    "traits": [],
     "ccClasses": [],
     "ccTraits": [],
     "ccEquippableCategories": [],
