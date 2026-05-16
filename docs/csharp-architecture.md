@@ -58,7 +58,7 @@ GameDataRepository.LoadAll(dataPath)
 
 `PassiveSetupView` 负责被动列表、PP 显示、被动装备/卸下按钮和被动触发条件选择。旧 UI 仍可写入 `BattleUnit.EquippedPassiveSkillIds` / `PassiveConditions`；原版风格策略栏应优先维护 `BattleUnit.PassiveStrategies`（顺序、`SkillId`、`Condition1`、`Condition2`），并保持 `EquippedPassiveSkillIds` 作为已装备白名单。
 
-`StrategySetupView` 负责策略槽、技能下拉、条件级联 `OptionButton`、条件预览和技能说明。新角色初始只创建 1 条主动策略和 1 条被动策略；玩家后续通过 UI 自行新增。`SandboxStrategyTableView` 是沙盒内的同类编辑器。新 UI 优先消费 `StrategyConditionCatalog` / `StrategyConditionUiMapper.GetCatalogItems(...)` 的原版两栏目录；旧的 `ConditionMeta` 三段下拉只是兼容包装。所有条件对象必须通过 `StrategyConditionCatalog.BuildCondition(...)`、`StrategyConditionUiMapper.SaveCatalogSelection(...)`、`ConditionMeta.BuildCondition(...)` 或 `StrategyConditionUiMapper.SaveSelection(...)` 生成，保证 UI 中文选项转换为 canonical operator/value。`Mode1` / `Mode2` 保留 `Priority` / `Only` 语义：`Only` 硬过滤，`Priority` 只排序。
+`StrategySetupView` 负责策略槽、技能下拉、条件级联 `OptionButton`、条件预览和技能说明。角色初始主动策略优先来自 `strategy_presets.json` 的 `char_default_{characterId}`，并过滤当前等级/CC 尚不可用的技能；没有可用预设行时才回退到 1 条最早解锁主动。被动初始仍只自动装备 1 条可负担被动，玩家后续通过 UI 自行新增。`SandboxStrategyTableView` 是沙盒内的同类编辑器。新 UI 优先消费 `StrategyConditionCatalog` / `StrategyConditionUiMapper.GetCatalogItems(...)` 的原版两栏目录；旧的 `ConditionMeta` 三段下拉只是兼容包装。所有条件对象必须通过 `StrategyConditionCatalog.BuildCondition(...)`、`StrategyConditionUiMapper.SaveCatalogSelection(...)`、`ConditionMeta.BuildCondition(...)` 或 `StrategyConditionUiMapper.SaveSelection(...)` 生成，保证 UI 中文选项转换为 canonical operator/value。`Mode1` / `Mode2` 保留 `Priority` / `Only` 语义：`Only` 硬过滤，`Priority` 只排序。
 
 `BattleView` 负责战斗阶段的双方状态面板、`OnLog` 字符串日志、下一步/自动战斗按钮和 `BattleEngine.StepOneAction()` 调用。它接收 `BattleEngine` / `BattleContext`，战斗结束后只通过回调把 `BattleResult` 交回 `Main.cs`；战斗规则仍只属于 `BattleEngine` / skills / pipeline。
 
@@ -86,22 +86,27 @@ GameDataRepository.LoadAll(dataPath)
 | 文件 | 内容 |
 | --- | --- |
 | `goddot/data/characters.json` | 角色模板、基础属性、兵种、CC、初始装备、技能池 |
-| `goddot/data/active_skills.json` | 主动技能、AP、目标类型、结构化 effects |
+| `goddot/data/active_skills.json` | 主动技能、AP、目标类型、结构化 effects；混合伤害技能可额外配置 `physicalPower` / `magicalPower`，当前行动追加魔法段用 `ModifyDamageCalc.AdditionalMagicalPower` |
 | `goddot/data/passive_skills.json` | 被动技能、PP、触发时机、结构化 effects / legacy tags |
 | `goddot/data/equipments.json` | 装备类别、属性、赋予技能、限制 |
 | `goddot/data/strategy_presets.json` | 旧策略预设，条件值必须是 canonical value；新角色初始策略不再填满 8 条 |
 | `goddot/data/class_display_names.json` | 职业显示名映射，用于未来原创化/本地化 |
+| `goddot/data/character_role_descriptions.json` | 从职业图鉴抽取的角色定位；正文用 `{char:ID}` / `{class:ID}` 引用可改名对象 |
+
+录入或修正角色/技能时，先读 `docs/skill-and-character-authoring-guide.md`。它集中说明资料来源、角色 CC 装备槽、主动/被动技能字段、`ratio`/`amount`/`hitRate` 语义和测试要求，避免数据靠猜。
+
+角色描述结构化方案见 `docs/character-role-description-plan.md`。新增角色前要先保证现有 18 个角色描述完成 token 化：正文不写死会被改名的角色/兵种显示名，展示层再通过稳定 ID 映射解析。
 
 ## 重要枚举
 
 ```csharp
-UnitClass: Infantry, Cavalry, Flying, Heavy, Scout, Archer, Mage, Elf, Beastman, Winged
+UnitClass: Infantry, Cavalry, Flying, Heavy, Scout, Archer, Mage, Elf, Beastman, Winged, Undead
 EquipmentCategory: Sword, Axe, Spear, Bow, Staff, Shield, GreatShield, Accessory
 SkillType: Physical, Magical, Assist, Heal, Debuff
 AttackType: Melee, Ranged, Magic
 TargetType: Self, SingleEnemy, SingleAlly, TwoEnemies, ThreeEnemies, FrontAndBack, Column, Row, AllEnemies, AllAllies
 ConditionCategory: Position, UnitClass, Hp, ApPp, Status, AttackAttribute, TeamSize, SelfState, SelfHp, SelfApPp, EnemyClassExists, AttributeRank
-PassiveTriggerTiming: BattleStart, SelfBeforeAttack, AllyBeforeAttack, AllyBeforeHit, SelfBeforeHit, SelfBeforeMeleeHit, SelfBeforePhysicalHit, AllyOnAttacked, SelfOnActiveUse, AllyOnActiveUse, AfterAction, BattleEnd, OnHit, OnBeingHit, OnKnockdown
+PassiveTriggerTiming: BattleStart, SelfBeforeAttack, AllyBeforeAttack, AllyBeforeHit, SelfBeforeHit, SelfBeforeMeleeHit, SelfBeforePhysicalHit, AllyOnAttacked, SelfOnActiveUse, AllyOnActiveUse, EnemyOnActiveUse, AfterAction, BattleEnd, OnHit, OnBeingHit, OnKnockdown
 PendingActionType: Counter, Pursuit, Preemptive, BattleEnd
 BattleActionSourceKind: ActiveAttack, PendingAction
 ```
@@ -158,7 +163,7 @@ Operator 约定：
 
 - `Self` 以 caster 作为唯一候选，仍会执行自身条件。
 - 近战地面攻击被前排阻挡。
-- 远程、魔法、飞行、贯通/列攻击可越排。
+- 远程、魔法、飞行、纵列攻击可越排；`FrontAndBack` 只表示命中锚点前后贯通，地面近战版仍必须先按前排阻挡选合法锚点。
 - 没有 `Only` / `Priority` 条件且没有 `ForcedTarget` 时，`SingleEnemy` 在所有合法候选中随机选择；不要依赖位置 1 或列表第一个作为默认目标。
 - Row / Column / FrontAndBack 不允许从 `AllUnits` 里误捞友方。
 - `ApPp highest/lowest` 必须按 `Value` 指定的 `AP` 或 `PP` 排序。
@@ -186,7 +191,7 @@ Operator 约定：
 
 `BattleSetupService.CreateUnit(...)` 当前初始规则：
 
-- 主动：从 `BattleUnit.GetAvailableActiveSkillIds()` 中选择当前等级可用、`UnlockLevel` 最低、原技能池顺序最靠前的 1 个主动技能，创建 `Strategies[0]`，两个条件均为空。
+- 主动：优先读取 `strategy_presets.json` 中的 `char_default_{characterId}`，把预设行过滤为当前等级/CC 可用的主动技能后写入 `Strategies`；若没有角色预设或过滤后为空，再从 `BattleUnit.GetAvailableActiveSkillIds()` 中选择当前等级可用、`UnlockLevel` 最低、原技能池顺序最靠前的 1 个主动技能作为兜底。
 - 被动：从 `BattleUnit.GetAvailablePassiveSkillIds()` 中选择当前等级可用、`UnlockLevel` 最低、`PpCost` 最低、原技能池顺序最靠前且 `PpCost <= PassivePpBudget` 的 1 个被动技能，写入 `EquippedPassiveSkillIds` 和 `PassiveStrategies[0]`，两个条件均为空。
 - 创建单位时会先套用初始装备，再调用 `SyncResourceCapsFromStats(...)` 同步装备后的 HP、入场 AP/PP、被动 PP 预算和当前值。沙盒草稿复制到真实战斗单位后也要同步一次，避免换装预览值和真实战斗资源不一致。
 
@@ -216,25 +221,29 @@ Operator 约定：
 - `ForceHit`, `ForceEvasion`, `ForceBlock`, `ForcedBlockReduction`
 - `SkillPowerMultiplier`, `DamageMultiplier`, `IgnoreDefenseRatio`
 - `NullifyPhysicalDamage`, `NullifyMagicalDamage`
+- `ReflectDamageToAttacker`, `ReflectedDamage`: 魔法反射类效果在命中结算中把本次魔法伤害记到攻击者身上，并让防守方该段魔法伤害为 0。
 - `CoverTarget`, `CannotBeCovered`, `ResolvedDefender`
-- `CannotBeBlocked`, `HitCount`, `CounterPowerBonus`, `SkillPowerBonus`
+- `CannotBeBlocked`, `CannotCrit`, `HitCount`, `CounterPowerBonus`, `SkillPowerBonus`, `AdditionalMagicalPower`, `FixedPhysicalDamagePerHit`
+- `PhysicalAttackPower` / `PhysicalDefense` / `MagicalAttackPower` / `MagicalDefense`: 混合伤害和当前行动追加魔法段会分别按物理与魔法攻防结算；`PhysicalSkillPowerRatio` / `MagicalSkillPowerRatio` 来自 `physicalPower` / `magicalPower` 或 `AdditionalMagicalPower`
 - `LandedHits`, `MissedHits`, `EvadedHits`, `NullifiedHits`
 - `HitResults`: 每段攻击的真实明细，记录 missed / evaded / landed / critical / blocked / nullified、单段基础伤害、暴击/格挡/无效后的 raw 单段伤害，以及本 hit 四舍五入后的 applied 伤害；多段日志必须从这里汇总，不要只看聚合 `IsCritical`。
 
-状态语义：`CritSeal` 挂在攻击者身上时禁止暴击；防守者身上的 `CritSeal` 不会保护其免受暴击。`BlockSeal` 挂在防守者身上时禁止其格挡。`PassiveSeal` 会让单位跳过被动触发检查；它不是暴击封印。`StatusAilment.Stun` 会同步设置 `UnitState.Stunned`，使目标下次行动跳过一次并恢复 `Normal`。
+状态语义：`CritSeal` 挂在攻击者身上时禁止暴击；防守者身上的 `CritSeal` 不会保护其免受暴击。`BlockSeal` 挂在防守者身上时禁止其格挡。`PassiveSeal` 会让单位跳过被动触发检查；它不是暴击封印。`Confusion` 当前作为可附加、可解除的原版异常记录，尚无行动 AI 语义。`StatusAilment.Stun` 会同步设置 `UnitState.Stunned`，使目标下次行动跳过一次并恢复 `Normal`。
 
 命中率语义：`ActiveSkillData.HitRate` 是技能命中倍率，不是加值。普通命中公式为 `floor((攻击者命中 - 防守者回避) * 技能命中倍率 / 100)`，地上近接攻击飞行目标时先把 `(攻击者命中 - 防守者回避)` 半减，再乘技能命中倍率，最终 clamp 到 0..100。`BattleLogHelper` 通过 `HitChanceCalculator` 显示同一套公式，避免日志和真实判定分裂。
 
 `DamageCalculator` 负责把 `CoverTarget` 解析成 `ResolvedDefender`。之后所有实际承伤语义都使用 `DamageResult.ResolvedDefender`：扣 HP、AfterHit、OnKnockdown、结构化日志。`BattleEngine` 在实际扣血阶段会调用 `DamageResult.RecordHpChange(...)`，把实际承伤者的 `DamageReceiverHpBefore`、`DamageReceiverHpAfter`、`AppliedHpDamage` 和 `LethalDamageResisted` 写回结果；日志和未来动画不要再用 `CurrentHp + TotalDamage` 反推扣血前 HP。
 `ForceHit` 会压过 `ForceEvasion` 和普通回避，但攻击者处于 `Darkness` 时仍会 miss。`ForceEvasion` 只回避多段攻击的第 1 hit；`MeleeHitNullify` 这类 temporal state 只无效下一段命中的近接物理伤害。多段攻击即使部分 hit 被回避/无效，剩余命中段仍要正常扣血。
 带 `RangedCover` tag 的被动是额外上下文限制：只允许在远程物理 `BeforeHit` 中触发；结构化效果仍用 `CoverAlly` + `ModifyDamageCalc.NullifyPhysicalDamage` 表达实际掩护/无效化。防御类同时发动限制按本次 `BeforeHit` 事件作用域结算，不能把箭矢掩护压成一战一次。
+`CoverAlly` 可用 `scope: "Row"` / `"Column"` 限制掩护者与原防守者必须同排/同列；这个限制在扣 PP 和占用同时发动限制前检查，避免跨排/跨列无效掩护白白消耗资源。`DamageCalculation.CoverScope` 记录触发本次掩护的范围；主动技能一次行动内，`scope: "Row"` 的列掩护会在同排后续目标上复用同一个掩护者、格挡强制和减伤，不重复扣 PP，也不让第二个掩护被动抢占。
 同一技能可以同时挂多个不同属性的纯 buff/debuff；`BuffManager` 默认只把“同一技能 + 同一属性”的纯 buff/debuff 视作重复。结构化 `AddBuff` / `AddDebuff` 可使用 `stackPolicy: "Stack"`（或兼容布尔 `stackable: true`）允许同技能同属性重复堆叠，当前用于 `pas_hawk_eye`、`pas_emergency_cover` 这类原版 Stackable 被动。
 
-`ModifyDamageCalc` 可带条件参数限制本条伤害修正是否生效：`targetClass` / `targetClasses` 按当前声明目标兵种过滤，`targetHasDebuff` 要求目标已有纯 debuff，`targetHasAilment` / `targetHasAilments` 要求目标已有指定异常，`targetLacksAilment` / `targetLacksAilments` 要求目标没有指定异常，`casterHasBuff` 要求施法者已有纯 buff，`casterHpRatioMin` / `casterHpRatioMax` 按施法者当前 HP 比例过滤，`casterRow` (`Front` / `Back`) / `requiresCasterFrontRow` 按施法者当前前后排过滤。纯 buff 判断包含 `Ratio > 0` 和 `FlatAmount > 0`，因此 `Spd +20` 这类 flat 增益也满足“自身有 buff”。条件不满足时整条 calculation effect 跳过；这用于满血威力提升、低血威力提升、前排发动威力提升、目标已有异常/debuff 伤害提升、自身有 buff 伤害提升、兵种特攻无视防御/不可格挡等 structured effects。`ForceCrit` 会让当前命中强制暴击，但攻击者身上的 `CritSeal` 仍会禁止暴击。`SkillPowerBonus` 会加到 `DamageCalculation.EffectivePower`，与 `SkillPowerMultiplier` 不同，它表达固定威力值加算；JSON 里“威力+N”应优先写 `SkillPowerBonus=N`，不要用倍率近似。`SkillPowerBonusFromTargetHpRatio` 表示按目标当前 HP / 装备后最大 HP 线性 floor 的威力加算，当前用于 `act_bastard_cross`。`BlockReduction` / `GuardType` 可覆盖强制格挡的减伤：轻格挡 25%，中格挡 50%，大格挡 75%；装备默认也是无盾 25%、盾 50%、大盾 75%。
+混合伤害技能通过 `ActiveSkillData.PhysicalPower` 和 `MagicalPower` 配置双威力；两者同时存在时，物理段使用 `Str/Def`，魔法段使用 `Mag/MDef`，每个 hit 分别计算基础伤害后再共同进入暴击、格挡、无效化和 per-hit 取整流程。`ModifyDamageCalc.AdditionalMagicalPower` 会给当前行动追加一个魔法威力分量，当前用于 `pas_magic_blade` 这类“物理攻击前追加魔法伤害”被动；追加后该行动按混合伤害处理，魔法屏障/列屏障会识别并无效魔法分量。`Power` 仍作为旧字段和显示/兼容基准；`SkillPowerBonus` / `CounterPowerBonus` 会叠加到两个威力分量。
+`ModifyDamageCalc` 可带条件参数限制本条伤害修正是否生效：`targetClass` / `targetClasses` 按当前声明目标兵种过滤，`targetHasDebuff` 要求目标已有纯 debuff，`targetHasAilment` / `targetHasAilments` 要求目标已有指定异常，`targetLacksAilment` / `targetLacksAilments` 要求目标没有指定异常，`casterHasBuff` 要求施法者已有纯 buff，`casterHpRatioMin` / `casterHpRatioMax` 按施法者当前 HP 比例过滤，`casterRow` (`Front` / `Back`) / `requiresCasterFrontRow` 按施法者当前前后排过滤。纯 buff 判断包含 `Ratio > 0` 和 `FlatAmount > 0`，因此 `Spd +20` 这类 flat 增益也满足“自身有 buff”。条件不满足时整条 calculation effect 跳过；这用于满血威力提升、低血威力提升、前排发动威力提升、目标已有异常/debuff 伤害提升、自身有 buff 伤害提升、兵种特攻无视防御/不可格挡等 structured effects。`ForceCrit` 会让当前命中强制暴击，但攻击者身上的 `CritSeal` 和 `CannotCrit` 仍会禁止暴击。`SkillPowerBonus` 会加到 `DamageCalculation.EffectivePower`，与 `SkillPowerMultiplier` 不同，它表达固定威力值加算；JSON 里“威力+N”应优先写 `SkillPowerBonus=N`，不要用倍率近似。`FixedDamageFromCasterHpRatio` 表达按施法者当前 HP 比例 floor 的固定物理基础伤害，当前用于 `act_griffin_quick_action`。`AdditionalMagicalPower=N` 表达额外魔法伤害分量，不是魔攻 buff。`SkillPowerBonusFromTargetHpRatio` 表示按目标当前 HP / 装备后最大 HP 线性 floor 的威力加算，当前用于 `act_bastard_cross`。`BlockReduction` / `GuardType` 可覆盖强制格挡的减伤：轻格挡 25%，中格挡 50%，大格挡 75%；装备默认也是无盾 25%、盾 50%、大盾 75%。
 
 Pending attacks (`CounterAttack` / `PursuitAttack` / `PreemptiveAttack` / `BattleEndAttack`) build a temporary active skill from the source skill and run that source skill's calculation effects before damage. The pending action itself carries `HitCount` / `hitCount`, so 2hit 先制/反击不要再靠 legacy tags 表达。This lets data express target-class bonuses such as `ModifyDamageCalc(targetClass=Flying, SkillPowerBonus=100)` for a queued counter without adding passive skill-id branches. `BeforeHitEvent` / `AfterHitEvent` carry `BattleActionSourceKind` (`ActiveAttack` or `PendingAction`); passives with effect parameter `requiresSourceKind: "ActiveAttack"` only respond to real active attacks, so pending counter/pursuit damage will not recursively trigger “被主动技能攻击时”反击类被动。
 
-`AugmentCurrentAction` can be gated by `requiresCurrentSkillType` / `currentSkillType` and `requiresCurrentAttackType` / `currentAttackType`. The passive processor checks those gates before consuming PP, and queued actions inside the augment use the current active action's selected targets as their anchor. Before-hit structured effects can similarly use `requiresIncomingSkillType` / `incomingSkillType` or `requiresIncomingAttackType` / `incomingAttackType`; `PassiveSkillProcessor` checks those gates before PP and simultaneous-limit consumption.
+`AugmentCurrentAction` / `AugmentOutgoingActions` can be gated by `requiresCurrentSkillType` / `currentSkillType` and `requiresCurrentAttackType` / `currentAttackType`; current-action requirements may contain multiple enum values separated by `|`, `,`, or `;` (for example `Physical|Magical`). The passive processor checks those gates before consuming PP, and queued actions inside the augment use the current active action's selected targets as their anchor. Before-hit structured effects can similarly use `requiresIncomingSkillType` / `incomingSkillType` or `requiresIncomingAttackType` / `incomingAttackType`; `PassiveSkillProcessor` checks those gates before PP and simultaneous-limit consumption. `Physical` / `Magical` skill type gates use damage components, not only the top-level `type`: mixed skills and actions augmented with `AdditionalMagicalPower` count as magical for incoming magic barriers.
 
 ## Effects 执行
 
@@ -252,6 +261,7 @@ Pending attacks (`CounterAttack` / `PursuitAttack` / `PreemptiveAttack` / `Battl
 普通 stat buff/debuff 默认按整场战斗持续表达为 `turns: -1`；只有明确写成“一次攻击/下一次攻击/一度だけ”等一次性效果才使用 `oneTime: true` 或有限 `turns`。带伤害的攻击技能附加物防下降等“对象 debuff”时，应把 `AddDebuff` 放在 `OnHitEffect` 里，确保 MISS/全回避不会附加；纯妨害技能没有伤害命中判定，仍保持顶层 effect。
 
 主动行动相关被动拆成明确阶段：`BeforeActiveUseEvent` 表示主动已宣言但尚未扣 AP，当前不承载常规 active-use 被动；`AfterActiveCostEvent` 在主动 AP 已扣除、主动 action effects 和伤害尚未生效前触发 `SelfOnActiveUse` / `AllyOnActiveUse`，因此 `RecoverAp` 会在扣费后回补，`oneTime` 命中/暴击伤害等 buff 仍会参与当前主动伤害计算，并在该单位本次行动完成后由 `CleanupAfterAction` 清理；主动 AP 消耗日志应先于扣费后被动恢复日志出现，避免看起来像先回 AP 再扣 AP。`BeforeAttackCalculationEvent` 随后触发 `SelfBeforeAttack` / `AllyBeforeAttack`，用于 `AugmentCurrentAction`、伤害计算修改和攻击前类资源效果。
+`OnBeingHit` / `AllyOnAttacked` 这类命中后被动也可以通过 effect 参数 `requiresIncomingSkillType` / `requiresIncomingAttackType` 过滤来源技能；例如“被物理攻击后”只应响应 `SkillType.Physical`，不能被魔法命中触发。
 
 常见 target DSL：
 
@@ -269,7 +279,7 @@ LowestHpAlly, HighestHpAlly, RandomAlly
 
 BattleEnd 常用 structured effects：
 
-- 多数 effect 可带通用条件参数：`casterHpRatioMin` / `casterHpRatioMax`、`targetHpRatioMin` / `targetHpRatioMax`、`targetHasAilment` / `targetHasAilments`、`targetLacksAilment` / `targetLacksAilments`、`targetHasBuff`、`targetHasDebuff`。条件不满足时该 effect 整条跳过；这让 `RecoverPp`、`ModifyCounter`、`StatusAilment`、`TemporalMark` 等非伤害修正也能表达“满血时”“目标已冻结时”等原版条件。
+- 多数 effect 可带通用条件参数：`casterHpRatioMin` / `casterHpRatioMax`、`targetHpRatioMin` / `targetHpRatioMax`、`targetHasAilment` / `targetHasAilments`、`targetHasAnyAilment`、`targetLacksAilment` / `targetLacksAilments`、`targetHasBuff`、`targetHasDebuff`。条件不满足时该 effect 整条跳过；这让 `RecoverPp`、`ModifyCounter`、`StatusAilment`、`TemporalMark` 等非伤害修正也能表达“满血时”“目标已冻结时”等原版条件。
 - `BattleEndAttack`: 入队 `PendingActionType.BattleEnd`，参数同 pending attack：`target`, `maxTargets`, `power`, `HitCount` / `hitCount`, `hitRate`, `damageType`, `attackType`, `targetType`, `tags`, `ignoreDefenseRatio`, `ignoreDefenseTargetClass`。
 - `PendingAttack`: 通用入队攻击，额外用 `pendingActionType` 指定 `Counter` / `Pursuit` / `Preemptive` / `BattleEnd`。
 - Pending action 的 `targetType: Row` / `Column` 在 `BattleEngine.ProcessPendingActions()` 里以已入队目标为锚点展开同阵营同排/同列目标；`ignoreDefenseRatio` 只修改 pending action 自己的 `DamageCalculation`，如果同时设置 `ignoreDefenseTargetClass`，只在实际目标拥有该 `UnitClass` 时生效。
@@ -277,16 +287,17 @@ BattleEnd 常用 structured effects：
 - 当前主动行动触发的 pending action 会在该主动单位“行动结束”日志前由 `ProcessPendingActions()` 结算；`StepOneAction()` 里仍保留一次兜底 drain，供 BattleStart/BattleEnd 或其它路径入队的 pending action 使用。pending 旧字符串日志会显示真实 `hp=before->after(-lost)`，并带 actor/target/receiver 的 id 与 position，方便同名单位手测；不要再用 `CurrentHp + damage` 反推。
 - `RecoverHp` / `RecoverAp` / `RecoverPp`: 直接恢复资源，按 target DSL 选目标；HP 恢复按目标装备后的 `GetCurrentStat("HP")` 计算和 clamp，但如果当前 HP 已高于该最大 HP，治疗不能把 HP 降回最大值；AP/PP 恢复最多到固定硬上限 4，而不是角色入场 AP/PP。
 - `ApDamage` / `PpDamage`: 扣除资源，按 target DSL 选目标；`amount` 支持整数或 `"All"`。
-- `OnHitEffect`: 伤害判定命中后执行嵌套 `effects`；可选 `requireDamage`、`requireUnblocked` / `requireNotBlocked`、`requireFirstHitUnblocked`、`chance` 进一步限制。`requireUnblocked` 表示本次任意命中段都不能被格挡；偷取类“第 1 hit 被格挡则无法夺取”必须用 `requireFirstHitUnblocked`。`chance` 支持 `0..1` 比例或 `0..100` 百分比，表示命中后整组 nested effects 的触发率。主动攻击和 pending attack 共用 `SkillEffectExecutor.ExecutePostDamageEffects(...)`。
+- `OnHitEffect`: 伤害判定命中后执行嵌套 `effects`；可选 `requireDamage`、`requireUnblocked` / `requireNotBlocked`、`requireFirstHitUnblocked`、`targetHpBeforeRatioMin` / `targetHpBeforeRatioMax`、`chance` 进一步限制。`requireUnblocked` 表示本次任意命中段都不能被格挡；偷取类“第 1 hit 被格挡则无法夺取”必须用 `requireFirstHitUnblocked`。`targetHpBeforeRatio*` 使用本次扣血前、装备后最大 HP 的比例，适合“目标满血时命中后 AP-1”。`chance` 支持 `0..1` 比例或 `0..100` 百分比，表示命中后整组 nested effects 的触发率。主动攻击和 pending attack 共用 `SkillEffectExecutor.ExecutePostDamageEffects(...)`。
 - `OnKillEffect`: 本次伤害击倒实际承伤者后执行嵌套 `effects`；击倒判断使用 `DamageResult.ResolvedDefender` 对应的扣血结果。
 - `AugmentCurrentAction`: `SelfBeforeAttack` / `AllyBeforeAttack` 等主动行动前被动可把 `calculationEffects`、`onHitEffects`、`queuedActions`、`tags` 附着到当前主动行动。`queuedActions` 使用普通 pending attack effect（如 `PursuitAttack` / `PendingAttack`）参数，并在当前主动攻击结算后以当前主动目标入队，actor 为触发该被动的单位，source passive id 保留为该被动 id。`requiresCurrentSkillType` / `requiresCurrentAttackType` 可限制当前主动技能类型；`PassiveSkillProcessor` 会在消耗 PP 前检查这些条件。`BattleContext.CurrentActionAugments` 只在当前 active action 内有效；`BattleEngine` 会对每个目标逐目标执行 calculation / on-hit 增强，并在 `AfterActiveUseEvent` 前清理。结构化日志会把来源 passive id 记为 `Augment:<passiveId>` flag，旧字符串日志会输出 augment source/tags。
 - `AugmentOutgoingActions`: `BattleStart` 等被动可登记 battle-long 阵营光环，把 `calculationEffects`、`onHitEffects`、`tags` 附着到该阵营后续主动行动。当前用于 `pas_calm_cover`，让己方主动攻击带 `CannotBeBlocked`；不会影响敌方行动，新 `BattleContext` / 新战斗初始化会清空旧光环。
 - `TransferResource`: 在选中的 `from` 与 `to` 目标之间转移资源，参数包括 `resource` (`AP` / `PP`)、`amount`（整数或 `"All"`）、`from`、`to`。当前用于命中后偷取 PP。
 - `HealRatio`: 按目标装备后的 `GetCurrentStat("HP")` 比例治疗并 clamp；可选 `lowHpThreshold` + `lowHpMultiplier` 也使用同一个装备后最大 HP 判断低血量目标治疗倍率；同 `RecoverHp`，不会把当前超出最大 HP 的单位治疗到更低 HP。
+- `CleanseAilment`: 解除目标异常状态；未指定 `ailment` / `ailments` 时解除全部异常。解除 `Stun` 时会同步把 `UnitState.Stunned` 恢复为 `Normal`。
 - `AmplifyDebuffs`: 放大选中目标身上已有的纯 debuff（`IsPureBuffOrDebuff` 且 `Ratio < 0` 或 `FlatAmount < 0`），只乘以负向数值；不影响正向 buff，不创建新 debuff。参数：`target`、`multiplier`。
-- `TemporalMark`: 给目标添加一次性/限时标记。当前 `DebuffNullify` 会在下一次结构化 `AddDebuff` 时被消费并阻止该 debuff；`AilmentNullify` 会在下一次结构化 `StatusAilment` 时被消费并阻止该异常；`DamageNullify` 会在 `DamageCalculator` 中的下一次命中伤害段被消费并无效物理/魔法伤害；`MagicDamageNullify` 只无效下一次魔法命中伤害段；`DeathResist` 会在下一次致死伤害时被消费，并让目标保留 1 HP。
+- `TemporalMark`: 给目标添加一次性/限时标记。当前 `DebuffNullify` 会在下一次结构化 `AddDebuff` 时被消费并阻止该 debuff；`AilmentNullify` 会在下一次结构化 `StatusAilment` 时被消费并阻止该异常；`DamageNullify` 会在 `DamageCalculator` 中的下一次命中伤害段被消费并无效物理/魔法伤害；`MagicDamageNullify` 只无效下一次魔法命中伤害段；`DeathResist` 会在下一次致死伤害时被消费，并让目标保留 1 HP。`activationScope: "Action"` 用于同一次主动攻击事件内的多目标来袭只触发一次同时发动被动，当前用于 `pas_row_barrier`，避免全体/多目标魔法按目标重复扣 PP 和重复刷 mark。
 - `ActionOrderPriority`: BattleStart 行动顺序修正；`mode: "Fastest"` 给目标写入高优先级，`BattleEngine` 排序时先按该优先级，再按当前 `Spd`，同级仍随机打散。
-- `ForcedTarget`: 给目标添加 `ForcedTarget` 运行时标记。`TargetSelector` 仍保留技能合法目标/前排阻挡等规则，但敌对目标且非 `AllEnemies` 的技能会把合法强制目标排到策略目标之前，Row / Column / FrontAndBack 以强制目标作锚点展开。
+- `ForcedTarget`: 给目标添加 `ForcedTarget` 运行时标记。`TargetSelector` 仍保留技能合法目标/前排阻挡等规则，但敌对目标且非 `AllEnemies` 的技能会把合法强制目标排到策略目标之前，Row / Column / FrontAndBack 以强制目标作锚点展开。可选 `affectedEnemyRow: "Auto" | "Front" | "Back"` 用于 Provoke 这类“迫使一排敌人攻击自身”的效果；写入标记时会记录受影响敌方单位 id，未受影响单位忽略该强制目标。`Auto` 当前优先选敌方前排，若无前排则选后排。
 
 ## 被动与同时发动限制
 
@@ -302,7 +313,11 @@ BattleEnd 常用 structured effects：
   -> 执行效果
 ```
 
-条件失败不能占用同时发动限制。`BattleStart` 等全局阶段可以保留阶段级 fired set；`AllyBeforeAttack` / `AllyBeforeHit` 这类按当前行动或当前来袭结算的同时发动限制必须使用本次事件作用域，避免合法的后续攻击无法再触发被动。
+条件失败不能占用同时发动限制。`BattleStart` 等全局阶段可以保留阶段级 fired set；`AllyBeforeAttack` / `AllyBeforeHit` 这类按当前行动或当前来袭结算的同时发动限制必须使用本次事件作用域，避免合法的后续攻击无法再触发被动。少数被动可在 structured effect 参数上写 `activationScope: "Action"` 或 `limitOncePerAction: true`，表示同一次主动行动的多目标逐 hit 事件中只允许触发一次；当前用于 `pas_row_barrier`，保证多目标魔法只扣一次 PP。
+
+被动数据通常使用单个 `triggerTiming`；少数原版同一技能确有多个触发窗口时，可额外声明 `triggerTimings` 数组。处理器会把 `triggerTiming` 和 `triggerTimings` 视为同一技能的合法触发集合。`OnHit` 在真实命中后的 `AfterHitEvent` 中处理，既会检查攻击者自身，也会检查攻击者的其他友方；`EnemyOnActiveUse` 在敌方主动扣 AP 后处理，用于“敌使用回复魔法时”这类资源回复被动。
+
+`AllyOnAttacked` 表达原版资料里的“友方被攻击时”，包含受击者自身；“其他友方被攻击前”仍由 `AllyBeforeHit` 这类防御/掩护时机排除受击者自身。不要把两者混成同一个候选范围。
 
 ## 结构化日志
 

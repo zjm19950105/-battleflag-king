@@ -304,7 +304,7 @@ namespace BattleKing.Ui
             foreach (var skill in _activeSkills)
             {
                 var button = CreateChoiceButton($"{skill.Name}  AP{skill.ApCost}", ActiveActionColor());
-                button.TooltipText = skill.EffectDescription ?? "";
+                SandboxTooltipHelper.AttachActiveSkillTooltip(button, skill);
                 button.Pressed += () =>
                 {
                     PlayUiConfirm();
@@ -330,7 +330,9 @@ namespace BattleKing.Ui
                 var button = CreateChoiceButton($"{skill.Name}  PP{skill.PpCost}", PassiveActionColor());
                 string reason = GetPassiveUnavailableReason(row, skill);
                 button.Disabled = reason != null;
-                button.TooltipText = reason ?? skill.EffectDescription ?? "";
+                SandboxTooltipHelper.AttachPassiveSkillTooltip(button, skill);
+                if (reason != null)
+                    button.TooltipText = reason + "\n\n" + button.TooltipText;
                 button.Pressed += () =>
                 {
                     PlayUiConfirm();

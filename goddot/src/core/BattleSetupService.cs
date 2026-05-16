@@ -55,7 +55,15 @@ namespace BattleKing.Core
 
         public void ApplyDefaultStrategies(BattleUnit unit)
         {
+            var preset = _gameData.GetStrategyPreset($"char_default_{unit.Data.Id}");
             var availableActiveSkillIds = unit.GetAvailableActiveSkillIds();
+            if (preset != null)
+            {
+                unit.Strategies = BuildStrategiesFromPreset(preset, availableActiveSkillIds);
+                if (unit.Strategies.Count > 0)
+                    return;
+            }
+
             var skillId = availableActiveSkillIds
                 .Select(id => _gameData.GetActiveSkill(id))
                 .Where(skill => skill != null)
@@ -76,10 +84,7 @@ namespace BattleKing.Core
                 return;
 
             var activeSkillIds = unit.GetAvailableActiveSkillIds();
-            unit.Strategies = preset.Strategies
-                .Select(strategy => BuildStrategy(strategy, activeSkillIds))
-                .Where(strategy => strategy != null)
-                .ToList();
+            unit.Strategies = BuildStrategiesFromPreset(preset, activeSkillIds);
 
             if (fillToEight && unit.Strategies.Count > 0)
             {
@@ -133,22 +138,40 @@ namespace BattleKing.Core
 
         private static Strategy BuildStrategy(PresetStrategyData presetStrategy, List<string> activeSkillIds)
         {
-            string skillId = !string.IsNullOrEmpty(presetStrategy.SkillId)
-                ? presetStrategy.SkillId
-                : presetStrategy.SkillIndex >= 0 && presetStrategy.SkillIndex < activeSkillIds.Count
+            string skillId;
+            if (!string.IsNullOrEmpty(presetStrategy.SkillId))
+            {
+                if (!activeSkillIds.Contains(presetStrategy.SkillId))
+                    return null;
+
+                skillId = presetStrategy.SkillId;
+            }
+            else
+            {
+                skillId = presetStrategy.SkillIndex >= 0 && presetStrategy.SkillIndex < activeSkillIds.Count
                     ? activeSkillIds[presetStrategy.SkillIndex]
                     : activeSkillIds.FirstOrDefault();
+            }
 
-            return skillId != null
-                ? new Strategy
-                {
-                    SkillId = skillId,
-                    Condition1 = presetStrategy.Condition1,
-                    Condition2 = presetStrategy.Condition2,
-                    Mode1 = presetStrategy.Mode1,
-                    Mode2 = presetStrategy.Mode2
-                }
-                : null;
+            if (skillId == null || !activeSkillIds.Contains(skillId))
+                return null;
+
+            return new Strategy
+            {
+                SkillId = skillId,
+                Condition1 = presetStrategy.Condition1,
+                Condition2 = presetStrategy.Condition2,
+                Mode1 = presetStrategy.Mode1,
+                Mode2 = presetStrategy.Mode2
+            };
+        }
+
+        private static List<Strategy> BuildStrategiesFromPreset(StrategyPresetData preset, List<string> activeSkillIds)
+        {
+            return preset.Strategies
+                .Select(strategy => BuildStrategy(strategy, activeSkillIds))
+                .Where(strategy => strategy != null)
+                .ToList();
         }
     }
 }

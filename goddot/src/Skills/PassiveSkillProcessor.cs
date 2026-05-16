@@ -23,6 +23,7 @@ namespace BattleKing.Skills
         // Per-side simultaneous limit: key=true=player, false=enemy
         private Dictionary<bool, HashSet<string>> _battleStartFired = new() { [true] = new(), [false] = new() };
         private Dictionary<bool, HashSet<string>> _afterActionFired = new() { [true] = new(), [false] = new() };
+        private HashSet<string> _actionScopedFired = new();
 
         public PassiveSkillProcessor(EventBus eventBus, GameDataRepository gameData, Action<string> log, Action<PendingAction> enqueueAction = null)
         {
@@ -59,6 +60,7 @@ namespace BattleKing.Skills
         private void OnBeforeActiveUse(BeforeActiveUseEvent evt)
         {
             _ctx = evt.Context;
+            _actionScopedFired.Clear();
         }
 
         private void OnAfterActiveCost(AfterActiveCostEvent evt)
@@ -70,17 +72,21 @@ namespace BattleKing.Skills
             var allies = GetAllies(evt.Caster, evt.Context).Where(u => u != evt.Caster).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnActiveUse, "友方主动时",
                 limitSimultaneous: false, attacker: evt.Caster, activeSkill: evt.Skill);
+
+            var enemies = GetEnemies(evt.Caster, evt.Context);
+            ProcessTiming(enemies, PassiveTriggerTiming.EnemyOnActiveUse, "敌方主动时",
+                limitSimultaneous: false, attacker: evt.Caster, activeSkill: evt.Skill);
         }
 
         private void OnBeforeAttackCalculation(BeforeAttackCalculationEvent evt)
         {
             _ctx = evt.Context;
             ProcessForUnit(evt.Caster, PassiveTriggerTiming.SelfBeforeAttack, "攻击前", limitSimultaneous: true,
-                activeSkill: evt.Skill);
+                attacker: evt.Caster, activeSkill: evt.Skill);
 
             var allies = GetAllies(evt.Caster, evt.Context).Where(u => u != evt.Caster).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyBeforeAttack, "友方攻击前",
-                limitSimultaneous: true, CreateSimultaneousFiredSet(), activeSkill: evt.Skill);
+                limitSimultaneous: true, CreateSimultaneousFiredSet(), attacker: evt.Caster, activeSkill: evt.Skill);
         }
 
         private void OnBeforeHit(BeforeHitEvent evt)
@@ -106,10 +112,22 @@ namespace BattleKing.Skills
         private void OnAfterHit(AfterHitEvent evt)
         {
             _ctx = evt.Context;
+            if (evt.IsHit)
+            {
+                ProcessForUnit(evt.Attacker, PassiveTriggerTiming.OnHit, "命中时", limitSimultaneous: false,
+                    attacker: evt.Attacker, defender: evt.Defender, activeSkill: evt.Skill, sourceKind: evt.SourceKind);
+
+                var attackerAllies = GetAllies(evt.Attacker, evt.Context).Where(u => u != evt.Attacker).ToList();
+                ProcessTiming(attackerAllies, PassiveTriggerTiming.OnHit, "友方命中时",
+                    limitSimultaneous: false, attacker: evt.Attacker, defender: evt.Defender,
+                    activeSkill: evt.Skill, sourceKind: evt.SourceKind);
+            }
+
             ProcessForUnit(evt.Defender, PassiveTriggerTiming.OnBeingHit, "被攻击后", limitSimultaneous: false,
                 attacker: evt.Attacker, activeSkill: evt.Skill, sourceKind: evt.SourceKind);
 
-            var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
+            // 原版“友方被攻击时”与“其他友方被攻击时”是不同语义；AllyOnAttacked 表达前者，包含受击者自身。
+            var allies = GetAllies(evt.Defender, evt.Context).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnAttacked, "友方被攻击后",
                 limitSimultaneous: false, attacker: evt.Attacker, defender: evt.Defender,
                 activeSkill: evt.Skill, sourceKind: evt.SourceKind);
@@ -121,6 +139,7 @@ namespace BattleKing.Skills
             _afterActionFired.Clear();
             ProcessTiming(evt.Context.AllUnits, PassiveTriggerTiming.AfterAction, "行动后",
                 limitSimultaneous: true, _afterActionFired);
+            _actionScopedFired.Clear();
         }
 
         private void OnKnockdown(OnKnockdownEvent evt)
@@ -152,15 +171,18 @@ namespace BattleKing.Skills
                 var skillId = row.SkillId;
                 if (!_gameData.PassiveSkills.TryGetValue(skillId, out var skillData))
                     continue;
-                if (skillData.TriggerTiming != timing)
+                if (!SkillMatchesTiming(skillData, timing))
                     continue;
                 if (!PassiveMatchesBattleContext(skillData, calc, activeSkill, sourceKind))
+                    continue;
+                if (!CoverScopeMatches(unit, skillData, calc))
                     continue;
                 if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                     continue;
 
                 // Check player-set passive condition
                 if (!CheckPassiveConditions(unit, row)) continue;
+                if (ActionScopedLimitAlreadyFired(unit, timing, skillData)) continue;
 
                 if (limitSimultaneous && skillData.HasSimultaneousLimit)
                 {
@@ -168,6 +190,8 @@ namespace BattleKing.Skills
                         continue;
                     simultaneousFired = true;
                 }
+
+                MarkActionScopedLimitFired(unit, timing, skillData);
 
                 bool deferPp = ShouldDeferPpUntilPendingAction(skillData);
                 if (!deferPp)
@@ -199,6 +223,15 @@ namespace BattleKing.Skills
             return conditions.All(condition => evaluator.Evaluate(condition, unit, null));
         }
 
+        private static bool SkillMatchesTiming(PassiveSkillData skillData, PassiveTriggerTiming timing)
+        {
+            if (skillData == null)
+                return false;
+
+            return skillData.TriggerTiming == timing
+                || (skillData.TriggerTimings != null && skillData.TriggerTimings.Contains(timing));
+        }
+
         private void ProcessTiming(List<BattleUnit> candidates, PassiveTriggerTiming timing, string timingLabel,
             bool limitSimultaneous, Dictionary<bool, HashSet<string>> firedSet = null, DamageCalculation calc = null,
             BattleUnit attacker = null, BattleUnit defender = null, BattleUnit knockoutVictim = null,
@@ -223,15 +256,18 @@ namespace BattleKing.Skills
                     var skillId = row.SkillId;
                     if (!_gameData.PassiveSkills.TryGetValue(skillId, out var skillData))
                         continue;
-                    if (skillData.TriggerTiming != timing)
+                    if (!SkillMatchesTiming(skillData, timing))
                         continue;
                     if (!PassiveMatchesBattleContext(skillData, calc, activeSkill, sourceKind))
+                        continue;
+                    if (!CoverScopeMatches(unit, skillData, calc))
                         continue;
                     if (!unit.CanUsePassiveSkill(new PassiveSkill(skillData, _gameData)))
                         continue;
 
                     // Check player-set passive condition before claiming a simultaneous slot.
                     if (!CheckPassiveConditions(unit, row)) continue;
+                    if (ActionScopedLimitAlreadyFired(unit, timing, skillData)) continue;
 
                     if (limitSimultaneous && skillData.HasSimultaneousLimit && firedSet != null)
                     {
@@ -240,6 +276,8 @@ namespace BattleKing.Skills
                             continue;
                         sideSet.Add(timingLabel);
                     }
+
+                    MarkActionScopedLimitFired(unit, timing, skillData);
 
                     bool deferPp = ShouldDeferPpUntilPendingAction(skillData);
                     if (!deferPp)
@@ -259,6 +297,43 @@ namespace BattleKing.Skills
             return new Dictionary<bool, HashSet<string>> { [true] = new(), [false] = new() };
         }
 
+        private bool ActionScopedLimitAlreadyFired(BattleUnit unit, PassiveTriggerTiming timing, PassiveSkillData skillData)
+        {
+            return HasActionScopedLimit(skillData)
+                && _ctx?.CurrentActionSkill != null
+                && _actionScopedFired.Contains(ActionScopedLimitKey(unit, timing, skillData));
+        }
+
+        private void MarkActionScopedLimitFired(BattleUnit unit, PassiveTriggerTiming timing, PassiveSkillData skillData)
+        {
+            if (!HasActionScopedLimit(skillData) || _ctx?.CurrentActionSkill == null)
+                return;
+
+            _actionScopedFired.Add(ActionScopedLimitKey(unit, timing, skillData));
+        }
+
+        private static string ActionScopedLimitKey(BattleUnit unit, PassiveTriggerTiming timing, PassiveSkillData skillData)
+        {
+            return $"{unit.IsPlayer}:{timing}:{skillData.Id}";
+        }
+
+        private static bool HasActionScopedLimit(PassiveSkillData skillData)
+        {
+            return skillData?.Effects?.Any(effect =>
+            {
+                var parameters = effect?.Parameters;
+                if (parameters == null)
+                    return false;
+
+                string activationScope = SkillEffectExecutor.GetString(parameters, "activationScope", "");
+                if (string.Equals(activationScope, "Action", StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                string limitOnce = SkillEffectExecutor.GetString(parameters, "limitOncePerAction", "");
+                return bool.TryParse(limitOnce, out bool parsed) && parsed;
+            }) == true;
+        }
+
         private static bool PassiveMatchesBattleContext(
             PassiveSkillData skillData,
             DamageCalculation calc,
@@ -266,13 +341,16 @@ namespace BattleKing.Skills
             BattleActionSourceKind sourceKind = BattleActionSourceKind.ActiveAttack)
         {
             var tags = skillData.Tags ?? new List<string>();
+            if (ForceHitSuppressesEvasion(skillData, calc))
+                return false;
+
             if (tags.Contains("RangedCover"))
             {
                 return calc?.Skill?.Data?.Type == SkillType.Physical
                     && calc.Skill.Data.AttackType == AttackType.Ranged;
             }
 
-            if (!IncomingSkillRequirementsMatch(skillData, calc))
+            if (!IncomingSkillRequirementsMatch(skillData, calc?.Skill ?? activeSkill, calc))
                 return false;
 
             if (!CurrentActionRequirementsMatch(skillData, activeSkill))
@@ -280,8 +358,55 @@ namespace BattleKing.Skills
 
             if (!SourceKindRequirementsMatch(skillData, sourceKind))
                 return false;
+            if (calc?.CannotBeBlocked == true && HasForceBlockEffect(skillData))
+                return false;
 
             return true;
+        }
+
+        private static bool ForceHitSuppressesEvasion(PassiveSkillData skillData, DamageCalculation calc)
+        {
+            if (calc?.ForceHit != true || skillData == null)
+                return false;
+
+            if (skillData.Tags?.Contains("EvasionSkill") == true)
+                return true;
+
+            return skillData.Effects?.Any(effect =>
+                effect?.EffectType == "ModifyDamageCalc"
+                && effect.Parameters != null
+                && SkillEffectExecutor.GetBool(effect.Parameters, "ForceEvasion", false)) == true;
+        }
+
+        private static bool HasForceBlockEffect(PassiveSkillData skillData)
+        {
+            if (skillData?.Tags?.Any(tag =>
+                string.Equals(tag, "MediumGuard", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tag, "LargeGuard", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tag, "MediumGuardAlly", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tag, "MediumGuardRow", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tag, "LargeGuardAlly", StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                return true;
+            }
+
+            return skillData?.Effects?.Any(HasForceBlockEffect) == true;
+        }
+
+        private static bool HasForceBlockEffect(SkillEffectData effect)
+        {
+            if (effect?.Parameters == null)
+                return false;
+
+            if (effect.EffectType == "ModifyDamageCalc"
+                && SkillEffectExecutor.GetBool(effect.Parameters, "ForceBlock", false))
+            {
+                return true;
+            }
+
+            return SkillEffectExecutor.GetEffectList(effect.Parameters, "calculationEffects")
+                .Concat(SkillEffectExecutor.GetEffectList(effect.Parameters, "effects"))
+                .Any(HasForceBlockEffect);
         }
 
         private static bool SourceKindRequirementsMatch(PassiveSkillData skillData, BattleActionSourceKind sourceKind)
@@ -306,7 +431,7 @@ namespace BattleKing.Skills
                 .Any(value => string.Equals(value.Trim(), sourceKind.ToString(), StringComparison.OrdinalIgnoreCase));
         }
 
-        private static bool IncomingSkillRequirementsMatch(PassiveSkillData skillData, DamageCalculation calc)
+        private static bool IncomingSkillRequirementsMatch(PassiveSkillData skillData, ActiveSkill incomingSkill, DamageCalculation calc)
         {
             var effectsWithRequirements = skillData.Effects?
                 .Where(effect => effect != null
@@ -315,18 +440,52 @@ namespace BattleKing.Skills
 
             return effectsWithRequirements.Count == 0
                 || effectsWithRequirements.Any(effect =>
-                    SkillEffectExecutor.IncomingSkillRequirementMatches(effect.Parameters, calc?.Skill));
+                    SkillEffectExecutor.IncomingSkillRequirementMatches(effect.Parameters, incomingSkill, calc));
+        }
+
+        private static bool CoverScopeMatches(BattleUnit unit, PassiveSkillData skillData, DamageCalculation calc)
+        {
+            var coverEffects = skillData.Effects?
+                .Where(effect => effect?.EffectType == "CoverAlly")
+                .ToList() ?? new List<SkillEffectData>();
+            if (coverEffects.Count == 0)
+                return true;
+            if (calc?.CannotBeCovered == true)
+                return false;
+            if (calc?.CoverTarget != null)
+                return false;
+
+            return coverEffects.Any(effect => CoverScopeMatches(unit, calc, effect.Parameters));
+        }
+
+        private static bool CoverScopeMatches(BattleUnit unit, DamageCalculation calc, Dictionary<string, object> parameters)
+        {
+            string scope = SkillEffectExecutor.GetString(parameters, "scope", "");
+            if (string.IsNullOrWhiteSpace(scope))
+                return true;
+
+            var defender = calc?.Defender;
+            if (unit == null || defender == null)
+                return false;
+
+            return scope.ToLowerInvariant() switch
+            {
+                "row" => unit.IsFrontRow == defender.IsFrontRow,
+                "column" => IsSameColumn(unit.Position, defender.Position),
+                _ => true
+            };
         }
 
         private static bool CurrentActionRequirementsMatch(PassiveSkillData skillData, ActiveSkill activeSkill)
         {
-            var augmentsWithRequirements = skillData.Effects?
-                .Where(effect => effect?.EffectType == "AugmentCurrentAction"
+            var effectsWithRequirements = skillData.Effects?
+                .Where(effect => effect != null
+                    && effect.EffectType != "AugmentOutgoingActions"
                     && HasCurrentActionRequirement(effect.Parameters))
                 .ToList() ?? new List<SkillEffectData>();
 
-            return augmentsWithRequirements.Count == 0
-                || augmentsWithRequirements.Any(effect =>
+            return effectsWithRequirements.Count == 0
+                || effectsWithRequirements.Any(effect =>
                     SkillEffectExecutor.CurrentActionRequirementMatches(effect.Parameters, activeSkill));
         }
 
@@ -599,6 +758,7 @@ namespace BattleKing.Skills
                 || effectType == "RemoveBuff"
                 || effectType == "RemoveDebuff"
                 || effectType == "CleanseDebuff"
+                || effectType == "CleanseAilment"
                 || effectType == "ModifyCounter"
                 || effectType == "ConsumeCounter"
                 || effectType == "ModifyDamageCalc"
@@ -707,6 +867,16 @@ namespace BattleKing.Skills
                     : ctx.EnemyUnits.Where(u => u != null && u.IsAlive).ToList();
             }
             return new List<BattleUnit> { unit };
+        }
+
+        private List<BattleUnit> GetEnemies(BattleUnit unit, BattleContext ctx)
+        {
+            if (ctx == null || unit == null)
+                return new List<BattleUnit>();
+
+            return unit.IsPlayer
+                ? ctx.EnemyUnits.Where(u => u != null && u.IsAlive).ToList()
+                : ctx.PlayerUnits.Where(u => u != null && u.IsAlive).ToList();
         }
 
         private static bool IsSameColumn(int a, int b)

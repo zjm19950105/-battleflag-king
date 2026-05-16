@@ -87,8 +87,8 @@ namespace BattleKing.Tests
                 new[] { "ActionOrderPriority", "AddDebuff" },
                 quickCast.Effects.Select(effect => effect.EffectType).ToList());
             ClassicAssert.AreEqual(1000, caster.ActionOrderPriority);
-            ClassicAssert.AreEqual(0, caster.GetCurrentCritRate());
-            Assert.That(logs, Has.Some.EqualTo("TestUnit.Crit 20->0"));
+            ClassicAssert.AreEqual(10, caster.GetCurrentCritRate());
+            Assert.That(logs, Has.Some.EqualTo("TestUnit.Crit 20->10"));
         }
 
         [Test]

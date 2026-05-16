@@ -6,6 +6,7 @@ namespace BattleKing.Data
         Burn,       // 炎上：固定20HP，每层多结算一次
         Freeze,     // 冻结：无法行动，受击解除，回避率=0
         Darkness,   // 黑暗：下次攻击命中率0
+        Confusion,  // 混乱：原版异常，当前先作为可附加/可解除状态记录
         Stun,       // 气绝：跳过一次行动
         BlockSeal,  // 格挡封印
         CritSeal,   // 无法暴击

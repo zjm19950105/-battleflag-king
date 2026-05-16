@@ -543,6 +543,7 @@ namespace BattleKing.Ai
             yield return (UnitClass.Elf, "精灵", "elf");
             yield return (UnitClass.Beastman, "兽人", "beastman");
             yield return (UnitClass.Winged, "有翼人", "winged");
+            yield return (UnitClass.Undead, "不死系", "undead");
         }
 
         private static IEnumerable<(string Id, string Label, float Value)> HpThresholds()

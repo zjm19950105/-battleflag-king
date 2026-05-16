@@ -93,7 +93,8 @@
         "parameters": {
           "stat": "CritDmg",
           "ratio": 0.5,
-          "turns": -1,
+          "turns": 1,
+          "oneTime": true,
           "target": "Self"
         }
       }
@@ -120,7 +121,13 @@
         "effectType": "CounterAttack",
         "parameters": {
           "power": 75,
-          "hitRate": 90
+          "hitRate": 90,
+          "HitCount": 1,
+          "damageType": "Physical",
+          "attackType": "Melee",
+          "targetType": "SingleEnemy",
+          "requiresSourceKind": "ActiveAttack",
+          "tags": []
         }
       },
       {
@@ -169,7 +176,8 @@
           "stat": "Str",
           "ratio": 0.2,
           "turns": -1,
-          "target": "Self"
+          "target": "Self",
+          "stackPolicy": "Stack"
         }
       }
     ],
@@ -212,7 +220,7 @@
         "effectType": "AddBuff",
         "parameters": {
           "stat": "Spd",
-          "ratio": 0.2,
+          "amount": 20,
           "turns": -1,
           "target": "Self"
         }
@@ -276,7 +284,8 @@
     "hitRate": null,
     "effectDescription": "其他友方被攻击前，中格挡掩护，目标防御+20%",
     "tags": [
-      "CoverAlly"
+      "CoverAlly",
+      "SimultaneousLimit"
     ],
     "effects": [
       {
@@ -300,9 +309,9 @@
         }
       }
     ],
-    "hasSimultaneousLimit": false,
-    "learnCondition": "领主/君主 Lv10",
-    "unlockLevel": 10
+    "hasSimultaneousLimit": true,
+    "learnCondition": "领主/高阶领主 Lv5",
+    "unlockLevel": 5
   },
   {
     "id": "pas_rapid_order",
@@ -390,7 +399,7 @@
   {
     "id": "pas_hundred_crit",
     "name": "吸引",
-    "ppCost": 2,
+    "ppCost": 1,
     "triggerTiming": "BattleStart",
     "type": "Assist",
     "power": null,
@@ -407,14 +416,15 @@
         "parameters": {
           "target": "Self",
           "stat": "Block",
-          "amount": 50,
+          "ratio": 0.5,
           "turns": -1
         }
       },
       {
         "effectType": "ForcedTarget",
         "parameters": {
-          "target": "Self"
+          "target": "Self",
+          "affectedEnemyRow": "Auto"
         }
       }
     ],
@@ -425,7 +435,7 @@
   {
     "id": "pas_give_ap",
     "name": "急救",
-    "ppCost": 2,
+    "ppCost": 1,
     "triggerTiming": "BattleEnd",
     "type": "Physical",
     "power": 1,
@@ -463,6 +473,7 @@
       {
         "effectType": "AugmentCurrentAction",
         "parameters": {
+          "requiresCurrentSkillType": "Physical|Magical",
           "calculationEffects": [
             {
               "effectType": "ModifyDamageCalc",
@@ -481,7 +492,7 @@
   {
     "id": "pas_formation_counter",
     "name": "主动礼物",
-    "ppCost": 1,
+    "ppCost": 2,
     "triggerTiming": "AllyOnActiveUse",
     "type": "Assist",
     "power": null,
@@ -506,7 +517,7 @@
   {
     "id": "pas_rampage",
     "name": "终结打击",
-    "ppCost": 2,
+    "ppCost": 1,
     "triggerTiming": "BattleEnd",
     "type": "Physical",
     "power": 75,
@@ -520,6 +531,7 @@
           "target": "AllEnemies",
           "maxTargets": 1,
           "power": 75,
+          "HitCount": 1,
           "hitRate": 100,
           "damageType": "Physical",
           "attackType": "Melee",
@@ -549,7 +561,11 @@
         "effectType": "CounterAttack",
         "parameters": {
           "power": 50,
-          "hitRate": 100
+          "HitCount": 1,
+          "hitRate": 100,
+          "damageType": "Physical",
+          "attackType": "Melee",
+          "targetType": "SingleEnemy"
         }
       },
       {
@@ -576,7 +592,7 @@
   {
     "id": "pas_calm_cover",
     "name": "战斗号角",
-    "ppCost": 1,
+    "ppCost": 2,
     "triggerTiming": "BattleStart",
     "type": "Assist",
     "power": null,
@@ -590,6 +606,7 @@
       {
         "effectType": "AugmentOutgoingActions",
         "parameters": {
+          "requiresCurrentSkillType": "Physical|Magical",
           "tags": [
             "CannotBeBlocked"
           ]
@@ -649,6 +666,7 @@
       {
         "effectType": "AddBuff",
         "parameters": {
+          "requiresIncomingSkillType": "Physical",
           "target": "Self",
           "stat": "Def",
           "ratio": 0.2,
@@ -659,9 +677,10 @@
       {
         "effectType": "AddBuff",
         "parameters": {
+          "requiresIncomingSkillType": "Physical",
           "target": "Self",
           "stat": "Block",
-          "ratio": 0.2,
+          "amount": 20,
           "turns": -1,
           "stackPolicy": "Stack"
         }
@@ -674,9 +693,9 @@
   {
     "id": "pas_pursuit",
     "name": "列掩护",
-    "ppCost": 1,
+    "ppCost": 2,
     "triggerTiming": "AllyBeforeHit",
-    "type": "Assist",
+    "type": "Physical",
     "power": null,
     "hitRate": null,
     "effectDescription": "其他友方被攻击前，中格挡掩护一列",
@@ -707,7 +726,7 @@
   },
   {
     "id": "pas_rapid_reload",
-    "name": "格挡束缚",
+    "name": "格挡封缚",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
     "type": "Assist",
@@ -770,7 +789,7 @@
         "parameters": {
           "target": "Self",
           "stat": "Hit",
-          "ratio": 0.2,
+          "amount": 20,
           "turns": -1,
           "stackPolicy": "Stack"
         }
@@ -785,13 +804,14 @@
     "name": "重装反击",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
-    "type": "Assist",
+    "type": "Physical",
     "power": 150,
     "hitRate": null,
-    "effectDescription": "被主动技能攻击时，敌单体反击，重装系无视100%防御",
+    "effectDescription": "被主动技能攻击时，敌单体反击，重装系无视100%防御，格挡不可",
     "tags": [
       "HeavyCounter",
-      "IgnoreDef100Heavy"
+      "IgnoreDef100Heavy",
+      "CannotBeBlocked"
     ],
     "effects": [
       {
@@ -802,6 +822,9 @@
           "damageType": "Physical",
           "attackType": "Melee",
           "targetType": "SingleEnemy",
+          "tags": [
+            "CannotBeBlocked"
+          ],
           "ignoreDefenseRatio": 1,
           "ignoreDefenseTargetClass": "Heavy",
           "requiresSourceKind": "ActiveAttack"
@@ -826,9 +849,16 @@
     ],
     "effects": [
       {
-        "effectType": "ModifyDamageCalc",
+        "effectType": "AugmentCurrentAction",
         "parameters": {
-          "ForceHit": true
+          "calculationEffects": [
+            {
+              "effectType": "ModifyDamageCalc",
+              "parameters": {
+                "ForceHit": true
+              }
+            }
+          ]
         }
       }
     ],
@@ -841,9 +871,9 @@
     "name": "追击",
     "ppCost": 1,
     "triggerTiming": "AllyOnActiveUse",
-    "type": "Assist",
+    "type": "Physical",
     "power": null,
-    "hitRate": null,
+    "hitRate": 100,
     "effectDescription": "其他友方攻击时(主动)，敌单体追击",
     "tags": [
       "Pursuit"
@@ -857,6 +887,7 @@
               "effectType": "PursuitAttack",
               "parameters": {
                 "power": 75,
+                "hitRate": 100,
                 "damageType": "Physical",
                 "attackType": "Ranged",
                 "targetType": "SingleEnemy",
@@ -890,6 +921,7 @@
       {
         "effectType": "CounterAttack",
         "parameters": {
+          "requiresSourceKind": "ActiveAttack",
           "target": "Attacker",
           "power": 50,
           "damageType": "Physical",
@@ -930,7 +962,7 @@
         }
       }
     ],
-    "hasSimultaneousLimit": true,
+    "hasSimultaneousLimit": false,
     "learnCondition": "射手/盾射手 Lv1",
     "unlockLevel": 1
   },
@@ -1020,10 +1052,9 @@
     "type": "Physical",
     "power": null,
     "hitRate": null,
-    "effectDescription": "被攻击直前，回避攻击，AP+1",
+    "effectDescription": "被攻击直前，回避1hit攻击",
     "tags": [
-      "EvasionSkill",
-      "ApPlus1"
+      "EvasionSkill"
     ],
     "effects": [
       {
@@ -1031,18 +1062,73 @@
         "parameters": {
           "ForceEvasion": true
         }
-      },
-      {
-        "effectType": "RecoverAp",
-        "parameters": {
-          "amount": 1,
-          "target": "Self"
-        }
       }
     ],
     "hasSimultaneousLimit": false,
     "learnCondition": "盗贼/流氓 Lv1",
     "unlockLevel": 1
+  },
+  {
+    "id": "pas_quick_action",
+    "name": "快速行动",
+    "ppCost": 1,
+    "triggerTiming": "AllyOnActiveUse",
+    "type": "Physical",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "其他友方使用主动技能时，友方单体AP+1",
+    "tags": [
+      "ApPlus1Ally"
+    ],
+    "effects": [
+      {
+        "effectType": "RecoverAp",
+        "parameters": {
+          "target": "Attacker",
+          "amount": 1
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "盗贼/流氓 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "pas_shadow_step",
+    "name": "暗影步",
+    "ppCost": 2,
+    "triggerTiming": "SelfBeforeAttack",
+    "type": "Physical",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "自身主动攻击前，自身速度+30、回避+30",
+    "tags": [
+      "SpdUp30",
+      "EvaUp30"
+    ],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Spd",
+          "amount": 30,
+          "turns": -1
+        }
+      },
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "Self",
+          "stat": "Eva",
+          "amount": 30,
+          "turns": -1
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "流氓 Lv25",
+    "unlockLevel": 25
   },
   {
     "id": "pas_stealth_blade",
@@ -1052,24 +1138,24 @@
     "type": "Physical",
     "power": 50,
     "hitRate": null,
-    "effectDescription": "战斗开始时，敌单体2连击先制攻击，赋予格挡封印+被动封印",
+    "effectDescription": "战斗开始时，敌单体先制攻击，赋予格挡封印+被动封印",
     "tags": [
       "Preemptive",
-      "SureHit",
+      "Ranged",
+      "CannotBeCovered",
       "BlockSealEnemy",
-      "MultiHit2",
       "SimultaneousLimit"
     ],
     "effects": [
       {
         "effectType": "PreemptiveAttack",
-        "parameters": {
-          "power": 50,
-          "hitRate": 100,
-          "HitCount": 2,
+          "parameters": {
+            "power": 50,
+            "damageType": "Physical",
+            "attackType": "Ranged",
+          "targetType": "SingleEnemy",
           "tags": [
-            "SureHit",
-            "CannotBeBlocked",
+            "Ranged",
             "CannotBeCovered"
           ]
         }
@@ -1097,21 +1183,21 @@
       }
     ],
     "hasSimultaneousLimit": true,
-    "learnCondition": "潜行者 Lv25",
+    "learnCondition": "流氓 Lv25",
     "unlockLevel": 25
   },
   {
-    "id": "pas_counter_magic",
+    "id": "pas_magic_counter",
     "name": "反击魔法",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
     "type": "Magical",
     "power": 150,
     "hitRate": 100,
-    "effectDescription": "被主动技能攻击时，魔法反击",
+    "effectDescription": "被主动技能攻击时，敌单体魔法反击",
     "tags": [
       "Counter",
-      "Magical"
+      "Ranged"
     ],
     "effects": [
       {
@@ -1120,8 +1206,10 @@
           "target": "Attacker",
           "power": 150,
           "hitRate": 100,
+          "HitCount": 1,
           "damageType": "Magical",
           "attackType": "Magic",
+          "targetType": "SingleEnemy",
           "requiresSourceKind": "ActiveAttack"
         }
       }
@@ -1131,59 +1219,15 @@
     "unlockLevel": 1
   },
   {
-    "id": "pas_pursuit_magic",
-    "name": "追击魔法",
-    "ppCost": 1,
-    "triggerTiming": "AllyOnActiveUse",
-    "type": "Magical",
-    "power": 100,
-    "hitRate": 100,
-    "effectDescription": "友方魔法攻击时，追击",
-    "tags": [
-      "Pursuit",
-      "Magical"
-    ],
-    "effects": [
-      {
-        "effectType": "AugmentCurrentAction",
-        "parameters": {
-          "requiresCurrentSkillType": "Magical",
-          "queuedActions": [
-            {
-              "effectType": "PursuitAttack",
-              "parameters": {
-                "power": 100,
-                "hitRate": 100,
-                "damageType": "Magical",
-                "attackType": "Magic",
-                "targetType": "SingleEnemy",
-                "tags": [
-                  "Pursuit",
-                  "Magical"
-                ]
-              }
-            }
-          ]
-        }
-      }
-    ],
-    "hasSimultaneousLimit": false,
-    "learnCondition": "术士 Lv20",
-    "unlockLevel": 20
-  },
-  {
     "id": "pas_concentration",
     "name": "专注",
     "ppCost": 1,
     "triggerTiming": "SelfOnActiveUse",
-    "type": "Assist",
+    "type": "Magical",
     "power": null,
     "hitRate": null,
-    "effectDescription": "自身使用主动技能时，AP+1，命中+40",
-    "tags": [
-      "ApPlus1",
-      "HitUp40"
-    ],
+    "effectDescription": "使用主动技能时，AP+1，命中+40",
+    "tags": [],
     "effects": [
       {
         "effectType": "RecoverAp",
@@ -1198,7 +1242,50 @@
           "target": "Self",
           "stat": "Hit",
           "amount": 40,
+          "turns": 1,
           "oneTime": true
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "术士 Lv25",
+    "unlockLevel": 25
+  },
+  {
+    "id": "pas_magic_pursuit",
+    "name": "追击魔法",
+    "ppCost": 1,
+    "triggerTiming": "AllyOnActiveUse",
+    "type": "Magical",
+    "power": 100,
+    "hitRate": 100,
+    "effectDescription": "友方魔法攻击时追击",
+    "tags": [
+      "Pursuit",
+      "Ranged"
+    ],
+    "effects": [
+      {
+        "effectType": "AugmentCurrentAction",
+        "parameters": {
+          "requiresCurrentSkillType": "Magical",
+          "queuedActions": [
+            {
+              "effectType": "PursuitAttack",
+              "parameters": {
+                "power": 100,
+                "hitRate": 100,
+                "HitCount": 1,
+                "damageType": "Magical",
+                "attackType": "Magic",
+                "targetType": "SingleEnemy",
+                "tags": [
+                  "Pursuit",
+                  "Ranged"
+                ]
+              }
+            }
+          ]
         }
       }
     ],
@@ -1211,12 +1298,11 @@
     "name": "魔法剑刃",
     "ppCost": 1,
     "triggerTiming": "AllyBeforeAttack",
-    "type": "Assist",
-    "power": 50,
+    "type": "Magical",
+    "power": null,
     "hitRate": null,
-    "effectDescription": "友方物理攻击前，附加魔法伤害追击",
+    "effectDescription": "友方物理攻击前，赋予魔法伤害追加(威力50)",
     "tags": [
-      "MagicBlade",
       "SimultaneousLimit"
     ],
     "effects": [
@@ -1224,17 +1310,11 @@
         "effectType": "AugmentCurrentAction",
         "parameters": {
           "requiresCurrentSkillType": "Physical",
-          "queuedActions": [
+          "calculationEffects": [
             {
-              "effectType": "PursuitAttack",
+              "effectType": "ModifyDamageCalc",
               "parameters": {
-                "power": 50,
-                "damageType": "Magical",
-                "attackType": "Magic",
-                "targetType": "SingleEnemy",
-                "tags": [
-                  "MagicBlade"
-                ]
+                "AdditionalMagicalPower": 50
               }
             }
           ]
@@ -1242,7 +1322,7 @@
       }
     ],
     "hasSimultaneousLimit": true,
-    "learnCondition": "女巫/魔女 Lv1",
+    "learnCondition": "女巫/女术士 Lv1",
     "unlockLevel": 1
   },
   {
@@ -1253,22 +1333,24 @@
     "type": "Assist",
     "power": null,
     "hitRate": null,
-    "effectDescription": "友方物理攻击前，附加必中",
+    "effectDescription": "友方物理攻击前，赋予必中",
     "tags": [
-      "SureHit",
       "SimultaneousLimit"
     ],
     "effects": [
       {
-        "effectType": "ModifyDamageCalc",
+        "effectType": "AugmentCurrentAction",
         "parameters": {
-          "ForceHit": true
+          "requiresCurrentSkillType": "Physical",
+          "tags": [
+            "SureHit"
+          ]
         }
       }
     ],
     "hasSimultaneousLimit": true,
-    "learnCondition": "魔女 Lv15",
-    "unlockLevel": 15
+    "learnCondition": "女巫/女术士 Lv10",
+    "unlockLevel": 10
   },
   {
     "id": "pas_quick_cast",
@@ -1297,13 +1379,14 @@
         "parameters": {
           "target": "Self",
           "stat": "Crit",
-          "amount": 50,
-          "turns": -1
+          "ratio": -0.5,
+          "turns": 1,
+          "oneTime": true
         }
       }
     ],
     "hasSimultaneousLimit": true,
-    "learnCondition": "魔女 Lv25",
+    "learnCondition": "女术士 Lv25",
     "unlockLevel": 25
   },
   {
@@ -1375,13 +1458,13 @@
       }
     ],
     "hasSimultaneousLimit": false,
-    "learnCondition": "圣骑士 Lv20",
-    "unlockLevel": 20
+    "learnCondition": "白骑士/圣骑士 Lv15, 圣骑士 Lv10, 圣骑士盾",
+    "unlockLevel": 10
   },
   {
     "id": "pas_row_barrier",
     "name": "列屏障",
-    "ppCost": 1,
+    "ppCost": 2,
     "triggerTiming": "AllyBeforeHit",
     "type": "Assist",
     "power": null,
@@ -1400,6 +1483,7 @@
           "target": "RowAlliesOfTarget",
           "key": "MagicDamageNullify",
           "count": 1,
+          "activationScope": "Action",
           "requiresIncomingSkillType": "Magical"
         }
       },
@@ -1409,50 +1493,107 @@
           "target": "RowAlliesOfTarget",
           "key": "AilmentNullify",
           "count": 1,
+          "activationScope": "Action",
           "requiresIncomingSkillType": "Magical"
         }
       }
     ],
     "hasSimultaneousLimit": true,
-    "learnCondition": "圣骑士 Lv25",
-    "unlockLevel": 25
+    "learnCondition": "圣骑士 Lv20",
+    "unlockLevel": 20
   },
   {
-    "id": "pas_deflect",
-    "name": "偏转",
+    "id": "pas_griffin_guard",
+    "name": "狮鹫滑翔",
     "ppCost": 1,
-    "triggerTiming": "SelfBeforeMeleeHit",
-    "type": "Physical",
+    "triggerTiming": "SelfBeforeHit",
+    "type": "Assist",
     "power": null,
     "hitRate": null,
-    "effectDescription": "被近接攻击直前，近接物理1hit变0，回避+20(可叠加)",
+    "effectDescription": "被远程攻击前发动，回避1hit远程攻击，AP+1",
     "tags": [
-      "NullifyFirstMeleeHit",
-      "EvaUp20",
-      "Stackable"
+      "EvasionSkill",
+      "Ranged",
+      "SimultaneousLimit"
     ],
     "effects": [
       {
-        "effectType": "TemporalMark",
+        "effectType": "ModifyDamageCalc",
         "parameters": {
-          "key": "MeleeHitNullify",
-          "count": 1,
-          "target": "Self"
+          "requiresIncomingAttackType": "Ranged",
+          "requiresSourceKind": "ActiveAttack",
+          "ForceEvasion": true
         }
       },
       {
-        "effectType": "AddBuff",
+        "effectType": "RecoverAp",
         "parameters": {
-          "stat": "Eva",
-          "ratio": 0.2,
-          "turns": -1,
-          "target": "Self"
+          "requiresIncomingAttackType": "Ranged",
+          "requiresSourceKind": "ActiveAttack",
+          "target": "Self",
+          "amount": 1
+        }
+      }
+    ],
+    "hasSimultaneousLimit": true,
+    "learnCondition": "狮鹫骑士/狮鹫统治者 Lv1",
+    "unlockLevel": 1
+  },
+  {
+    "id": "pas_griffin_wing_rest",
+    "name": "羽翼休憩",
+    "ppCost": 1,
+    "triggerTiming": "BattleEnd",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "战斗结束时自身HP回复25%；状态异常时回复量2倍",
+    "tags": [],
+    "effects": [
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "Self",
+          "ratio": 0.25
+        }
+      },
+      {
+        "effectType": "HealRatio",
+        "parameters": {
+          "target": "Self",
+          "ratio": 0.25,
+          "targetHasAnyAilment": true
         }
       }
     ],
     "hasSimultaneousLimit": false,
-    "learnCondition": "狮鹫骑士 Lv1",
+    "learnCondition": "狮鹫骑士/狮鹫统治者 Lv1",
     "unlockLevel": 1
+  },
+  {
+    "id": "pas_griffin_wing_stroke",
+    "name": "羽翼轻抚",
+    "ppCost": 1,
+    "triggerTiming": "SelfBeforeAttack",
+    "type": "Assist",
+    "power": null,
+    "hitRate": null,
+    "effectDescription": "自身主动技能攻击前，同列友方行动速度+15",
+    "tags": [],
+    "effects": [
+      {
+        "effectType": "AddBuff",
+        "parameters": {
+          "target": "RowAllies",
+          "stat": "Spd",
+          "amount": 15,
+          "turns": -1
+        }
+      }
+    ],
+    "hasSimultaneousLimit": false,
+    "learnCondition": "狮鹫骑士/狮鹫统治者 Lv10",
+    "unlockLevel": 10
   },
   {
     "id": "pas_quick_curse",
@@ -1467,7 +1608,8 @@
       "AtkDown20",
       "CritSeal",
       "Ranged",
-      "SimultaneousLimit"
+      "SimultaneousLimit",
+      "SureHit"
     ],
     "effects": [
       {
@@ -1476,20 +1618,26 @@
           "target": "Attacker",
           "stat": "Str",
           "ratio": 0.2,
-          "turns": -1
+          "turns": -1,
+          "requiresSourceKind": "ActiveAttack"
         }
       },
       {
         "effectType": "StatusAilment",
         "parameters": {
           "target": "Attacker",
-          "ailment": "CritSeal"
+          "ailment": "CritSeal",
+          "requiresSourceKind": "ActiveAttack"
         }
       }
     ],
     "hasSimultaneousLimit": true,
     "learnCondition": "萨满/德鲁伊 Lv1",
-    "unlockLevel": 1
+    "unlockLevel": 1,
+    "triggerTimings": [
+      "SelfBeforeHit",
+      "AllyBeforeHit"
+    ]
   },
   {
     "id": "pas_curse_swamp",
@@ -1652,7 +1800,7 @@
     "name": "弹跳",
     "ppCost": 1,
     "triggerTiming": "OnBeingHit",
-    "type": "Assist",
+    "type": "Physical",
     "power": null,
     "hitRate": null,
     "effectDescription": "被攻击时，自身HP回复40%",
@@ -1670,8 +1818,8 @@
       }
     ],
     "hasSimultaneousLimit": false,
-    "learnCondition": "角斗士/狂战士 Lv1",
-    "unlockLevel": 1
+    "learnCondition": "狂战士 Lv25",
+    "unlockLevel": 25
   },
   {
     "id": "pas_wide_counter",
@@ -1700,23 +1848,22 @@
       }
     ],
     "hasSimultaneousLimit": false,
-    "learnCondition": "狂战士 Lv20",
-    "unlockLevel": 20
+    "learnCondition": "角斗士/狂战士 Lv15",
+    "unlockLevel": 15
   },
   {
     "id": "pas_berserk",
     "name": "狂暴",
     "ppCost": 1,
     "triggerTiming": "SelfBeforeAttack",
-    "type": "Assist",
+    "type": "Physical",
     "power": null,
     "hitRate": null,
     "effectDescription": "自身主动攻击前，PP全失，AP+1，致死耐buff",
     "tags": [
       "SacrificePp",
       "ApPlus1",
-      "DeathResist",
-      "SimultaneousLimit"
+      "DeathResist"
     ],
     "effects": [
       {
@@ -1742,7 +1889,7 @@
         }
       }
     ],
-    "hasSimultaneousLimit": true,
+    "hasSimultaneousLimit": false,
     "learnCondition": "狂战士 Lv25",
     "unlockLevel": 25
   }

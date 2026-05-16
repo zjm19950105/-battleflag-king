@@ -8,6 +8,7 @@ namespace BattleKing.Data
         public string Name { get; set; }
         public int PpCost { get; set; }
         public PassiveTriggerTiming TriggerTiming { get; set; }
+        public List<PassiveTriggerTiming> TriggerTimings { get; set; } = new();
         public SkillType Type { get; set; }
         public int? Power { get; set; }
         public int? HitRate { get; set; }

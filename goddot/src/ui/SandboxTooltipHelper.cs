@@ -53,15 +53,16 @@ namespace BattleKing.Ui
         private static string BuildActiveSkillTooltip(ActiveSkillData skill)
         {
             var lines = new List<string> { SafeText(skill.Name, skill.Id) };
+            int hitCount = ExtractHitCount(skill.Effects);
 
             lines.Add($"消耗：AP {skill.ApCost}");
             lines.Add($"类型：{SkillTypeLabel(skill.Type)} / {AttackTypeLabel(skill.AttackType)}");
-            lines.Add($"威力：{FormatPower(skill.Power)}");
-            lines.Add($"命中：{FormatHitRate(skill.HitRate)}");
+            lines.Add($"威力：{FormatActivePower(skill)}");
+            lines.Add($"攻击次数：{hitCount}");
+            lines.Add($"命中：{FormatHitRate(skill.HitRate, HasSureHit(skill.Tags, skill.Effects))}");
             lines.Add($"目标：{TargetTypeLabel(skill.TargetType)}");
 
             AddDescription(lines, skill.EffectDescription);
-            AddTagsAndEffects(lines, skill.Tags, skill.Effects);
             AddLearnInfo(lines, skill.LearnCondition, skill.UnlockLevel);
 
             return string.Join("\n", lines);
@@ -70,19 +71,21 @@ namespace BattleKing.Ui
         private static string BuildPassiveSkillTooltip(PassiveSkillData skill)
         {
             var lines = new List<string> { SafeText(skill.Name, skill.Id) };
+            var attack = ExtractPassiveAttackSpec(skill);
 
             lines.Add($"消耗：PP {skill.PpCost}");
             lines.Add($"触发时机：{TriggerTimingLabel(skill.TriggerTiming)}");
             lines.Add($"类型：{SkillTypeLabel(skill.Type)}");
-            if (skill.Power.HasValue)
-                lines.Add($"威力：{FormatPower(skill.Power.Value)}");
-            if (skill.HitRate.HasValue)
-                lines.Add($"命中：{FormatHitRate(skill.HitRate)}");
+            if (attack.Power.HasValue)
+                lines.Add($"威力：{FormatPower(attack.Power.Value)}");
+            if (attack.Power.HasValue)
+                lines.Add($"攻击次数：{attack.HitCount}");
+            if (attack.Power.HasValue || attack.HitRate.HasValue || attack.ForceHit)
+                lines.Add($"命中：{FormatHitRate(attack.HitRate, attack.ForceHit)}");
             if (skill.HasSimultaneousLimit)
                 lines.Add("限制：同一时机只发动一次");
 
             AddDescription(lines, skill.EffectDescription);
-            AddTagsAndEffects(lines, skill.Tags, skill.Effects);
             AddLearnInfo(lines, skill.LearnCondition, skill.UnlockLevel);
 
             return string.Join("\n", lines);
@@ -257,15 +260,191 @@ namespace BattleKing.Ui
             };
         }
 
+        private static string FormatActivePower(ActiveSkillData skill)
+        {
+            if (skill.PhysicalPower.HasValue || skill.MagicalPower.HasValue)
+            {
+                var parts = new List<string>();
+                if (skill.PhysicalPower.HasValue)
+                    parts.Add("物理 " + FormatPower(skill.PhysicalPower.Value));
+                if (skill.MagicalPower.HasValue)
+                    parts.Add("魔法 " + FormatPower(skill.MagicalPower.Value));
+                return string.Join(" / ", parts);
+            }
+
+            return FormatPower(skill.Power);
+        }
+
         private static string FormatPower(int power)
         {
             return power > 0 ? power.ToString(CultureInfo.InvariantCulture) : "无";
         }
 
-        private static string FormatHitRate(int? hitRate)
+        private static string FormatHitRate(int? hitRate, bool forceHit)
         {
-            return hitRate.HasValue ? hitRate.Value + "%" : "默认";
+            if (forceHit) return "必中";
+            return hitRate.HasValue ? hitRate.Value + "%" : "100%（默认）";
         }
+
+        private static int ExtractHitCount(IEnumerable<SkillEffectData> effects)
+        {
+            foreach (var effect in effects ?? Enumerable.Empty<SkillEffectData>())
+            {
+                if (TryGetInt(effect.Parameters, "HitCount", out int hitCount)
+                    || TryGetInt(effect.Parameters, "hitCount", out hitCount))
+                {
+                    return Math.Max(1, hitCount);
+                }
+            }
+
+            return 1;
+        }
+
+        private static PassiveAttackSpec ExtractPassiveAttackSpec(PassiveSkillData skill)
+        {
+            int? power = skill.Power;
+            int? hitRate = skill.HitRate;
+            int hitCount = 1;
+            bool forceHit = HasSureHit(skill.Tags, skill.Effects);
+
+            foreach (var effect in skill.Effects ?? Enumerable.Empty<SkillEffectData>())
+            {
+                if (effect == null || !IsPassiveAttackEffect(effect.EffectType)) continue;
+
+                if (!power.HasValue && TryGetInt(effect.Parameters, "power", out int effectPower))
+                    power = effectPower;
+                if (!hitRate.HasValue && TryGetInt(effect.Parameters, "hitRate", out int effectHitRate))
+                    hitRate = effectHitRate;
+                if (TryGetInt(effect.Parameters, "HitCount", out int effectHitCount)
+                    || TryGetInt(effect.Parameters, "hitCount", out effectHitCount))
+                    hitCount = Math.Max(1, effectHitCount);
+
+                forceHit |= HasSureHitInParameters(effect.Parameters);
+            }
+
+            return new PassiveAttackSpec(power, hitRate, hitCount, forceHit);
+        }
+
+        private static bool IsPassiveAttackEffect(string effectType)
+        {
+            return effectType is "PreemptiveAttack" or "CounterAttack" or "BattleEndAttack";
+        }
+
+        private static bool HasSureHit(List<string> tags, IEnumerable<SkillEffectData> effects)
+        {
+            if (tags?.Any(tag => string.Equals(tag, "SureHit", StringComparison.OrdinalIgnoreCase)) == true)
+                return true;
+
+            return effects?.Any(effect =>
+                TryGetBool(effect.Parameters, "ForceHit", out bool forceHit) && forceHit
+                || HasSureHitInParameters(effect.Parameters)) == true;
+        }
+
+        private static bool HasSureHitInParameters(Dictionary<string, object> parameters)
+        {
+            if (parameters == null) return false;
+            if (TryGetBool(parameters, "ForceHit", out bool forceHit) && forceHit)
+                return true;
+            if (!parameters.TryGetValue("tags", out var value) || value == null)
+                return false;
+
+            return EnumerateStringValues(value)
+                .Any(tag => string.Equals(tag, "SureHit", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool TryGetInt(Dictionary<string, object> parameters, string key, out int value)
+        {
+            value = default;
+            if (parameters == null || !parameters.TryGetValue(key, out var raw) || raw == null)
+                return false;
+
+            switch (raw)
+            {
+                case JsonElement { ValueKind: JsonValueKind.Number } json when json.TryGetInt32(out value):
+                    return true;
+                case JsonElement { ValueKind: JsonValueKind.String } json:
+                    return int.TryParse(json.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+                case int i:
+                    value = i;
+                    return true;
+                case long l:
+                    value = (int)l;
+                    return true;
+                case double d:
+                    value = (int)d;
+                    return true;
+                case float f:
+                    value = (int)f;
+                    return true;
+                case string s:
+                    return int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+                default:
+                    try
+                    {
+                        value = Convert.ToInt32(raw, CultureInfo.InvariantCulture);
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+            }
+        }
+
+        private static bool TryGetBool(Dictionary<string, object> parameters, string key, out bool value)
+        {
+            value = default;
+            if (parameters == null || !parameters.TryGetValue(key, out var raw) || raw == null)
+                return false;
+
+            switch (raw)
+            {
+                case JsonElement { ValueKind: JsonValueKind.True }:
+                    value = true;
+                    return true;
+                case JsonElement { ValueKind: JsonValueKind.False }:
+                    value = false;
+                    return true;
+                case JsonElement { ValueKind: JsonValueKind.String } json:
+                    return bool.TryParse(json.GetString(), out value);
+                case bool b:
+                    value = b;
+                    return true;
+                case string s:
+                    return bool.TryParse(s, out value);
+                default:
+                    return false;
+            }
+        }
+
+        private static IEnumerable<string> EnumerateStringValues(object value)
+        {
+            switch (value)
+            {
+                case JsonElement { ValueKind: JsonValueKind.Array } json:
+                    return json.EnumerateArray()
+                        .Where(item => item.ValueKind == JsonValueKind.String)
+                        .Select(item => item.GetString())
+                        .Where(item => !string.IsNullOrWhiteSpace(item))
+                        .Select(item => item!);
+                case IEnumerable enumerable when value is not string:
+                {
+                    var strings = new List<string>();
+                    foreach (var item in enumerable)
+                    {
+                        if (item is string text && !string.IsNullOrWhiteSpace(text))
+                            strings.Add(text);
+                    }
+                    return strings;
+                }
+                case string text when !string.IsNullOrWhiteSpace(text):
+                    return new[] { text };
+                default:
+                    return Enumerable.Empty<string>();
+            }
+        }
+
+        private readonly record struct PassiveAttackSpec(int? Power, int? HitRate, int HitCount, bool ForceHit);
 
         private static string FormatSigned(int value)
         {
@@ -367,6 +546,7 @@ namespace BattleKing.Ui
             UnitClass.Elf => "精灵",
             UnitClass.Beastman => "兽人",
             UnitClass.Winged => "有翼人",
+            UnitClass.Undead => "不死系",
             _ => unitClass.ToString()
         };
 

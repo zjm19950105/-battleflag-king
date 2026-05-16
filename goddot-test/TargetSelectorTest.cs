@@ -298,6 +298,24 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(2, targets.Count);
         }
 
+        [Test]
+        public void FrontAndBack_MeleeBackRowPriority_DoesNotBypassFrontRowAnchor()
+        {
+            AddEnemies((1, 80), (4, 50));
+            var caster = TestDataFactory.CreateUnit(isPlayer: true);
+            var skill = TestDataFactory.CreateSkill(attackType: AttackType.Melee, targetType: TargetType.FrontAndBack);
+            var strategy = new Strategy
+            {
+                SkillId = "test_skill",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "back" },
+                Mode1 = ConditionMode.Priority
+            };
+
+            var targets = _selector.SelectTargets(caster, strategy, skill.Data);
+
+            CollectionAssert.AreEqual(new[] { 1, 4 }, targets.Select(target => target.Position).ToArray());
+        }
+
         // ────────── Row攻击 ──────────
 
         [Test]

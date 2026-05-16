@@ -7,6 +7,8 @@ namespace BattleKing.Data
     /// Text may contain {char:ID} and {class:ID} tokens for stable ID referencing —
     /// the display layer resolves these to current display names so that renaming
     /// a class (e.g. "飞龙" → new name) auto-updates all descriptions that mention it.
+    /// Keep this data sourced from unicorn-overlord-class-compendium.md only; older
+    /// active/passive skill documents are stale and must not drive role text.
     /// </summary>
     public class CharacterRoleDescriptionData
     {
@@ -19,7 +21,7 @@ namespace BattleKing.Data
         /// <summary>Stable unit class IDs (e.g. "infantry", "flying").</summary>
         public List<string> UnitClasses { get; set; } = new();
 
-        /// <summary>"主要角色" bullet points.</summary>
+        /// <summary>"主要角色" bullet points. May contain {char:ID} and {class:ID} tokens.</summary>
         public List<string> MainRoles { get; set; } = new();
 
         /// <summary>"特点" bullet points. May contain {char:ID} and {class:ID} tokens.</summary>

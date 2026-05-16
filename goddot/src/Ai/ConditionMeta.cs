@@ -59,14 +59,14 @@ namespace BattleKing.Ai
         public static List<string> GetValues(ConditionCategory cat, string op) => cat switch
         {
             ConditionCategory.Position => new() { "前排", "后排", "前后排一列", "白天", "夜晚" },
-            ConditionCategory.UnitClass => new() { "步兵", "骑马", "飞行", "重装", "斥候", "弓兵", "术师", "精灵", "兽人", "有翼人" },
+            ConditionCategory.UnitClass => new() { "步兵", "骑马", "飞行", "重装", "斥候", "弓兵", "术师", "精灵", "兽人", "有翼人", "不死系" },
             ConditionCategory.Hp => op == "最低" || op == "最高"
                 ? new() { "-" }
                 : new() { "25%", "50%", "75%", "100%" },
             ConditionCategory.ApPp => op == "最低" || op == "最高"
                 ? new() { "AP", "PP" }
                 : new() { "1", "2", "3", "4" },
-            ConditionCategory.Status => new() { "buff", "debuff", "异常", "无状态", "毒", "炎上", "冻结", "气绝", "黑暗", "被动封印", "格挡封印", "非毒", "非炎上", "非冻结", "非气绝", "非黑暗", "非被动封印", "非格挡封印" },
+            ConditionCategory.Status => new() { "buff", "debuff", "异常", "无状态", "毒", "炎上", "冻结", "混乱", "气绝", "黑暗", "被动封印", "格挡封印", "非毒", "非炎上", "非冻结", "非混乱", "非气绝", "非黑暗", "非被动封印", "非格挡封印" },
             ConditionCategory.AttackAttribute => new() { "物理", "魔法", "近接", "远程", "横排", "纵列", "前后排", "全体" },
             ConditionCategory.TeamSize => op == "以上"
                 ? new() { "敌2体", "敌3体", "敌4体", "敌5体", "友2体", "友3体", "友4体", "友5体" }
@@ -74,7 +74,7 @@ namespace BattleKing.Ai
             ConditionCategory.SelfState => new() { "自身", "自身以外", "buff", "debuff", "第1次行动", "第2次行动", "第3次行动", "第4次行动", "第5次行动", "蓄力", "气绝", "冻结", "黑暗" },
             ConditionCategory.SelfHp => new() { "25%", "50%", "75%", "100%" },
             ConditionCategory.SelfApPp => new() { "1", "2", "3", "4" },
-            ConditionCategory.EnemyClassExists => new() { "步兵", "骑马", "飞行", "重装", "斥候", "弓兵", "术师", "精灵", "兽人", "有翼人" },
+            ConditionCategory.EnemyClassExists => new() { "步兵", "骑马", "飞行", "重装", "斥候", "弓兵", "术师", "精灵", "兽人", "有翼人", "不死系" },
             ConditionCategory.AttributeRank => new() { "最大HP", "最大AP", "最大PP", "HP", "物攻", "魔攻", "物防", "魔防", "速度", "命中", "回避", "会心", "格挡" },
             _ => new() { "-" }
         };
@@ -155,6 +155,7 @@ namespace BattleKing.Ai
             "精灵" => "Elf",
             "兽人" => "Beastman",
             "有翼人" => "Winged",
+            "不死系" => "Undead",
             _ => label
         };
 
@@ -178,6 +179,7 @@ namespace BattleKing.Ai
             "毒" => "Poison",
             "炎上" => "Burn",
             "冻结" => "Freeze",
+            "混乱" => "Confusion",
             "气绝" => "Stun",
             "黑暗" => "Darkness",
             "被动封印" => "PassiveSeal",
@@ -187,6 +189,7 @@ namespace BattleKing.Ai
             "非毒" => "not:Poison",
             "非炎上" => "not:Burn",
             "非冻结" => "not:Freeze",
+            "非混乱" => "not:Confusion",
             "非气绝" => "not:Stun",
             "非黑暗" => "not:Darkness",
             "非被动封印" => "not:PassiveSeal",

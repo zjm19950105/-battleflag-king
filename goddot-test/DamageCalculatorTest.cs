@@ -427,6 +427,32 @@ namespace BattleKing.Tests
             // Tested above in 魔法攻击_魔攻减魔防
             ClassicAssert.Pass();
         }
+
+        [Test]
+        public void MixedDamage_UsesSeparatePhysicalAndMagicalStatsAndPowers()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 150, mag: 80, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 50, mdef: 20, eva: 0, block: 0);
+            var skill = TestDataFactory.CreateSkill(
+                power: 50,
+                type: SkillType.Physical,
+                physicalPower: 50,
+                magicalPower: 100);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.IsTrue(skill.HasMixedDamage);
+            ClassicAssert.AreEqual(150, calc.PhysicalAttackPower);
+            ClassicAssert.AreEqual(50, calc.PhysicalDefense);
+            ClassicAssert.AreEqual(80, calc.MagicalAttackPower);
+            ClassicAssert.AreEqual(20, calc.MagicalDefense);
+            ClassicAssert.AreEqual(50, result.PhysicalDamage);
+            ClassicAssert.AreEqual(60, result.MagicalDamage);
+            ClassicAssert.AreEqual(110, result.TotalDamage);
+            ClassicAssert.AreEqual(50f, result.HitResults[0].BasePhysicalDamage, 0.001f);
+            ClassicAssert.AreEqual(60f, result.HitResults[0].BaseMagicalDamage, 0.001f);
+        }
         // ────────── 兵种克制 ──────────
 
         [Test]
@@ -451,6 +477,56 @@ namespace BattleKing.Tests
             var c = TestDataFactory.CreateCalc(a, d, skill);
             var result = _calc.Calculate(c);
             ClassicAssert.AreEqual(60, result.TotalDamage);
+        }
+
+        [Test]
+        public void 兵种克制_同源Trait不和有效兵种重复翻倍()
+        {
+            var a = TestDataFactory.CreateUnit(str: 50, crit: 0, classes: new() { UnitClass.Cavalry });
+            a.Data.Traits.Add(new TraitData { TraitType = "PhysAtkVsInfantry2x" });
+            var d = TestDataFactory.CreateUnit(def: 20, block: 0, classes: new() { UnitClass.Infantry });
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var c = TestDataFactory.CreateCalc(a, d, skill);
+
+            var result = _calc.Calculate(c);
+
+            ClassicAssert.AreEqual(60, result.TotalDamage);
+            ClassicAssert.AreEqual(2.0f, c.ClassTraitMultiplier);
+            ClassicAssert.AreEqual(1.0f, c.CharacterTraitMultiplier);
+        }
+
+        [Test]
+        public void 兵种克制_弓兵Trait不和Archer兵种重复翻倍()
+        {
+            var a = TestDataFactory.CreateUnit(str: 50, crit: 0, classes: new() { UnitClass.Archer });
+            a.Data.Traits.Add(new TraitData { TraitType = "BowVsFlying" });
+            var d = TestDataFactory.CreateUnit(def: 20, block: 0, classes: new() { UnitClass.Flying });
+            var skill = TestDataFactory.CreateSkill(power: 100, attackType: AttackType.Ranged);
+            var c = TestDataFactory.CreateCalc(a, d, skill);
+
+            var result = _calc.Calculate(c);
+
+            ClassicAssert.AreEqual(60, result.TotalDamage);
+            ClassicAssert.AreEqual(2.0f, c.ClassTraitMultiplier);
+            ClassicAssert.AreEqual(1.0f, c.CharacterTraitMultiplier);
+        }
+
+        [Test]
+        public void 特性克制_非兵种来源仍生效并写入单段日志()
+        {
+            var a = TestDataFactory.CreateUnit(str: 50, crit: 0, classes: new() { UnitClass.Infantry });
+            a.Data.Traits.Add(new TraitData { TraitType = "PhysAtkVsInfantry2x" });
+            var d = TestDataFactory.CreateUnit(def: 20, block: 0, classes: new() { UnitClass.Infantry });
+            var skill = TestDataFactory.CreateSkill(power: 100);
+            var c = TestDataFactory.CreateCalc(a, d, skill);
+
+            var result = _calc.Calculate(c);
+            var lines = BattleLogHelper.FormatAttack(a, d, skill, c, result, false, new());
+
+            ClassicAssert.AreEqual(60, result.TotalDamage);
+            ClassicAssert.AreEqual(1.0f, c.ClassTraitMultiplier);
+            ClassicAssert.AreEqual(2.0f, c.CharacterTraitMultiplier);
+            Assert.That(lines, Has.Some.Contains("Damage:").And.Contains("x 特性2.0").And.Contains("= 60"));
         }
 
         // ────────── ForceHit / ForceEvasion ──────────

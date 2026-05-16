@@ -24,7 +24,7 @@
         "effectType": "AddBuff",
         "parameters": {
           "stat": "Crit",
-          "amount": 50,
+          "ratio": 0.5,
           "turns": 1,
           "oneTime": true,
           "target": "Self"
@@ -92,7 +92,8 @@
         "parameters": {
           "stat": "Crit",
           "ratio": 0.3,
-          "turns": -1,
+          "turns": 1,
+          "oneTime": true,
           "target": "Self"
         }
       }
@@ -111,39 +112,7 @@
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击",
     "tags": [],
-    "effects": [
-      {
-        "effectType": "OnHitEffect",
-        "parameters": {
-          "effects": [
-            {
-              "effectType": "ApDamage",
-              "parameters": {
-                "target": "Target",
-                "targetClass": "Cavalry",
-                "amount": 1
-              }
-            },
-            {
-              "effectType": "PpDamage",
-              "parameters": {
-                "target": "Target",
-                "targetClass": "Cavalry",
-                "amount": 1
-              }
-            },
-            {
-              "effectType": "StatusAilment",
-              "parameters": {
-                "target": "Target",
-                "targetClass": "Cavalry",
-                "ailment": "BlockSeal"
-              }
-            }
-          ]
-        }
-      }
-    ],
+    "effects": [],
     "learnCondition": "佣兵/兰茨克内希特 Lv1，无畏舰 Lv1",
     "unlockLevel": 1
   },
@@ -218,22 +187,14 @@
     "type": "Physical",
     "attackType": "Melee",
     "power": 100,
-    "hitRate": null,
+    "hitRate": 100,
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击，命中时HP回复25%，击倒时HP回复25%",
     "tags": [
-      "SureHit",
       "HitHeal25",
-      "KillHeal25",
-      "HpBelow50Priority"
+      "KillHeal25"
     ],
     "effects": [
-      {
-        "effectType": "ModifyDamageCalc",
-        "parameters": {
-          "ForceHit": true
-        }
-      },
       {
         "effectType": "OnHitEffect",
         "parameters": {
@@ -355,8 +316,8 @@
         }
       }
     ],
-    "learnCondition": "君主 Lv20",
-    "unlockLevel": 20
+    "learnCondition": "高阶领主 Lv30",
+    "unlockLevel": 30
   },
   {
     "id": "act_arrow_cover",
@@ -382,7 +343,7 @@
         }
       }
     ],
-    "learnCondition": "斗士/先锋 Lv1",
+    "learnCondition": "战士/先锋 Lv1",
     "unlockLevel": 1
   },
   {
@@ -412,13 +373,13 @@
         }
       }
     ],
-    "learnCondition": "斗士/先锋 Lv10",
-    "unlockLevel": 10
+    "learnCondition": "战士/先锋 Lv15",
+    "unlockLevel": 15
   },
   {
     "id": "act_attract_attention",
     "name": "防御者",
-    "apCost": 1,
+    "apCost": 2,
     "type": "Physical",
     "attackType": "Melee",
     "power": 75,
@@ -469,7 +430,7 @@
     "name": "长枪突刺",
     "apCost": 1,
     "type": "Physical",
-    "attackType": "Ranged",
+    "attackType": "Melee",
     "power": 100,
     "hitRate": 100,
     "targetType": "FrontAndBack",
@@ -487,7 +448,7 @@
         }
       }
     ],
-    "learnCondition": "兵士/士官 Lv1",
+    "learnCondition": "士兵 Lv1",
     "unlockLevel": 1
   },
   {
@@ -513,15 +474,15 @@
         }
       }
     ],
-    "learnCondition": "兵士/士官 Lv10",
+    "learnCondition": "士兵/军士 Lv10",
     "unlockLevel": 10
   },
   {
     "id": "act_throwing_spear",
     "name": "强化长枪",
-    "apCost": 1,
+    "apCost": 2,
     "type": "Physical",
-    "attackType": "Ranged",
+    "attackType": "Melee",
     "power": 130,
     "hitRate": 100,
     "targetType": "FrontAndBack",
@@ -579,7 +540,7 @@
         }
       }
     ],
-    "learnCondition": "近卫/维京 Lv1",
+    "learnCondition": "家臣/维京 Lv1",
     "unlockLevel": 1
   },
   {
@@ -620,7 +581,7 @@
         }
       }
     ],
-    "learnCondition": "近卫/维京 Lv10",
+    "learnCondition": "家臣/维京 Lv10",
     "unlockLevel": 10
   },
   {
@@ -687,7 +648,7 @@
         }
       }
     ],
-    "learnCondition": "重装步兵/铁甲卫士 Lv1",
+    "learnCondition": "重装步兵/甲胄骑兵 Lv1",
     "unlockLevel": 1
   },
   {
@@ -714,7 +675,7 @@
         }
       }
     ],
-    "learnCondition": "铁甲卫士 Lv25",
+    "learnCondition": "甲胄骑兵 Lv25",
     "unlockLevel": 25
   },
   {
@@ -749,7 +710,7 @@
         }
       }
     ],
-    "learnCondition": "铁甲卫士 Lv30",
+    "learnCondition": "甲胄骑兵 Lv30",
     "unlockLevel": 30
   },
   {
@@ -781,7 +742,7 @@
   {
     "id": "act_formation_breaker",
     "name": "巨大蓄力",
-    "apCost": 2,
+    "apCost": 1,
     "type": "Assist",
     "attackType": "Melee",
     "power": 0,
@@ -810,22 +771,24 @@
         }
       }
     ],
-    "learnCondition": "角斗士/狂战士 Lv10",
-    "unlockLevel": 10
+    "learnCondition": "狂战士 Lv20",
+    "unlockLevel": 20
   },
   {
     "id": "act_accumulate",
     "name": "大满贯",
     "apCost": 2,
     "type": "Physical",
-    "attackType": "Melee",
+    "attackType": "Ranged",
     "power": 100,
     "hitRate": 80,
     "targetType": "AllEnemies",
-    "effectDescription": "敌全体攻击，自身HP100%时威力+50",
+    "effectDescription": "敌全体攻击，自身HP100%时威力+50，地面属性对飞行系无效",
     "tags": [
       "FullHpDamageUp50",
-      "AoE"
+      "AoE",
+      "Ranged",
+      "GroundAttribute"
     ],
     "effects": [
       {
@@ -834,10 +797,17 @@
           "casterHpRatioMin": 1.0,
           "SkillPowerBonus": 50
         }
+      },
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "targetClass": "Flying",
+          "NullifyPhysicalDamage": true
+        }
       }
     ],
-    "learnCondition": "狂战士 Lv20",
-    "unlockLevel": 20
+    "learnCondition": "狂战士 Lv30",
+    "unlockLevel": 30
   },
   {
     "id": "act_heavy_slayer",
@@ -868,7 +838,7 @@
         }
       }
     ],
-    "learnCondition": "战士/扫荡者 Lv1",
+    "learnCondition": "勇士/破坏者 Lv1",
     "unlockLevel": 1
   },
   {
@@ -906,12 +876,12 @@
         }
       }
     ],
-    "learnCondition": "战士/扫荡者 Lv10",
+    "learnCondition": "勇士/破坏者 Lv10",
     "unlockLevel": 10
   },
   {
     "id": "act_line_destruction",
-    "name": "列破坏者",
+    "name": "列破坏",
     "apCost": 2,
     "type": "Physical",
     "attackType": "Melee",
@@ -939,7 +909,7 @@
         }
       }
     ],
-    "learnCondition": "扫荡者 Lv30",
+    "learnCondition": "破坏者 Lv30",
     "unlockLevel": 30
   },
   {
@@ -1099,7 +1069,7 @@
         }
       }
     ],
-    "learnCondition": "盗贼/恶棍 Lv1",
+    "learnCondition": "盗贼/流氓 Lv1",
     "unlockLevel": 1
   },
   {
@@ -1114,8 +1084,7 @@
     "effectDescription": "敌单体2连击，赋予毒",
     "tags": [
       "Ranged",
-      "Poison",
-      "FlyingNoHitPenalty"
+      "Poison"
     ],
     "effects": [
       {
@@ -1139,7 +1108,7 @@
         }
       }
     ],
-    "learnCondition": "盗贼/恶棍 Lv10",
+    "learnCondition": "盗贼/流氓 Lv10",
     "unlockLevel": 10
   },
   {
@@ -1147,12 +1116,13 @@
     "name": "暗影撕咬",
     "apCost": 2,
     "type": "Physical",
-    "attackType": "Melee",
+    "attackType": "Ranged",
     "power": 15,
     "hitRate": 100,
     "targetType": "Row",
     "effectDescription": "敌一列2连击，赋予黑暗，对象速度-20、回避-20",
     "tags": [
+      "Ranged",
       "Darkness",
       "SpdDown20",
       "EvaDown20"
@@ -1180,7 +1150,7 @@
               "parameters": {
                 "target": "Target",
                 "stat": "Spd",
-                "ratio": 0.2,
+                "amount": 20,
                 "turns": -1
               }
             },
@@ -1189,7 +1159,7 @@
               "parameters": {
                 "target": "Target",
                 "stat": "Eva",
-                "ratio": 0.2,
+                "amount": 20,
                 "turns": -1
               }
             }
@@ -1197,7 +1167,7 @@
         }
       }
     ],
-    "learnCondition": "恶棍 Lv20",
+    "learnCondition": "流氓 Lv20",
     "unlockLevel": 20
   },
   {
@@ -1238,7 +1208,7 @@
         }
       }
     ],
-    "learnCondition": "恶棍 Lv30",
+    "learnCondition": "流氓 Lv30",
     "unlockLevel": 30
   },
   {
@@ -1246,15 +1216,14 @@
     "name": "火球术",
     "apCost": 1,
     "type": "Magical",
-    "attackType": "Ranged",
+    "attackType": "Magic",
     "power": 40,
     "hitRate": 100,
     "targetType": "SingleEnemy",
-    "effectDescription": "敌单体3连击魔法攻击，赋予炎上",
+    "effectDescription": "敌单体3hit魔法攻击，赋予炎上",
     "tags": [
-      "MultiHit3",
       "Burn",
-      "Ranged"
+      "MultiHit3"
     ],
     "effects": [
       {
@@ -1282,19 +1251,49 @@
     "unlockLevel": 1
   },
   {
+    "id": "act_freeze_arrow",
+    "name": "冰箭",
+    "apCost": 1,
+    "type": "Magical",
+    "attackType": "Magic",
+    "power": 100,
+    "hitRate": 100,
+    "targetType": "SingleEnemy",
+    "effectDescription": "敌单体魔法攻击，赋予冻结",
+    "tags": [
+      "Freeze"
+    ],
+    "effects": [
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "effects": [
+            {
+              "effectType": "StatusAilment",
+              "parameters": {
+                "target": "Target",
+                "ailment": "Freeze"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "learnCondition": "女巫/女术士 Lv1",
+    "unlockLevel": 1
+  },
+  {
     "id": "act_thunderstorm",
     "name": "雷暴",
     "apCost": 1,
     "type": "Magical",
-    "attackType": "Ranged",
+    "attackType": "Magic",
     "power": 100,
-    "hitRate": 100,
+    "hitRate": 90,
     "targetType": "Row",
     "effectDescription": "敌一列魔法攻击，赋予气绝",
     "tags": [
-      "Stun",
-      "Ranged",
-      "Row"
+      "Stun"
     ],
     "effects": [
       {
@@ -1320,15 +1319,13 @@
     "name": "火山",
     "apCost": 2,
     "type": "Magical",
-    "attackType": "Ranged",
+    "attackType": "Magic",
     "power": 150,
-    "hitRate": 100,
-    "targetType": "Row",
+    "hitRate": 90,
+    "targetType": "FrontAndBack",
     "effectDescription": "敌前后列贯通魔法攻击，赋予炎上",
     "tags": [
-      "Burn",
-      "Ranged",
-      "FrontAndBack"
+      "Burn"
     ],
     "effects": [
       {
@@ -1346,55 +1343,22 @@
         }
       }
     ],
-    "learnCondition": "术士 Lv25",
-    "unlockLevel": 25
-  },
-  {
-    "id": "act_ice_arrow",
-    "name": "冰箭",
-    "apCost": 1,
-    "type": "Magical",
-    "attackType": "Ranged",
-    "power": 100,
-    "hitRate": 100,
-    "targetType": "SingleEnemy",
-    "effectDescription": "敌单体魔法攻击，赋予冻结",
-    "tags": [
-      "Freeze",
-      "Ranged"
-    ],
-    "effects": [
-      {
-        "effectType": "OnHitEffect",
-        "parameters": {
-          "effects": [
-            {
-              "effectType": "StatusAilment",
-              "parameters": {
-                "target": "Target",
-                "ailment": "Freeze"
-              }
-            }
-          ]
-        }
-      }
-    ],
-    "learnCondition": "女巫/魔女 Lv1",
-    "unlockLevel": 1
+    "learnCondition": "术士 Lv20",
+    "unlockLevel": 20
   },
   {
     "id": "act_magic_missile",
     "name": "魔法导弹",
     "apCost": 1,
     "type": "Magical",
-    "attackType": "Ranged",
+    "attackType": "Magic",
     "power": 70,
     "hitRate": 100,
     "targetType": "TwoEnemies",
     "effectDescription": "敌2体魔法攻击",
     "tags": [],
     "effects": [],
-    "learnCondition": "女巫/魔女 Lv10",
+    "learnCondition": "女巫/女术士 Lv10",
     "unlockLevel": 10
   },
   {
@@ -1402,15 +1366,13 @@
     "name": "冰棺",
     "apCost": 2,
     "type": "Magical",
-    "attackType": "Ranged",
+    "attackType": "Magic",
     "power": 100,
     "hitRate": 100,
     "targetType": "Row",
-    "effectDescription": "敌一列魔法攻击，赋予冻结；对冻结目标威力+50",
+    "effectDescription": "敌一列魔法攻击，赋予冻结；冻结中威力+50",
     "tags": [
-      "Freeze",
-      "Ranged",
-      "Row"
+      "Freeze"
     ],
     "effects": [
       {
@@ -1435,8 +1397,8 @@
         }
       }
     ],
-    "learnCondition": "魔女 Lv25",
-    "unlockLevel": 25
+    "learnCondition": "女术士 Lv20",
+    "unlockLevel": 20
   },
   {
     "id": "act_hache",
@@ -1473,9 +1435,9 @@
   {
     "id": "act_row_heal",
     "name": "列治愈",
-    "apCost": 2,
+    "apCost": 1,
     "type": "Heal",
-    "attackType": "Melee",
+    "attackType": "Magic",
     "power": 50,
     "hitRate": null,
     "targetType": "Row",
@@ -1544,46 +1506,70 @@
     "unlockLevel": 25
   },
   {
-    "id": "act_dive_strike",
-    "name": "坠落突刺",
+    "id": "act_griffin_slash",
+    "name": "高空挥击",
     "apCost": 1,
     "type": "Physical",
-    "attackType": "Melee",
+    "attackType": "Ranged",
     "power": 100,
     "hitRate": 100,
-    "targetType": "SingleEnemy",
-    "effectDescription": "敌单体攻击，对骑兵系格挡不可且威力+50",
+    "targetType": "Row",
+    "effectDescription": "敌一列攻击；骑乘系不可格挡，威力+50",
     "tags": [
-      "CavalryBonus",
-      "Unblockable"
+      "Ranged"
     ],
     "effects": [
       {
         "effectType": "ModifyDamageCalc",
         "parameters": {
           "targetClass": "Cavalry",
-          "CannotBeBlocked": true,
-          "SkillPowerBonus": 50
+          "SkillPowerBonus": 50,
+          "CannotBeBlocked": true
         }
       }
     ],
-    "learnCondition": "狮鹫骑士 Lv1",
+    "learnCondition": "狮鹫骑士/狮鹫统治者 Lv1",
     "unlockLevel": 1
   },
   {
-    "id": "act_wing_gust",
-    "name": "风翼突袭",
+    "id": "act_griffin_quick_action",
+    "name": "致命坠落",
+    "apCost": 1,
+    "type": "Physical",
+    "attackType": "Ranged",
+    "power": 0,
+    "hitRate": 100,
+    "targetType": "FrontAndBack",
+    "effectDescription": "敌前后列贯通攻击；造成自身HP50%伤害（不可会心）",
+    "tags": [
+      "Ranged",
+      "CannotBeBlocked"
+    ],
+    "effects": [
+      {
+        "effectType": "ModifyDamageCalc",
+        "parameters": {
+          "FixedDamageFromCasterHpRatio": 0.5,
+          "CannotCrit": true,
+          "CannotBeBlocked": true
+        }
+      }
+    ],
+    "learnCondition": "狮鹫骑士/狮鹫统治者 Lv10",
+    "unlockLevel": 10
+  },
+  {
+    "id": "act_griffin_storm",
+    "name": "空中猛击",
     "apCost": 2,
     "type": "Physical",
     "attackType": "Ranged",
-    "power": 100,
+    "power": 150,
     "hitRate": 100,
     "targetType": "Row",
-    "effectDescription": "敌一列攻击，对骑兵系格挡不可",
+    "effectDescription": "敌一列攻击；骑乘系不可格挡；目标HP100%时AP-1",
     "tags": [
-      "CavalryBonus",
-      "Unblockable",
-      "Row"
+      "Ranged"
     ],
     "effects": [
       {
@@ -1592,10 +1578,25 @@
           "targetClass": "Cavalry",
           "CannotBeBlocked": true
         }
+      },
+      {
+        "effectType": "OnHitEffect",
+        "parameters": {
+          "targetHpBeforeRatioMin": 1,
+          "effects": [
+            {
+              "effectType": "ApDamage",
+              "parameters": {
+                "target": "Target",
+                "amount": 1
+              }
+            }
+          ]
+        }
       }
     ],
-    "learnCondition": "狮鹫骑士 Lv15",
-    "unlockLevel": 15
+    "learnCondition": "狮鹫统治者 Lv20",
+    "unlockLevel": 20
   },
   {
     "id": "act_passive_curse",
@@ -1626,8 +1627,8 @@
         "parameters": {
           "target": "Target",
           "stat": "Spd",
-          "ratio": 0.1,
-          "turns": -1
+          "turns": -1,
+          "amount": 10
         }
       }
     ],
@@ -1754,6 +1755,8 @@
     "type": "Physical",
     "attackType": "Melee",
     "power": 50,
+    "physicalPower": 50,
+    "magicalPower": 100,
     "hitRate": 100,
     "targetType": "SingleEnemy",
     "effectDescription": "敌单体攻击，自身HP100%时PP+1且小精灵+1",
@@ -1774,7 +1777,8 @@
         "effectType": "ModifyCounter",
         "parameters": {
           "key": "Sprite",
-          "delta": 1
+          "delta": 1,
+          "casterHpRatioMin": 1.0
         }
       }
     ],
@@ -1831,6 +1835,8 @@
     "type": "Magical",
     "attackType": "Ranged",
     "power": 70,
+    "physicalPower": 70,
+    "magicalPower": 70,
     "hitRate": 100,
     "targetType": "AllEnemies",
     "effectDescription": "敌全体攻击，威力=70+小精灵数×30，消耗全部小精灵",

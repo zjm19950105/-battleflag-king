@@ -97,7 +97,8 @@ namespace BattleKing.Ui
             {
                 string formula = "  Damage:(" + calc.FinalAttackPower + "-" + calc.FinalDefense + "=" + diff + ")";
                 if (Math.Abs(powerRatio - 1f) > 0.01f) formula += " x " + powerRatio.ToString("F1");
-                if (Math.Abs(classMult - 1f) > 0.01f) formula += " x " + classMult.ToString("F1");
+                if (Math.Abs(classMult - 1f) > 0.01f) formula += " x 兵种" + classMult.ToString("F1");
+                if (Math.Abs(calc.CharacterTraitMultiplier - 1f) > 0.01f) formula += " x 特性" + calc.CharacterTraitMultiplier.ToString("F1");
                 if (calc.MagicalDamage > 0) formula += " + " + calc.MagicalDamage;
                 formula += " = " + result.TotalDamage;
                 if (flags.Length > 0) formula += " [" + flags.Trim() + "]";

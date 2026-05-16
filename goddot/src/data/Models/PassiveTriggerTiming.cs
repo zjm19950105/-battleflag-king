@@ -12,6 +12,7 @@ namespace BattleKing.Data
         AllyOnAttacked,        // 友方被攻击时（追击斩等）
         SelfOnActiveUse,       // 自身使用主动技能时（蓄力行动/蛮力等）
         AllyOnActiveUse,       // 友方使用主动技能时（主动礼物等）
+        EnemyOnActiveUse,      // 敌方使用主动技能时（魔力吸收等）
         AfterAction,           // 行动后（敌我双方）
         BattleEnd,             // 战斗结束时
         OnHit,                 // 命中时

@@ -65,8 +65,8 @@ namespace BattleKing.Equipment
 
         public bool CanDualWield()
         {
-            // Stub: will check if class is Swordsman/Swordmaster in the future
-            return false;
+            return MainHand?.Data.Category == EquipmentCategory.Sword
+                && OffHand?.Data.Category == EquipmentCategory.Sword;
         }
 
         public void Equip(EquipmentData data)

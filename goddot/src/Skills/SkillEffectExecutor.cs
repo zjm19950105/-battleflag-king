@@ -160,6 +160,9 @@ namespace BattleKing.Skills
                 case "StatusAilment":
                     ApplyStatusAilment(context, caster, targets, parameters, calculation, logs);
                     break;
+                case "CleanseAilment":
+                    ApplyCleanseAilment(context, caster, targets, parameters, calculation, logs);
+                    break;
                 case "TemporalMark":
                     ApplyTemporalMark(context, caster, targets, parameters, sourceSkillId, calculation, logs);
                     break;
@@ -218,7 +221,7 @@ namespace BattleKing.Skills
                     ApplyConsumeCounter(caster, parameters, calculation, state, logs);
                     break;
                 case "CoverAlly":
-                    ApplyCoverAlly(caster, calculation, logs);
+                    ApplyCoverAlly(caster, parameters, calculation, logs);
                     break;
             }
         }
@@ -278,6 +281,12 @@ namespace BattleKing.Skills
                 logs.Add("CannotBeBlocked");
             }
 
+            if (GetBool(parameters, "CannotCrit", false))
+            {
+                calculation.CannotCrit = true;
+                logs.Add("CannotCrit");
+            }
+
             if (GetBool(parameters, "CannotBeCovered", false))
             {
                 calculation.CannotBeCovered = true;
@@ -309,6 +318,13 @@ namespace BattleKing.Skills
                 logs.Add($"PowerBonus={skillPowerBonus:0.##}");
             }
 
+            if (TryGetFloat(parameters, "AdditionalMagicalPower", out float additionalMagicalPower)
+                || TryGetFloat(parameters, "additionalMagicalPower", out additionalMagicalPower))
+            {
+                calculation.AdditionalMagicalPower += Math.Max(0f, additionalMagicalPower);
+                logs.Add($"AdditionalMagicalPower={calculation.AdditionalMagicalPower:0.##}");
+            }
+
             if (TryGetFloat(parameters, "SkillPowerBonusFromTargetHpRatio", out float targetHpRatioMaxBonus))
             {
                 var target = calculation.Defender;
@@ -327,6 +343,14 @@ namespace BattleKing.Skills
                 logs.Add($"DamageMultiplier={calculation.DamageMultiplier:0.##}");
             }
 
+            if (TryGetFloat(parameters, "FixedDamageFromCasterHpRatio", out float fixedDamageRatio))
+            {
+                int currentHp = Math.Max(0, caster?.CurrentHp ?? 0);
+                float damage = MathF.Floor(currentHp * NormalizeRatio(fixedDamageRatio));
+                calculation.FixedPhysicalDamagePerHit = damage;
+                logs.Add($"FixedPhysicalDamage={damage:0.##}");
+            }
+
             if (GetBool(parameters, "NullifyPhysicalDamage", false))
             {
                 calculation.NullifyPhysicalDamage = true;
@@ -337,6 +361,12 @@ namespace BattleKing.Skills
             {
                 calculation.NullifyMagicalDamage = true;
                 logs.Add("NullifyMagicalDamage");
+            }
+
+            if (GetBool(parameters, "ReflectDamageToAttacker", false))
+            {
+                calculation.ReflectDamageToAttacker = true;
+                logs.Add("ReflectDamageToAttacker");
             }
 
             if (TryGetString(parameters, "CounterPowerBonus", out string counterKey)
@@ -433,6 +463,12 @@ namespace BattleKing.Skills
             Dictionary<string, object> parameters,
             BattleUnit target)
         {
+            if (GetBool(parameters, "targetHasAnyAilment", false)
+                && target?.Ailments.Any() != true)
+            {
+                return false;
+            }
+
             var requiredAilments = GetStringList(parameters, "targetHasAilments");
             if (TryGetString(parameters, "targetHasAilment", out string targetHasAilment))
                 requiredAilments.Add(targetHasAilment);
@@ -502,7 +538,9 @@ namespace BattleKing.Skills
 
         private static bool HasDebuff(BattleUnit unit)
         {
-            return unit?.Buffs.Any(buff => buff.Ratio < 0f && buff.IsPureBuffOrDebuff) == true;
+            return unit?.Buffs.Any(buff =>
+                buff.IsPureBuffOrDebuff
+                && (buff.Ratio < 0f || buff.FlatAmount < 0)) == true;
         }
 
         private static bool HasBuff(BattleUnit unit)
@@ -913,6 +951,47 @@ namespace BattleKing.Skills
             }
         }
 
+        private static void ApplyCleanseAilment(
+            BattleContext context,
+            BattleUnit caster,
+            IReadOnlyList<BattleUnit> targets,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            List<string> logs)
+        {
+            var ailmentNames = GetStringList(parameters, "ailments");
+            if (TryGetString(parameters, "ailment", out string singleAilment))
+                ailmentNames.Add(singleAilment);
+
+            var requested = ailmentNames
+                .Select(name => Enum.TryParse<StatusAilment>(name, true, out var ailment)
+                    ? (StatusAilment?)ailment
+                    : null)
+                .Where(ailment => ailment.HasValue)
+                .Select(ailment => ailment.Value)
+                .ToHashSet();
+            int count = GetInt(parameters, "count", int.MaxValue);
+
+            foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Target"))
+            {
+                int removed = 0;
+                for (int i = target.Ailments.Count - 1; i >= 0 && removed < count; i--)
+                {
+                    var ailment = target.Ailments[i];
+                    if (requested.Count > 0 && !requested.Contains(ailment))
+                        continue;
+
+                    target.Ailments.RemoveAt(i);
+                    removed++;
+                }
+
+                if (!target.Ailments.Contains(StatusAilment.Stun) && target.State == UnitState.Stunned)
+                    target.State = UnitState.Normal;
+
+                logs.Add($"{target.Data.Name}.AilmentRemoved={removed}");
+            }
+        }
+
         private static void ApplyTemporalMark(
             BattleContext context,
             BattleUnit caster,
@@ -946,9 +1025,52 @@ namespace BattleKing.Skills
             int turns = GetInt(parameters, "turns", -1);
             foreach (var target in SelectTargets(context, caster, targets, parameters, calculation, "Self"))
             {
-                target.AddTemporal(key, count, turns, sourceSkillId);
-                logs.Add($"{target.Data.Name}.{key}");
+                var affectedUnitIds = SelectForcedTargetAffectedUnits(context, target, parameters)
+                    .Select(unit => unit.Data?.Id)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct()
+                    .ToList();
+                target.AddTemporal(key, count, turns, sourceSkillId, affectedUnitIds);
+                string affectedText = affectedUnitIds.Count == 0 ? "" : $" affected={FormatList(affectedUnitIds)}";
+                logs.Add($"{target.Data.Name}.{key}{affectedText}");
             }
+        }
+
+        private static List<BattleUnit> SelectForcedTargetAffectedUnits(
+            BattleContext context,
+            BattleUnit forcedTarget,
+            Dictionary<string, object> parameters)
+        {
+            if (context == null || forcedTarget == null)
+                return new List<BattleUnit>();
+
+            string affectedEnemyRow = GetString(parameters, "affectedEnemyRow", "");
+            if (string.IsNullOrWhiteSpace(affectedEnemyRow))
+                return new List<BattleUnit>();
+
+            var enemies = context.GetAliveUnits(!forcedTarget.IsPlayer);
+            bool? frontRow = affectedEnemyRow.Trim().ToLowerInvariant() switch
+            {
+                "front" => true,
+                "frontrow" => true,
+                "back" => false,
+                "backrow" => false,
+                "auto" => SelectAutoAffectedEnemyRow(enemies),
+                "onerow" => SelectAutoAffectedEnemyRow(enemies),
+                _ => null
+            };
+
+            return frontRow.HasValue
+                ? enemies.Where(unit => unit.IsFrontRow == frontRow.Value).ToList()
+                : new List<BattleUnit>();
+        }
+
+        private static bool? SelectAutoAffectedEnemyRow(List<BattleUnit> enemies)
+        {
+            if (enemies == null || enemies.Count == 0)
+                return null;
+
+            return enemies.Any(unit => unit.IsFrontRow);
         }
 
         private static void ApplyActionOrderPriority(
@@ -1036,13 +1158,41 @@ namespace BattleKing.Skills
             }
         }
 
-        private static void ApplyCoverAlly(BattleUnit caster, DamageCalculation calculation, List<string> logs)
+        private static void ApplyCoverAlly(
+            BattleUnit caster,
+            Dictionary<string, object> parameters,
+            DamageCalculation calculation,
+            List<string> logs)
         {
             if (calculation == null || calculation.CannotBeCovered)
                 return;
+            if (!CoverScopeMatches(caster, calculation, parameters))
+                return;
 
             calculation.CoverTarget = caster;
+            calculation.CoverScope = GetString(parameters, "scope", "");
             logs.Add($"Cover={caster.Data.Name}");
+        }
+
+        private static bool CoverScopeMatches(
+            BattleUnit caster,
+            DamageCalculation calculation,
+            Dictionary<string, object> parameters)
+        {
+            string scope = GetString(parameters, "scope", "");
+            if (string.IsNullOrWhiteSpace(scope))
+                return true;
+
+            var defender = calculation?.Defender;
+            if (caster == null || defender == null)
+                return false;
+
+            return scope.ToLowerInvariant() switch
+            {
+                "row" => caster.IsFrontRow == defender.IsFrontRow,
+                "column" => IsSameColumn(caster.Position, defender.Position),
+                _ => true
+            };
         }
 
         private void ApplyPendingActionEffect(
@@ -1114,20 +1264,26 @@ namespace BattleKing.Skills
                 .Select(t => t.Data?.Name ?? t.Data?.Id ?? "")
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .ToList();
-            var tags = action.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? new List<string>();
-            string hitRate = action.HitRate.HasValue ? action.HitRate.Value.ToString() : "default";
+            string actorName = action.Actor?.Data?.Name ?? "";
+            string targetNames = targets.Count == 0 ? "目标" : string.Join("、", targets);
+            string verb = GetPendingActionQueuedVerb(action);
 
-            return $"{action.Type} queued actor={action.Actor?.Data?.Name ?? ""}"
-                + $" passive={action.SourcePassiveId}"
-                + $" targets={FormatList(targets)}"
-                + $" power={action.Power}"
-                + $" hitCount={action.HitCount}"
-                + $" hitRate={hitRate}"
-                + $" damageType={action.DamageType}"
-                + $" attackType={action.AttackType}"
-                + $" targetType={action.TargetType}"
-                + $" ignoreDefense={FormatPendingIgnoreDefense(action)}"
-                + $" tags={FormatList(tags)}";
+            return $"{verb}: {actorName} -> {targetNames}（{FormatPendingActionSpec(action)}）";
+        }
+
+        private static string GetPendingActionQueuedVerb(PendingAction action)
+        {
+            if (action.SourcePassiveId?.Contains("pursuit", StringComparison.OrdinalIgnoreCase) == true)
+                return "准备追击";
+
+            return action.Type switch
+            {
+                PendingActionType.Counter => "准备反击",
+                PendingActionType.Pursuit => "准备追击",
+                PendingActionType.Preemptive => "准备先制攻击",
+                PendingActionType.BattleEnd => "准备战斗结束攻击",
+                _ => "准备追加攻击"
+            };
         }
 
         private static string FormatPendingIgnoreDefense(PendingAction action)
@@ -1139,6 +1295,30 @@ namespace BattleKing.Skills
                 ? $"{action.IgnoreDefenseRatio:0.##}@{action.IgnoreDefenseTargetClass.Value}"
                 : $"{action.IgnoreDefenseRatio:0.##}";
         }
+
+        private static string FormatPendingActionSpec(PendingAction action)
+        {
+            string hitRate = action.HitRate.HasValue ? $"{action.HitRate.Value}%" : "100%";
+            return $"威力{action.Power} / 命中倍率{hitRate} / {SkillTypeLabel(action.DamageType)}{AttackTypeLabel(action.AttackType)} / {Math.Max(1, action.HitCount)}hit";
+        }
+
+        private static string SkillTypeLabel(SkillType type) => type switch
+        {
+            SkillType.Physical => "物理",
+            SkillType.Magical => "魔法",
+            SkillType.Assist => "辅助",
+            SkillType.Heal => "回复",
+            SkillType.Debuff => "妨害",
+            _ => type.ToString()
+        };
+
+        private static string AttackTypeLabel(AttackType type) => type switch
+        {
+            AttackType.Melee => "近接",
+            AttackType.Ranged => "远隔",
+            AttackType.Magic => "魔法",
+            _ => type.ToString()
+        };
 
         private static void ApplyAugmentCurrentAction(
             BattleContext context,
@@ -1231,28 +1411,14 @@ namespace BattleKing.Skills
             if (currentActionSkill == null)
                 return false;
 
-            SkillType skillType = default;
             if (!string.IsNullOrWhiteSpace(requiredSkillType)
-                && !Enum.TryParse(requiredSkillType, true, out skillType))
-            {
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(requiredSkillType)
-                && currentActionSkill.Data.Type != skillType)
-            {
-                return false;
-            }
-
-            AttackType attackType = default;
-            if (!string.IsNullOrWhiteSpace(requiredAttackType)
-                && !Enum.TryParse(requiredAttackType, true, out attackType))
+                && !SkillTypeRequirementMatches(requiredSkillType, currentActionSkill))
             {
                 return false;
             }
 
             if (!string.IsNullOrWhiteSpace(requiredAttackType)
-                && currentActionSkill.Data.AttackType != attackType)
+                && !EnumRequirementMatches(requiredAttackType, currentActionSkill.Data.AttackType))
             {
                 return false;
             }
@@ -1260,9 +1426,33 @@ namespace BattleKing.Skills
             return true;
         }
 
+        private static bool EnumRequirementMatches<TEnum>(string requiredValues, TEnum actual)
+            where TEnum : struct, Enum
+        {
+            var parts = requiredValues
+                .Split(new[] { ',', '|', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => value.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList();
+
+            if (parts.Count == 0)
+                return true;
+
+            foreach (var part in parts)
+            {
+                if (!Enum.TryParse(part, true, out TEnum parsed))
+                    return false;
+                if (EqualityComparer<TEnum>.Default.Equals(parsed, actual))
+                    return true;
+            }
+
+            return false;
+        }
+
         internal static bool IncomingSkillRequirementMatches(
             Dictionary<string, object> parameters,
-            ActiveSkill incomingSkill)
+            ActiveSkill incomingSkill,
+            DamageCalculation calculation = null)
         {
             if (!TryGetIncomingRequirement(parameters, "SkillType", out string requiredSkillType)
                 && !TryGetIncomingRequirement(parameters, "DamageType", out requiredSkillType))
@@ -1284,15 +1474,8 @@ namespace BattleKing.Skills
             if (incomingSkill == null)
                 return false;
 
-            SkillType skillType = default;
             if (!string.IsNullOrWhiteSpace(requiredSkillType)
-                && !Enum.TryParse(requiredSkillType, true, out skillType))
-            {
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(requiredSkillType)
-                && incomingSkill.Data.Type != skillType)
+                && !SkillTypeRequirementMatches(requiredSkillType, incomingSkill, calculation))
             {
                 return false;
             }
@@ -1313,6 +1496,47 @@ namespace BattleKing.Skills
             return true;
         }
 
+        private static bool SkillTypeRequirementMatches(
+            string requiredValues,
+            ActiveSkill skill,
+            DamageCalculation calculation = null)
+        {
+            var parts = requiredValues
+                .Split(new[] { ',', '|', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => value.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList();
+
+            if (parts.Count == 0)
+                return true;
+
+            foreach (var part in parts)
+            {
+                if (!Enum.TryParse(part, true, out SkillType parsed))
+                    return false;
+                if (SkillTypeRequirementMatches(parsed, skill, calculation))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool SkillTypeRequirementMatches(
+            SkillType required,
+            ActiveSkill skill,
+            DamageCalculation calculation = null)
+        {
+            if (skill == null)
+                return false;
+
+            return required switch
+            {
+                SkillType.Physical => skill.HasPhysicalComponent,
+                SkillType.Magical => skill.HasMagicalComponent || calculation?.HasAdditionalMagicalComponent == true,
+                _ => skill.Data.Type == required
+            };
+        }
+
         internal static bool HasIncomingSkillRequirement(Dictionary<string, object> parameters)
         {
             return parameters != null
@@ -1330,7 +1554,7 @@ namespace BattleKing.Skills
                 || TryGetString(parameters, $"incoming{suffix}", out value);
         }
 
-        private static List<SkillEffectData> GetEffectList(Dictionary<string, object> parameters, string key)
+        internal static List<SkillEffectData> GetEffectList(Dictionary<string, object> parameters, string key)
         {
             var effects = new List<SkillEffectData>();
             AddNestedEffects(parameters, key, effects);
@@ -1530,10 +1754,36 @@ namespace BattleKing.Skills
             bool requireUnblocked = GetBool(parameters, "requireUnblocked", false)
                 || GetBool(parameters, "requireNotBlocked", false);
             bool requireFirstHitUnblocked = GetBool(parameters, "requireFirstHitUnblocked", false);
+            bool targetHpBeforeRatioMatches = TargetHpBeforeRatioMatches(parameters, result);
             return (!requireDamage || result.TotalDamage > 0)
                 && (!requireUnblocked || !result.IsBlocked)
                 && (!requireFirstHitUnblocked || FirstHitWasNotBlocked(result))
+                && targetHpBeforeRatioMatches
                 && ChanceMatches(parameters);
+        }
+
+        private static bool TargetHpBeforeRatioMatches(Dictionary<string, object> parameters, DamageResult result)
+        {
+            bool hasMin = TryGetFloat(parameters, "targetHpBeforeRatioMin", out float min);
+            bool hasMax = TryGetFloat(parameters, "targetHpBeforeRatioMax", out float max);
+            if (!hasMin && !hasMax)
+                return true;
+
+            var target = result?.ResolvedDefender;
+            int maxHp = GetMaxHp(target);
+            float beforeRatio = Math.Clamp((result?.DamageReceiverHpBefore ?? 0) / (float)maxHp, 0f, 1f);
+
+            if (hasMin && beforeRatio < NormalizeRatio(min))
+            {
+                return false;
+            }
+
+            if (hasMax && beforeRatio > NormalizeRatio(max))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static bool FirstHitWasNotBlocked(DamageResult result)
@@ -1711,7 +1961,7 @@ namespace BattleKing.Skills
             return Enum.TryParse<UnitClass>(value, true, out var parsed) ? parsed : null;
         }
 
-        private static bool GetBool(Dictionary<string, object> parameters, string key, bool fallback)
+        internal static bool GetBool(Dictionary<string, object> parameters, string key, bool fallback)
         {
             if (!parameters.TryGetValue(key, out var raw) || raw == null)
                 return fallback;

@@ -43,6 +43,15 @@ namespace BattleKing.Core
             RetryLater
         }
 
+        private sealed class RowCoverActivation
+        {
+            public bool CoveredSide { get; set; }
+            public bool IsFrontRow { get; set; }
+            public BattleUnit CoverTarget { get; set; }
+            public bool? ForceBlock { get; set; }
+            public float? ForcedBlockReduction { get; set; }
+        }
+
         public BattleEngine(BattleContext ctx)
         {
             _ctx = ctx;
@@ -432,6 +441,7 @@ namespace BattleKing.Core
                 return;
             }
 
+            var rowCoverActivations = new List<RowCoverActivation>();
             foreach (var target in targets)
             {
                 if (!target.IsAlive)
@@ -455,6 +465,7 @@ namespace BattleKing.Core
                 if (augmentCalcLogs.Count > 0)
                     Log($"  augment calc effects: {string.Join(", ", augmentCalcLogs)}");
 
+                ApplyActiveRowCover(rowCoverActivations, target, calc);
                 _ctx.CurrentCalc = calc;  // For AttackAttribute conditions
                 _eventBus.Publish(new BeforeHitEvent
                 {
@@ -465,6 +476,7 @@ namespace BattleKing.Core
                     Calc = calc,
                     SourceKind = BattleActionSourceKind.ActiveAttack
                 });
+                RegisterRowCover(rowCoverActivations, target, calc);
 
                 var result = _damageCalculator.Calculate(calc);
                 var damageReceiver = result.ResolvedDefender ?? calc.ResolvedDefender ?? target;
@@ -482,7 +494,7 @@ namespace BattleKing.Core
                     killed,
                     "ActiveAttack",
                     AppendCurrentActionAugmentLog(logLines.LastOrDefault() ?? ""),
-                    extraFlags: BuildCurrentActionAugmentFlags()));
+                    extraFlags: BuildDamageCalculationFlags(calc).Concat(BuildCurrentActionAugmentFlags())));
 
 				if (killed)
 				{
@@ -493,6 +505,17 @@ namespace BattleKing.Core
 						Context = _ctx
 					});
 				}
+
+                bool reflectedKilled = ApplyReflectedDamage(calc);
+                if (reflectedKilled)
+                {
+                    _eventBus.Publish(new OnKnockdownEvent
+                    {
+                        Victim = unit,
+                        Killer = damageReceiver,
+                        Context = _ctx
+                    });
+                }
 
                 var postEffectLogs = _skillEffectExecutor.ExecutePostDamageEffects(
                     _ctx, unit, damageReceiver, skill.Data.Effects, skill.Data.Id, calc, result, killed);
@@ -526,6 +549,57 @@ namespace BattleKing.Core
             ProcessPendingActions();
 
             Log($"  {BattleKing.Ui.BattleLogHelper.FormatUnitName(unit)} 行动结束: {DumpUnitBrief(unit)}");
+        }
+
+        private static void ApplyActiveRowCover(
+            List<RowCoverActivation> rowCoverActivations,
+            BattleUnit target,
+            DamageCalculation calc)
+        {
+            if (target == null || calc == null || calc.CannotBeCovered)
+                return;
+
+            var rowCover = rowCoverActivations.FirstOrDefault(cover =>
+                cover.CoverTarget?.IsAlive == true
+                && cover.CoveredSide == target.IsPlayer
+                && cover.IsFrontRow == target.IsFrontRow);
+            if (rowCover == null)
+                return;
+
+            calc.CoverTarget = rowCover.CoverTarget;
+            calc.CoverScope = "Row";
+            if (rowCover.ForceBlock.HasValue)
+                calc.ForceBlock = rowCover.ForceBlock;
+            if (rowCover.ForcedBlockReduction.HasValue)
+                calc.ForcedBlockReduction = rowCover.ForcedBlockReduction;
+        }
+
+        private static void RegisterRowCover(
+            List<RowCoverActivation> rowCoverActivations,
+            BattleUnit target,
+            DamageCalculation calc)
+        {
+            if (target == null
+                || calc?.CoverTarget == null
+                || calc.CannotBeCovered
+                || !string.Equals(calc.CoverScope, "Row", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            bool exists = rowCoverActivations.Any(cover =>
+                cover.CoveredSide == target.IsPlayer
+                && cover.IsFrontRow == target.IsFrontRow
+                && cover.CoverTarget == calc.CoverTarget);
+            if (exists)
+                return;
+
+            rowCoverActivations.Add(new RowCoverActivation
+            {
+                CoveredSide = target.IsPlayer,
+                IsFrontRow = target.IsFrontRow,
+                CoverTarget = calc.CoverTarget,
+                ForceBlock = calc.ForceBlock,
+                ForcedBlockReduction = calc.ForcedBlockReduction
+            });
         }
 
         private void AddOutgoingActionAugments(BattleUnit unit, ActiveSkill skill)
@@ -619,6 +693,21 @@ namespace BattleKing.Core
             return result.IsHit && result.TotalDamage > 0 && !damageReceiver.IsAlive;
         }
 
+        private bool ApplyReflectedDamage(DamageCalculation calc)
+        {
+            if (calc?.ReflectDamageToAttacker != true
+                || calc.ReflectedDamage <= 0
+                || calc.Attacker?.IsAlive != true)
+            {
+                return false;
+            }
+
+            int hpBefore = calc.Attacker.CurrentHp;
+            calc.Attacker.TakeDamage(calc.ReflectedDamage);
+            Log($"  [反射] {BattleKing.Ui.BattleLogHelper.FormatUnitName(calc.Attacker)} hp={hpBefore}->{calc.Attacker.CurrentHp}(-{Math.Max(0, hpBefore - calc.Attacker.CurrentHp)})");
+            return !calc.Attacker.IsAlive;
+        }
+
         private List<string> ExecuteCurrentActionAugmentQueuedActions(IReadOnlyList<BattleUnit> targets)
         {
             var logs = new List<string>();
@@ -702,6 +791,30 @@ namespace BattleKing.Core
             return flags.Distinct();
         }
 
+        private static IEnumerable<string> BuildDamageCalculationFlags(DamageCalculation calc)
+        {
+            var flags = new List<string>();
+            if (calc.ForceHit)
+                flags.Add("ForceHit");
+            if (calc.CannotBeBlocked)
+                flags.Add("CannotBeBlocked");
+            if (calc.CannotCrit)
+                flags.Add("CannotCrit");
+            if (calc.CannotBeCovered)
+                flags.Add("CannotBeCovered");
+            if (calc.FixedPhysicalDamagePerHit.HasValue)
+                flags.Add($"FixedPhysicalDamage={calc.FixedPhysicalDamagePerHit.Value:0.##}");
+            if (calc.IgnoreDefenseRatio > 0f)
+                flags.Add($"IgnoreDefense={calc.IgnoreDefenseRatio:0.##}");
+            if (calc.HitCount > 1)
+                flags.Add($"HitCount={calc.HitCount}");
+            if (calc.AdditionalMagicalPower > 0f)
+                flags.Add($"AdditionalMagicalPower={calc.AdditionalMagicalPower:0.##}");
+            if (calc.ReflectDamageToAttacker)
+                flags.Add("ReflectDamageToAttacker");
+            return flags;
+        }
+
         private bool ProcessPendingActions()
         {
             bool processed = false;
@@ -776,6 +889,16 @@ namespace BattleKing.Core
                         {
                             Victim = damageReceiver,
                             Killer = action.Actor,
+                            Context = _ctx
+                        });
+                    }
+                    bool reflectedKilled = ApplyReflectedDamage(calc);
+                    if (reflectedKilled)
+                    {
+                        _eventBus.Publish(new OnKnockdownEvent
+                        {
+                            Victim = action.Actor,
+                            Killer = damageReceiver,
                             Context = _ctx
                         });
                     }
@@ -1088,23 +1211,126 @@ namespace BattleKing.Core
             DamageResult result,
             bool killed)
         {
-            return $"[{action.Type}] actor={FormatPendingUnit(action.Actor)}"
-                + $" passive={GetPassiveDisplayName(action.SourcePassiveId)}"
-                + $" target={FormatPendingUnit(declaredTarget)}"
-                + $" receiver={FormatPendingUnit(damageReceiver)}"
-                + $" damage={result.TotalDamage}"
-                + $" hitCount={Math.Max(1, action.HitCount)}"
-                + FormatPendingHpChange(result)
-                + $" hit={result.IsHit}"
-                + $" blocked={result.IsBlocked}"
-                + $" critical={result.IsCritical}"
-                + $" evaded={result.IsEvaded}"
-                + $" killed={killed}"
-                + $" sureHit={calc.ForceHit}"
-                + $" ignoreDefense={calc.IgnoreDefenseRatio:0.##}"
-                + $" ailments={FormatAilments(result.AppliedAilments)}"
-                + $" temporary=actor:{FormatTemporalStates(action.Actor)};receiver:{FormatTemporalStates(damageReceiver)}"
-                + $" tags={FormatTags(action.Tags)}";
+            var lines = new List<string>();
+            string skillName = GetPassiveName(action.SourcePassiveId);
+            string verb = GetPendingActionVerb(action, skillName);
+            string attackerName = FormatReadableUnitName(action.Actor);
+            string targetName = FormatReadableUnitName(declaredTarget);
+            string receiverName = FormatReadableUnitName(damageReceiver);
+
+            lines.Add($"[{skillName}] {attackerName}{verb}{targetName}");
+            lines.Add($"  威力{action.Power} / 命中倍率{FormatHitRate(action.HitRate)} / {SkillTypeLabel(action.DamageType)}{AttackTypeLabel(action.AttackType)} / {Math.Max(1, action.HitCount)}hit");
+            if (damageReceiver != declaredTarget)
+                lines.Add($"  掩护: {targetName} -> {receiverName}");
+            lines.Add("  " + BuildPendingHitFormula(action.Actor, declaredTarget, calc));
+            lines.Add("  判定: " + BuildPendingJudgement(result, killed));
+            if (result.IsHit)
+                lines.Add($"  伤害: {result.TotalDamage}");
+            lines.Add("  " + BuildPendingHpLine(receiverName, result));
+            if (result.AppliedAilments.Count > 0)
+                lines.Add("  异常: " + string.Join("、", result.AppliedAilments));
+
+            return string.Join("\n", lines);
+        }
+
+        private static string GetPendingActionVerb(PendingAction action, string skillName)
+        {
+            if (!string.IsNullOrWhiteSpace(skillName) && skillName.Contains("追击"))
+                return "追击";
+
+            return action.Type switch
+            {
+                PendingActionType.Counter => "反击",
+                PendingActionType.Pursuit => "追击",
+                PendingActionType.Preemptive => "先制攻击",
+                PendingActionType.BattleEnd => "战斗结束攻击",
+                _ => "追加攻击"
+            };
+        }
+
+        private static string BuildPendingHitFormula(BattleUnit attacker, BattleUnit defender, DamageCalculation calc)
+        {
+            if (calc.ForceHit)
+                return "命中率: 必中";
+
+            var hitChance = HitChanceCalculator.Calculate(attacker, defender, calc.Skill);
+            string baseFormula = $"({FormatReadableUnitName(attacker)}命中{hitChance.AttackerHit} - {FormatReadableUnitName(defender)}回避{hitChance.DefenderEvasion})";
+            if (hitChance.FlyingPenaltyApplied)
+                baseFormula = $"({baseFormula} / 2(飞行防御))";
+            string formula = "命中率: " + baseFormula;
+            formula += $" x 技能命中倍率{hitChance.SkillHitRate}% = {FormatFloat(hitChance.RawChance)}%";
+            if (hitChance.RawChance < 0f || hitChance.RawChance > 100f)
+                formula += $"，显示上限/下限后 {hitChance.FinalChance}%";
+            else if (Math.Abs(hitChance.RawChance - hitChance.FinalChance) > 0.001f)
+                formula += $"，向下取整后 {hitChance.FinalChance}%";
+            else
+                formula += $"，最终 {hitChance.FinalChance}%";
+            return formula;
+        }
+
+        private static string BuildPendingJudgement(DamageResult result, bool killed)
+        {
+            if (result.IsEvaded)
+                return "回避";
+            if (!result.IsHit)
+                return "未命中";
+
+            var parts = new List<string> { "命中" };
+            if (result.IsCritical)
+                parts.Add("暴击");
+            if (result.IsBlocked)
+                parts.Add("格挡");
+            if (result.TotalDamage == 0)
+                parts.Add("0伤害");
+            if (killed)
+                parts.Add("击倒");
+            return string.Join("，", parts);
+        }
+
+        private static string BuildPendingHpLine(string receiverName, DamageResult result)
+        {
+            if (!result.DamageReceiverHpBefore.HasValue || !result.DamageReceiverHpAfter.HasValue)
+                return $"{receiverName} HP: 未变化";
+
+            string text = $"{receiverName} HP: {result.DamageReceiverHpBefore.Value} -> {result.DamageReceiverHpAfter.Value}(-{result.AppliedHpDamage})";
+            if (result.LethalDamageResisted)
+                text += " [保留1HP]";
+            return text;
+        }
+
+        private static string FormatReadableUnitName(BattleUnit unit)
+        {
+            return unit?.Data?.Name ?? unit?.Data?.Id ?? "";
+        }
+
+        private static string FormatHitRate(int? hitRate)
+        {
+            return hitRate.HasValue ? $"{hitRate.Value}%" : "100%";
+        }
+
+        private static string SkillTypeLabel(SkillType type) => type switch
+        {
+            SkillType.Physical => "物理",
+            SkillType.Magical => "魔法",
+            SkillType.Assist => "辅助",
+            SkillType.Heal => "回复",
+            SkillType.Debuff => "妨害",
+            _ => type.ToString()
+        };
+
+        private static string AttackTypeLabel(AttackType type) => type switch
+        {
+            AttackType.Melee => "近接",
+            AttackType.Ranged => "远隔",
+            AttackType.Magic => "魔法",
+            _ => type.ToString()
+        };
+
+        private static string FormatFloat(float value)
+        {
+            return Math.Abs(value - MathF.Round(value)) < 0.01f
+                ? MathF.Round(value).ToString("F0")
+                : value.ToString("0.##");
         }
 
         private static string FormatPendingUnit(BattleUnit unit)
@@ -1152,17 +1378,7 @@ namespace BattleKing.Core
 
         private static IEnumerable<string> BuildPendingActionFlags(PendingAction action, DamageCalculation calc)
         {
-            var flags = new List<string>();
-            if (calc.ForceHit)
-                flags.Add("ForceHit");
-            if (calc.CannotBeBlocked)
-                flags.Add("CannotBeBlocked");
-            if (calc.CannotBeCovered)
-                flags.Add("CannotBeCovered");
-            if (calc.IgnoreDefenseRatio > 0f)
-                flags.Add($"IgnoreDefense={calc.IgnoreDefenseRatio:0.##}");
-            if (action.HitCount > 1)
-                flags.Add($"HitCount={action.HitCount}");
+            var flags = BuildDamageCalculationFlags(calc).ToList();
             flags.AddRange(action.Tags ?? new List<string>());
             return flags;
         }

@@ -19,7 +19,6 @@ namespace BattleKing.Tests
             "data"));
 
         [TestCase("act_dual_shot", SkillType.Physical)]
-        [TestCase("act_magic_missile", SkillType.Magical)]
         public void StepOneAction_RealJsonTwoEnemyRangedSkills_DamageOnlyTwoEnemies(string skillId, SkillType skillType)
         {
             var repository = LoadRepository();

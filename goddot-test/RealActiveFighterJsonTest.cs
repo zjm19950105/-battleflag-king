@@ -82,6 +82,8 @@ namespace BattleKing.Tests
             CollectionAssert.AreEqual(
                 new[] { "ModifyDamageCalc", "AddBuff", "OnHitEffect" },
                 skill.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual(2, skill.ApCost);
+            ClassicAssert.AreEqual(1, caster.CurrentAp);
             ClassicAssert.AreEqual(150, caster.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(1, caster.CurrentPp);
             ClassicAssert.Less(firstEnemy.CurrentHp, firstEnemy.Data.BaseStats["HP"]);

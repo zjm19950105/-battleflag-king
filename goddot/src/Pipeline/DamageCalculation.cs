@@ -16,7 +16,16 @@ namespace BattleKing.Pipeline
 
         public int BaseDifference => System.Math.Max(1, FinalAttackPower - FinalDefense);
 
+        public int PhysicalAttackPower { get; set; }
+        public int PhysicalDefense { get; set; }
+        public int MagicalAttackPower { get; set; }
+        public int MagicalDefense { get; set; }
+        public int PhysicalBaseDifference => System.Math.Max(1, PhysicalAttackPower - PhysicalDefense);
+        public int MagicalBaseDifference => System.Math.Max(1, MagicalAttackPower - MagicalDefense);
+
         public float SkillPowerRatio { get; set; } = 1.0f;
+        public float PhysicalSkillPowerRatio { get; set; } = 1.0f;
+        public float MagicalSkillPowerRatio { get; set; } = 1.0f;
         public float ClassTraitMultiplier { get; set; } = 1.0f;
         public float CharacterTraitMultiplier { get; set; } = 1.0f;
 
@@ -68,8 +77,16 @@ namespace BattleKing.Pipeline
         /// <summary>Nullify magical damage (magic barrier, etc.)</summary>
         public bool NullifyMagicalDamage { get; set; } = false;
 
+        /// <summary>Reflect incoming magical damage back to the attacker.</summary>
+        public bool ReflectDamageToAttacker { get; set; } = false;
+
+        public int ReflectedDamage { get; set; }
+
         /// <summary>If set, attack redirects to this unit (cover)</summary>
         public BattleUnit CoverTarget { get; set; } = null;
+
+        /// <summary>Cover scope that created CoverTarget, e.g. Row for row-cover reuse within one action.</summary>
+        public string CoverScope { get; set; } = "";
 
         /// <summary>Final unit that receives damage after cover is resolved</summary>
         public BattleUnit ResolvedDefender { get; set; } = null;
@@ -79,6 +96,12 @@ namespace BattleKing.Pipeline
 
         /// <summary>This attack cannot be blocked (guard-seal)</summary>
         public bool CannotBeBlocked { get; set; } = false;
+
+        /// <summary>This attack cannot critically hit.</summary>
+        public bool CannotCrit { get; set; } = false;
+
+        /// <summary>Fixed physical base damage per hit, before nullify/final damage multiplier.</summary>
+        public float? FixedPhysicalDamagePerHit { get; set; } = null;
 
         // === Module 1: Multi-hit support ===
 
@@ -91,10 +114,32 @@ namespace BattleKing.Pipeline
         /// <summary>Bonus power from structured calculation effects.</summary>
         public float SkillPowerBonus { get; set; } = 0f;
 
+        /// <summary>Additional magical component power appended to the current action.</summary>
+        public float AdditionalMagicalPower { get; set; } = 0f;
+
         public List<string> SkillPowerBonusNotes { get; } = new List<string>();
+
+        public bool HasPhysicalComponent => Skill?.HasPhysicalComponent == true;
+
+        public bool HasAdditionalMagicalComponent => AdditionalMagicalPower > 0f;
+
+        public bool HasMagicalComponent => Skill?.HasMagicalComponent == true || HasAdditionalMagicalComponent;
+
+        public bool HasMixedDamage => HasPhysicalComponent && HasMagicalComponent;
 
         /// <summary>Effective skill power = base power + structured/counter bonuses.</summary>
         public float EffectivePower => Skill.Power + SkillPowerBonus + CounterPowerBonus;
+
+        public float EffectivePhysicalPower
+            => (Skill.PhysicalPower ?? (Skill.HasPhysicalComponent ? Skill.Power : 0))
+                + SkillPowerBonus
+                + CounterPowerBonus;
+
+        public float EffectiveMagicalPower
+            => (Skill.MagicalPower ?? (Skill.HasMagicalComponent ? Skill.Power : 0))
+                + AdditionalMagicalPower
+                + SkillPowerBonus
+                + CounterPowerBonus;
     }
 
     public class DamageHitResult

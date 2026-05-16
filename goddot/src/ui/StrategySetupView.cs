@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using BattleKing.Ai;
 using BattleKing.Core;
@@ -64,11 +65,13 @@ namespace BattleKing.Ui
                     if (s != null && avail[j].Id == s.SkillId) skillSel = j + 1;
                 }
                 skillOpt.Selected = skillSel;
+                UpdateSkillOptionTooltip(skillOpt, avail, skillSel);
                 int cap = slot;
                 skillOpt.ItemSelected += (long idx) => {
                     int si = (int)idx;
                     while (unit.Strategies.Count <= cap) unit.Strategies.Add(new Strategy { SkillId = avail[0].Id });
                     unit.Strategies[cap].SkillId = si == 0 ? avail[0].Id : avail[si - 1].Id;
+                    UpdateSkillOptionTooltip(skillOpt, avail, si);
                 };
                 headerRow.AddChild(skillOpt);
                 stratList.AddChild(headerRow);
@@ -274,8 +277,40 @@ namespace BattleKing.Ui
             {
                 var sk = gameData.GetActiveSkill(sid);
                 if (sk == null) continue;
-                detailLabel.AppendText($"  AP{sk.ApCost} {sk.Name} — {sk.EffectDescription}\n");
+                detailLabel.AppendText($"  AP{sk.ApCost} {sk.Name} — 威力{FormatPowerSummary(sk)} / 命中{FormatHitSummary(sk)} — {sk.EffectDescription}\n");
             }
+        }
+
+        private static void UpdateSkillOptionTooltip(OptionButton skillOpt, List<ActiveSkillData> skills, int selectedIndex)
+        {
+            if (selectedIndex <= 0 || selectedIndex > skills.Count)
+            {
+                skillOpt.TooltipText = "";
+                return;
+            }
+
+            skillOpt.TooltipText = SandboxTooltipHelper.BuildActiveSkillDetail(skills[selectedIndex - 1]);
+        }
+
+        private static string FormatPowerSummary(ActiveSkillData skill)
+        {
+            if (skill.PhysicalPower.HasValue || skill.MagicalPower.HasValue)
+            {
+                var parts = new List<string>();
+                if (skill.PhysicalPower.HasValue)
+                    parts.Add("物理" + skill.PhysicalPower.Value);
+                if (skill.MagicalPower.HasValue)
+                    parts.Add("魔法" + skill.MagicalPower.Value);
+                return string.Join("/", parts);
+            }
+
+            return skill.Power > 0 ? skill.Power.ToString() : "无";
+        }
+
+        private static string FormatHitSummary(ActiveSkillData skill)
+        {
+            bool sureHit = skill.Tags?.Any(tag => string.Equals(tag, "SureHit", StringComparison.OrdinalIgnoreCase)) == true;
+            return sureHit ? "必中" : (skill.HitRate.HasValue ? skill.HitRate.Value + "%" : "100%");
         }
 
         private static void ClearPanel(Control panel)

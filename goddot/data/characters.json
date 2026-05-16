@@ -38,7 +38,10 @@
     "initialEquipmentIds": [
       "equ_recruit_sword"
     ],
-    "ccInitialEquipmentIds": [],
+    "ccInitialEquipmentIds": [
+      "equ_recruit_sword",
+      "equ_recruit_sword"
+    ],
     "ccClassId": "swordmaster",
     "ccName": "剑圣",
     "ccEquippableCategories": [
@@ -90,10 +93,12 @@
     "growthType": "攻击特化型",
     "traits": [],
     "initialEquipmentIds": [
+      "equ_recruit_sword"
+    ],
+    "ccInitialEquipmentIds": [
       "equ_recruit_sword",
       "equ_mercenary_wood_shield"
     ],
-    "ccInitialEquipmentIds": [],
     "ccClassId": "landsknecht",
     "ccName": "兰茨克内希特",
     "ccEquippableCategories": [
@@ -165,7 +170,10 @@
     "ccInnatePassiveSkillIds": [
       "pas_rapid_order"
     ],
-    "ccInitialEquipmentIds": [],
+    "ccInitialEquipmentIds": [
+      "equ_lord_sword",
+      "equ_lord_shield"
+    ],
     "ccClasses": [
       "Cavalry"
     ],
@@ -214,7 +222,7 @@
     "growthType": "防御型",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_fighter_axe",
+      "equ_bronze_sword",
       "equ_fighter_shield"
     ],
     "ccClassId": "vanguard",
@@ -325,8 +333,7 @@
     "growthType": "攻击型",
     "traits": [],
     "initialEquipmentIds": [
-      "equ_huskarl_axe",
-      "equ_huskarl_shield"
+      "equ_huskarl_axe"
     ],
     "ccClassId": "viking",
     "ccName": "维京",
@@ -342,7 +349,10 @@
     "ccInnatePassiveSkillIds": [
       "pas_calm_cover"
     ],
-    "ccInitialEquipmentIds": []
+    "ccInitialEquipmentIds": [
+      "equ_huskarl_axe",
+      "equ_huskarl_shield"
+    ]
   },
   {
     "id": "hoplite",
@@ -413,11 +423,10 @@
       "Accessory"
     ],
     "innateActiveSkillIds": [
-      "act_full_assault",
-      "act_formation_breaker"
+      "act_full_assault"
     ],
     "innatePassiveSkillIds": [
-      "pas_bounce"
+      "pas_wide_counter"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
@@ -450,10 +459,11 @@
       "Accessory"
     ],
     "ccInnateActiveSkillIds": [
+      "act_formation_breaker",
       "act_accumulate"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_wide_counter",
+      "pas_bounce",
       "pas_berserk"
     ],
     "ccInitialEquipmentIds": []
@@ -616,7 +626,10 @@
     "initialEquipmentIds": [
       "equ_shooter_bow"
     ],
-    "ccInitialEquipmentIds": [],
+    "ccInitialEquipmentIds": [
+      "equ_shooter_bow",
+      "equ_shooter_greatshield"
+    ],
     "ccClassId": "shield_shooter",
     "ccName": "盾射手",
     "ccEquippableCategories": [
@@ -705,7 +718,7 @@
       "act_thunderstorm"
     ],
     "innatePassiveSkillIds": [
-      "pas_counter_magic"
+      "pas_magic_counter"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
@@ -741,7 +754,7 @@
       "act_volcano"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_pursuit_magic",
+      "pas_magic_pursuit",
       "pas_concentration"
     ],
     "ccInitialEquipmentIds": []
@@ -759,11 +772,12 @@
       "Accessory"
     ],
     "innateActiveSkillIds": [
-      "act_ice_arrow",
+      "act_freeze_arrow",
       "act_magic_missile"
     ],
     "innatePassiveSkillIds": [
-      "pas_magic_blade"
+      "pas_magic_blade",
+      "pas_focus"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
@@ -799,7 +813,6 @@
       "act_ice_coffin"
     ],
     "ccInnatePassiveSkillIds": [
-      "pas_focus",
       "pas_quick_cast"
     ],
     "ccInitialEquipmentIds": []
@@ -871,16 +884,18 @@
       "Flying"
     ],
     "equippableCategories": [
-      "Sword",
+      "Axe",
       "Accessory",
       "Accessory"
     ],
     "innateActiveSkillIds": [
-      "act_dive_strike",
-      "act_wing_gust"
+      "act_griffin_slash",
+      "act_griffin_quick_action"
     ],
     "innatePassiveSkillIds": [
-      "pas_deflect"
+      "pas_griffin_guard",
+      "pas_griffin_wing_stroke",
+      "pas_griffin_wing_rest"
     ],
     "innateValorSkillIds": [],
     "baseStats": {
@@ -907,14 +922,23 @@
       }
     ],
     "initialEquipmentIds": [
-      "equ_bronze_sword"
+      "equ_iron_axe"
     ],
-    "ccClassId": null,
-    "ccName": null,
-    "ccClasses": [],
+    "ccClassId": "griffin_ruler",
+    "ccName": "狮鹫统治者",
+    "ccClasses": [
+      "Flying"
+    ],
     "ccTraits": [],
-    "ccEquippableCategories": [],
-    "ccInnateActiveSkillIds": [],
+    "ccEquippableCategories": [
+      "Axe",
+      "Accessory",
+      "Accessory",
+      "Accessory"
+    ],
+    "ccInnateActiveSkillIds": [
+      "act_griffin_storm"
+    ],
     "ccInnatePassiveSkillIds": [],
     "ccInitialEquipmentIds": []
   },

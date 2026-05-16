@@ -11,22 +11,31 @@ namespace BattleKing.Equipment
         {
             float mult = 1.0f;
             var traits = calc.Attacker.GetEffectiveTraits();
+            var attackerClasses = calc.Attacker.GetEffectiveClasses();
+            var defenderClasses = calc.Defender.GetEffectiveClasses();
 
             foreach (var trait in traits)
             {
                 switch (trait.TraitType)
                 {
                     case "PhysAtkVsInfantry2x":
-                        // CC 领主: 物理攻击对步兵系2倍
                         if (calc.Skill.Type == SkillType.Physical
-                            && calc.Defender.GetEffectiveClasses()?.Contains(UnitClass.Infantry) == true)
+                            && defenderClasses?.Contains(UnitClass.Infantry) == true
+                            && attackerClasses?.Contains(UnitClass.Cavalry) != true)
+                            mult *= 2.0f;
+                        break;
+
+                    case "PhysAtkVsCavalry2x":
+                        if (calc.Skill.Type == SkillType.Physical
+                            && defenderClasses?.Contains(UnitClass.Cavalry) == true
+                            && attackerClasses?.Contains(UnitClass.Flying) != true)
                             mult *= 2.0f;
                         break;
 
                     case "BowVsFlying":
-                        // 弓兵特性: 弓攻击对飞行2倍
                         if (calc.Skill.AttackType == AttackType.Ranged
-                            && calc.Defender.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true)
+                            && defenderClasses?.Contains(UnitClass.Flying) == true
+                            && attackerClasses?.Contains(UnitClass.Archer) != true)
                             mult *= 2.0f;
                         break;
                 }

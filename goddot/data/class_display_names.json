@@ -1,5 +1,17 @@
 {
-  "_description": "Maps ALL compendium class stable IDs to current display names. Used by the UI to resolve {char:ID} tokens in role descriptions. When a class is renamed, update its value here and all descriptions auto-update.",
+  "_description": "Maps ALL compendium character/class stable IDs to current display names. Used by the UI to resolve {char:ID} and {class:ID} tokens in role descriptions. When a class is renamed, update its value here and all descriptions auto-update.",
+
+  "infantry": "步兵",
+  "cavalry": "骑兵",
+  "flying": "飞行",
+  "heavy": "重装",
+  "scout": "斥候",
+  "archer": "弓兵",
+  "mage": "术师",
+  "elf": "精灵",
+  "beastman": "兽人",
+  "winged": "翼人",
+  "undead": "不死",
 
   "snow_ranger": "雪游侠",
   "white_knight": "白骑士",
@@ -20,6 +32,7 @@
   "wizard": "巫师",
   "witch": "女巫",
   "griffin_knight": "狮鹫骑士",
+  "griffin_ruler": "狮鹫统治者",
   "elf_fencer": "精灵剑士",
   "shaman": "萨满",
   "wyvern_knight": "飞龙骑士",

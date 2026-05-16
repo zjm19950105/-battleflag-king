@@ -266,6 +266,7 @@ namespace BattleKing.Ui
                 UnitClass.Elf => "精灵",
                 UnitClass.Beastman => "兽人",
                 UnitClass.Winged => "有翼",
+                UnitClass.Undead => "不死",
                 _ => unitClass.ToString()
             };
         }
@@ -287,6 +288,7 @@ namespace BattleKing.Ui
                 UnitClass.Elf => new Color(0.18f, 0.5f, 0.38f),
                 UnitClass.Beastman => new Color(0.48f, 0.36f, 0.22f),
                 UnitClass.Winged => new Color(0.42f, 0.46f, 0.62f),
+                UnitClass.Undead => new Color(0.34f, 0.32f, 0.4f),
                 _ => new Color(0.32f, 0.34f, 0.38f)
             };
         }

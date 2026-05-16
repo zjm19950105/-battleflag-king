@@ -394,14 +394,16 @@ namespace BattleKing.Core
             return true;
         }
 
-        public void AddTemporal(string key, int count = 1, int turns = -1, string source = null)
+        public void AddTemporal(string key, int count = 1, int turns = -1, string source = null, IReadOnlyCollection<string> affectedUnitIds = null)
         {
             TemporalStates.Add(new TemporalState
             {
                 Key = key,
                 RemainingCount = count,
                 RemainingTurns = turns,
-                SourceSkillId = source
+                SourceSkillId = source,
+                AffectedUnitIds = affectedUnitIds?.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList()
+                    ?? new List<string>()
             });
         }
 

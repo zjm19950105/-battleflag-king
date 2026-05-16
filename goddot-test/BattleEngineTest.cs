@@ -152,9 +152,9 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(100, passive.HpBefore.GetValueOrDefault());
             ClassicAssert.AreEqual(70, passive.HpAfter.GetValueOrDefault());
             ClassicAssert.AreEqual(30, passive.HpLost.GetValueOrDefault());
-            Assert.That(passive.Text, Does.Contain("hp=100->70(-30)"));
+            Assert.That(passive.Text, Does.Contain("HP: 100 -> 70(-30)"));
 
-            int pendingLogIndex = logs.FindIndex(line => line.Contains("[Counter]"));
+            int pendingLogIndex = logs.FindIndex(line => line.Contains("反击"));
             int actionEndIndex = logs.FindIndex(line => line.Contains("行动结束"));
             ClassicAssert.GreaterOrEqual(pendingLogIndex, 0);
             ClassicAssert.GreaterOrEqual(actionEndIndex, 0);
@@ -244,16 +244,12 @@ namespace BattleKing.Tests
             CollectionAssert.AreEqual(new[] { "enemy" }, passiveLog.TargetIds);
             ClassicAssert.AreEqual(100 - enemy.CurrentHp, passiveLog.Damage);
             ClassicAssert.Greater(passiveLog.Damage, 0);
-            Assert.That(passiveLog.Text, Does.Contain("actor={{P:swordsman}}"));
+            Assert.That(passiveLog.Text, Does.Contain("swordsman先制攻击enemy"));
             Assert.That(passiveLog.Text, Does.Contain(passive.Name));
-            Assert.That(passiveLog.Text, Does.Contain("target={{E:enemy}}"));
-            Assert.That(passiveLog.Text, Does.Contain("damage="));
-            Assert.That(passiveLog.Text, Does.Contain("hit=True"));
-            Assert.That(passiveLog.Text, Does.Contain("blocked=False"));
-            Assert.That(passiveLog.Text, Does.Contain("critical=False"));
-            Assert.That(passiveLog.Text, Does.Contain("ailments=None"));
-            Assert.That(passiveLog.Text, Does.Contain("temporary=actor:None;receiver:None"));
-            Assert.That(passiveLog.Text, Does.Contain("tags=SureHit"));
+            Assert.That(passiveLog.Text, Does.Contain("威力150"));
+            Assert.That(passiveLog.Text, Does.Contain("命中率: 必中"));
+            Assert.That(passiveLog.Text, Does.Contain("判定: 命中"));
+            Assert.That(passiveLog.Text, Does.Contain("伤害:"));
             ClassicAssert.IsFalse(logs.Any(line => line.Trim() == "Preemptive queued"));
         }
 
@@ -311,7 +307,7 @@ namespace BattleKing.Tests
         }
 
         [Test]
-        public void StepOneAction_WideCounterTriggersOnlyFromActiveAttack_NotFromPendingPursuit()
+        public void StepOneAction_PendingCounterDoesNotTriggerPursuitSlash()
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
@@ -350,13 +346,11 @@ namespace BattleKing.Tests
             var wideLogs = engine.BattleLogEntries.Where(entry => entry.SkillId == "pas_wide_counter").ToList();
             var pursuitLogs = engine.BattleLogEntries.Where(entry => entry.SkillId == "pas_pursuit_slash").ToList();
             ClassicAssert.AreEqual(1, wideLogs.Count);
-            ClassicAssert.AreEqual(1, pursuitLogs.Count);
-            ClassicAssert.AreEqual("merc_ally", pursuitLogs[0].ActorId);
-            ClassicAssert.AreNotEqual("merc_attacker", pursuitLogs[0].ActorId);
-            Assert.That(wideLogs[0].Text, Does.Contain("id=gladiator,pos=1"));
-            Assert.That(wideLogs[0].Text, Does.Contain("id=merc_attacker,pos=1"));
-            Assert.That(pursuitLogs[0].Text, Does.Contain("id=merc_ally,pos=4"));
-            Assert.That(pursuitLogs[0].Text, Does.Contain("id=gladiator,pos=1"));
+            ClassicAssert.AreEqual(0, pursuitLogs.Count);
+            ClassicAssert.AreEqual(1, attacker.CurrentPp);
+            ClassicAssert.AreEqual(1, pursuitAlly.CurrentPp);
+            Assert.That(wideLogs[0].Text, Does.Contain("gladiator反击merc_attacker"));
+            Assert.That(wideLogs[0].Text, Does.Contain("判定: 命中"));
         }
 
         [Test]
@@ -420,7 +414,7 @@ namespace BattleKing.Tests
                 Position = 1,
                 CurrentAp = 1
             };
-            var giftUser = new BattleUnit(CreateStructuredLogCharacter("gift_user", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 1), repository, true)
+            var giftUser = new BattleUnit(CreateStructuredLogCharacter("gift_user", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 2), repository, true)
             {
                 Position = 2
             };
@@ -492,7 +486,7 @@ namespace BattleKing.Tests
             CollectionAssert.Contains(activeLog.Flags, "Critical");
             ClassicAssert.AreEqual(200, activeLog.Damage);
             ClassicAssert.IsFalse(caster.Buffs.Any(buff =>
-                buff.TargetStat == "CritDmg" && buff.IsOneTime && buff.SkillId == "pas_charge_action"));
+                buff.TargetStat == "CritDmg" && buff.SkillId == "pas_charge_action"));
             int costLogIndex = logs.FindIndex(line => line.Contains("AP消耗") && line.Contains("4->2"));
             int recoverLogIndex = logs.FindIndex(line => line.Contains("caster.AP 2->3"));
             ClassicAssert.GreaterOrEqual(costLogIndex, 0);
@@ -537,6 +531,8 @@ namespace BattleKing.Tests
                 repository.PassiveSkills["pas_brute_force"].Effects.Select(effect => effect.EffectType).ToList());
             ClassicAssert.AreEqual(3, caster.CurrentAp);
             ClassicAssert.AreEqual(0, caster.CurrentPp);
+            ClassicAssert.AreEqual(120, caster.GetCurrentStat("Str"));
+            ClassicAssert.AreEqual(50, caster.GetCurrentStat("Spd"));
             int costLogIndex = logs.FindIndex(line => line.Contains("AP消耗") && line.Contains("4->2"));
             int recoverLogIndex = logs.FindIndex(line => line.Contains("caster.AP 2->3"));
             ClassicAssert.GreaterOrEqual(costLogIndex, 0);
@@ -577,7 +573,9 @@ namespace BattleKing.Tests
             CollectionAssert.Contains(activeLog.Flags, "Hit");
             CollectionAssert.DoesNotContain(activeLog.Flags, "Evade");
             ClassicAssert.Less(defender.CurrentHp, 300);
+            ClassicAssert.AreEqual(1, defender.CurrentPp);
             ClassicAssert.IsFalse(logs.Any(line => line.Contains("* EVADE")));
+            Assert.That(logs, Has.None.Contains("触发 闪避"));
         }
 
         [Test]
@@ -609,7 +607,7 @@ namespace BattleKing.Tests
                 Position = 1,
                 CurrentAp = 4
             };
-            var giftUser = new BattleUnit(CreateStructuredLogCharacter("gift_user", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 1), repository, true)
+            var giftUser = new BattleUnit(CreateStructuredLogCharacter("gift_user", null, hp: 300, str: 10, def: 0, spd: 10, ap: 0, pp: 2), repository, true)
             {
                 Position = 2
             };

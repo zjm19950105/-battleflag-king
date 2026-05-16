@@ -41,8 +41,8 @@ namespace BattleKing.Tests
                 new() { { "phys_atk", 25 } }));
             _slot.Equip(TestDataFactory.CreateEquipment("eq_b", "剑B", EquipmentCategory.Sword,
                 new() { { "phys_atk", 10 } }));
-            // Currently CanDualWield returns false — so total should be 25+10=35
-            ClassicAssert.AreEqual(35, _slot.GetTotalStat("phys_atk"));
+            // 副手武器攻击半加算：25 + 10 / 2 = 30
+            ClassicAssert.AreEqual(30, _slot.GetTotalStat("phys_atk"));
         }
 
         [Test]

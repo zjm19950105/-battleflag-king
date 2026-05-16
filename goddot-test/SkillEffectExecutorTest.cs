@@ -97,6 +97,43 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void ModifyDamageCalc_TargetHasDebuff_TreatsFlatNegativePureBuffAsDebuffState()
+        {
+            var executor = new SkillEffectExecutor();
+            var context = new BattleContext(new GameDataRepository());
+            var attacker = TestDataFactory.CreateUnit();
+            var defender = TestDataFactory.CreateUnit(isPlayer: false);
+            defender.Buffs.Add(new Buff
+            {
+                SkillId = "pas_curse_swamp",
+                TargetStat = "Def",
+                FlatAmount = -15,
+                RemainingTurns = -1,
+                IsPureBuffOrDebuff = true
+            });
+            var skill = TestDataFactory.CreateSkill(effects: new()
+            {
+                new SkillEffectData
+                {
+                    EffectType = "ModifyDamageCalc",
+                    Parameters = new()
+                    {
+                        { "targetHasDebuff", true },
+                        { "SkillPowerBonus", 50 }
+                    }
+                }
+            });
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            var logs = executor.ExecuteCalculationEffects(
+                context, attacker, new List<BattleUnit> { defender }, skill.Data.Effects,
+                skill.Data.Id, calc, new SkillEffectExecutionState());
+
+            ClassicAssert.AreEqual(50f, calc.SkillPowerBonus);
+            Assert.That(logs, Has.Some.Contains("PowerBonus=50"));
+        }
+
+        [Test]
         public void AddBuff_主动效果_按JSON参数修改目标面板()
         {
             var executor = new SkillEffectExecutor();
@@ -712,7 +749,7 @@ namespace BattleKing.Tests
             {
                 Position = 1,
                 CurrentAp = 0,
-                CurrentPp = 2
+                CurrentPp = 1
             };
             enemy.EquippedPassiveSkillIds.Add("pas_rampage");
             var context = new BattleContext(repository)
@@ -742,10 +779,11 @@ namespace BattleKing.Tests
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
             var passive = repository.PassiveSkills["pas_give_ap"];
+            ClassicAssert.AreEqual(1, passive.PpCost);
             var medic = new BattleUnit(CreateCharacter("medic", null, hp: 200, str: 10, def: 10, spd: 20), repository, true)
             {
                 Position = 1,
-                CurrentPp = 2
+                CurrentPp = 1
             };
             medic.CurrentHp = 20;
             var wounded = new BattleUnit(CreateCharacter("wounded", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
@@ -781,7 +819,7 @@ namespace BattleKing.Tests
             var medic = new BattleUnit(CreateCharacter("medic", null, hp: 200, str: 10, def: 10, spd: 20), repository, true)
             {
                 Position = 1,
-                CurrentPp = 2
+                CurrentPp = 1
             };
             medic.CurrentHp = 20;
             var defeatedAlly = new BattleUnit(CreateCharacter("defeatedAlly", null, hp: 200, str: 10, def: 10, spd: 10), repository, true)
@@ -839,6 +877,7 @@ namespace BattleKing.Tests
 
             ClassicAssert.IsNotEmpty(passive.Effects);
             CollectionAssert.IsEmpty(passive.Tags);
+            ClassicAssert.IsFalse(passive.HasSimultaneousLimit);
             ClassicAssert.AreEqual(400, backRowAlly.GetCurrentStat("HP"));
             ClassicAssert.AreEqual(300, backRowAlly.CurrentHp);
             ClassicAssert.AreEqual(40, frontRowAlly.CurrentHp);
@@ -854,6 +893,7 @@ namespace BattleKing.Tests
                 Position = 1,
                 CurrentLevel = 20
             };
+            attacker.Ailments.Add(StatusAilment.CritSeal);
             var defender = new BattleUnit(CreateCharacter("defender", null, hp: 1000, str: 10, def: 50, spd: 1), repository, false)
             {
                 Position = 1
@@ -873,11 +913,54 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void RealActiveJson_MeteorSlash_AddsOneTimeRatioCritForCurrentAction()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var skill = repository.ActiveSkills["act_meteor_slash"];
+            var critBuff = skill.Effects.Single(effect => effect.EffectType == "AddBuff");
+            ClassicAssert.AreEqual(0.3d, ((JsonElement)critBuff.Parameters["ratio"]).GetDouble(), 0.0001d);
+            ClassicAssert.IsFalse(critBuff.Parameters.ContainsKey("amount"));
+            ClassicAssert.IsTrue(((JsonElement)critBuff.Parameters["oneTime"]).GetBoolean());
+            ClassicAssert.AreEqual(1, ((JsonElement)critBuff.Parameters["turns"]).GetInt32());
+
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_meteor_slash", hp: 1000, str: 10, def: 0, spd: 100, crit: 50), repository, true)
+            {
+                Position = 1,
+                CurrentLevel = 20
+            };
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker }
+            };
+
+            var logs = new SkillEffectExecutor().ExecuteActionEffects(
+                context,
+                attacker,
+                Array.Empty<BattleUnit>(),
+                skill.Effects,
+                skill.Id);
+
+            ClassicAssert.AreEqual(65, attacker.GetCurrentCritRate());
+            ClassicAssert.IsTrue(attacker.Buffs.Any(buff =>
+                buff.SkillId == "act_meteor_slash"
+                && buff.TargetStat == "Crit"
+                && Math.Abs(buff.Ratio - 0.3f) < 0.0001f
+                && buff.IsOneTime));
+            Assert.That(logs, Has.Some.Contains("attacker.Crit 50->65"));
+
+            BuffManager.CleanupAfterAction(attacker);
+
+            ClassicAssert.AreEqual(50, attacker.GetCurrentCritRate());
+            ClassicAssert.IsFalse(attacker.Buffs.Any(buff => buff.SkillId == "act_meteor_slash"));
+        }
+
+        [Test]
         public void BattleEngine_锐利斩击_JSONEffects贯通必中与会心加成()
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
-            var attacker = new BattleUnit(CreateCharacter("attacker", "act_sharp_slash", hp: 1000, str: 100, def: 0, spd: 100, hit: 0, crit: 50), repository, true)
+            var attacker = new BattleUnit(CreateCharacter("attacker", "act_sharp_slash", hp: 1000, str: 100, def: 0, spd: 100, hit: 0, crit: 100), repository, true)
             {
                 Position = 1,
                 CurrentLevel = 20
@@ -899,7 +982,7 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
             ClassicAssert.AreEqual(925, defender.CurrentHp);
-            ClassicAssert.IsTrue(logs.Any(l => l.Contains("attacker.Crit 50->100")));
+            ClassicAssert.IsTrue(logs.Any(l => l.Contains("attacker.Crit 100->150")));
             ClassicAssert.IsFalse(attacker.Buffs.Any(b => b.SkillId == "act_sharp_slash"));
         }
 
@@ -980,7 +1063,7 @@ namespace BattleKing.Tests
 
         [TestCase("act_poison_bolt", StatusAilment.Poison)]
         [TestCase("act_poison_throw", StatusAilment.Poison)]
-        [TestCase("act_ice_arrow", StatusAilment.Freeze)]
+        [TestCase("act_freeze_arrow", StatusAilment.Freeze)]
         public void BattleEngine_RealActiveJsonG2SingleAilments_ApplyOnlyAfterHit(string skillId, StatusAilment ailment)
         {
             var hitScenario = RunSingleTargetSkillScenario(skillId, attackerHit: 1000, defenderEva: 0);
@@ -993,8 +1076,6 @@ namespace BattleKing.Tests
         }
 
         [TestCase("act_thunderstorm", StatusAilment.Stun)]
-        [TestCase("act_volcano", StatusAilment.Burn)]
-        [TestCase("act_ice_coffin", StatusAilment.Freeze)]
         public void BattleEngine_RealActiveJsonG2RowAilments_ApplyOnlyAfterHit(string skillId, StatusAilment ailment)
         {
             var hitScenario = RunRowSkillScenario(skillId, attackerHit: 1000, defenderEva: 0);
@@ -1013,6 +1094,22 @@ namespace BattleKing.Tests
             CollectionAssert.DoesNotContain(missScenario.FrontA.Ailments, ailment);
             CollectionAssert.DoesNotContain(missScenario.FrontB.Ailments, ailment);
             CollectionAssert.DoesNotContain(missScenario.Back.Ailments, ailment);
+            Assert.That(missScenario.Logs, Has.None.Contains("post effects:"));
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonAerialSmite_DamagesApOnlyWhenHitTargetStartedFullHp()
+        {
+            var fullHpScenario = RunRowSkillScenario("act_griffin_storm", attackerHit: 1000, defenderEva: 0);
+            var missScenario = RunRowSkillScenario("act_griffin_storm", attackerHit: 0, defenderEva: 1000);
+
+            ClassicAssert.AreEqual(2, fullHpScenario.FrontA.CurrentAp);
+            ClassicAssert.AreEqual(2, fullHpScenario.FrontB.CurrentAp);
+            ClassicAssert.AreEqual(3, fullHpScenario.Back.CurrentAp);
+            Assert.That(fullHpScenario.Logs, Has.Some.Contains("post effects:").And.Contains("AP 3->2"));
+
+            ClassicAssert.AreEqual(3, missScenario.FrontA.CurrentAp);
+            ClassicAssert.AreEqual(3, missScenario.FrontB.CurrentAp);
             Assert.That(missScenario.Logs, Has.None.Contains("post effects:"));
         }
 
@@ -1049,14 +1146,15 @@ namespace BattleKing.Tests
                 "act_passive_curse",
                 attackerHit: 0,
                 defenderEva: 1000,
-                defenderPp: 2);
+                defenderPp: 2,
+                defenderSpd: 60);
 
             ClassicAssert.AreEqual(1, scenario.FrontA.CurrentPp);
             ClassicAssert.AreEqual(1, scenario.FrontB.CurrentPp);
             ClassicAssert.AreEqual(2, scenario.Back.CurrentPp);
-            ClassicAssert.AreEqual(90, scenario.FrontA.GetCurrentStat("Spd"));
-            ClassicAssert.AreEqual(90, scenario.FrontB.GetCurrentStat("Spd"));
-            ClassicAssert.AreEqual(100, scenario.Back.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(50, scenario.FrontA.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(50, scenario.FrontB.GetCurrentStat("Spd"));
+            ClassicAssert.AreEqual(60, scenario.Back.GetCurrentStat("Spd"));
             Assert.That(scenario.Logs, Has.Some.Contains("effects:").And.Contains("PP").And.Contains("Spd"));
         }
 
@@ -1244,6 +1342,21 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void BattleEngine_RealActiveJsonAccumulate_IsRangedGroundAttackAndCannotHitFlying()
+        {
+            var flying = RunSingleTargetDamageScenario(
+                "act_accumulate",
+                defenderClasses: new List<UnitClass> { UnitClass.Flying });
+            var infantry = RunSingleTargetDamageScenario(
+                "act_accumulate",
+                defenderClasses: new List<UnitClass> { UnitClass.Infantry });
+
+            ClassicAssert.AreEqual(0, flying.Damage);
+            ClassicAssert.AreEqual(30, infantry.Damage);
+            Assert.That(flying.Logs, Has.Some.Contains("NullifyPhysicalDamage"));
+        }
+
+        [Test]
         public void BattleEngine_RealActiveJsonHeavySlayer_IgnoresHeavyDefenseAndCannotBeBlocked()
         {
             var heavy = RunSingleTargetDamageScenario(
@@ -1265,8 +1378,6 @@ namespace BattleKing.Tests
 
         [TestCase("act_enhanced_spear", UnitClass.Cavalry, 30, true)]
         [TestCase("act_spear_pierce", UnitClass.Flying, 30, false)]
-        [TestCase("act_dive_strike", UnitClass.Cavalry, 30, true)]
-        [TestCase("act_wing_gust", UnitClass.Cavalry, 20, true)]
         public void BattleEngine_RealActiveJsonClassBonusSkills_ApplyOnlyToMatchingClass(
             string skillId,
             UnitClass matchingClass,
@@ -1400,7 +1511,7 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(160, scenario.Caster.CurrentHp);
             ClassicAssert.AreEqual(130, scenario.Caster.GetCurrentStat("Str"));
-            ClassicAssert.AreEqual(1, scenario.Caster.CurrentAp);
+            ClassicAssert.AreEqual(2, scenario.Caster.CurrentAp);
             ClassicAssert.AreEqual(1000, scenario.Enemy.CurrentHp);
             ClassicAssert.AreEqual(3, scenario.Enemy.CurrentAp);
             ClassicAssert.AreEqual(2, scenario.Enemy.CurrentPp);
@@ -1501,12 +1612,14 @@ namespace BattleKing.Tests
                 Position = 1
             };
             frontAlly.CurrentHp = 80;
+            frontAlly.Ailments.Add(StatusAilment.Burn);
             var sameRowAlly = new BattleUnit(CreateCharacter("sameRowAlly", null, hp: 200, str: 10, def: 0, spd: 1), repository, true)
             {
                 Position = 2
             };
             EquipHpBonus(sameRowAlly, 100);
             sameRowAlly.CurrentHp = 230;
+            sameRowAlly.Ailments.Add(StatusAilment.Confusion);
             var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 200, str: 10, def: 0, spd: 1), repository, false)
             {
                 Position = 1
@@ -1523,9 +1636,43 @@ namespace BattleKing.Tests
 
             ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
             ClassicAssert.AreEqual(180, frontAlly.CurrentHp);
+            CollectionAssert.Contains(frontAlly.Ailments, StatusAilment.Burn);
             ClassicAssert.AreEqual(300, sameRowAlly.GetCurrentStat("HP"));
             ClassicAssert.AreEqual(300, sameRowAlly.CurrentHp);
+            CollectionAssert.Contains(sameRowAlly.Ailments, StatusAilment.Confusion);
             ClassicAssert.AreEqual(200, enemy.CurrentHp);
+        }
+
+        [Test]
+        public void BattleEngine_RealActiveJsonFatalDive_DealsFixedHalfCurrentHpAndCannotCritOrBlock()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var caster = new BattleUnit(CreateCharacter("caster", "act_griffin_quick_action", hp: 1000, str: 10, def: 0, spd: 100, crit: 100), repository, true)
+            {
+                Position = 4,
+                CurrentLevel = 20,
+                CurrentHp = 200
+            };
+            var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 1000, str: 10, def: 500, spd: 1, block: 100), repository, false)
+            {
+                Position = 1
+            };
+            caster.Strategies.Add(new Strategy { SkillId = "act_griffin_quick_action" });
+            var logs = new List<string>();
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { caster },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(900, enemy.CurrentHp);
+            Assert.That(logs, Has.Some.Contains("CannotCrit").And.Contains("CannotBeBlocked"));
+            Assert.That(logs, Has.Some.Contains("FixedPhysicalDamage=100"));
         }
 
         [Test]
@@ -1846,9 +1993,12 @@ namespace BattleKing.Tests
             var preemptive = queued.Single(a => a.SourcePassiveId == "pas_stealth_blade");
             ClassicAssert.AreEqual(PendingActionType.Preemptive, preemptive.Type);
             ClassicAssert.AreEqual(50, preemptive.Power);
-            ClassicAssert.AreEqual(100, preemptive.HitRate);
+            ClassicAssert.AreEqual(1, preemptive.HitCount);
+            ClassicAssert.IsNull(preemptive.HitRate);
+            ClassicAssert.AreEqual(AttackType.Ranged, preemptive.AttackType);
+            ClassicAssert.AreEqual(TargetType.SingleEnemy, preemptive.TargetType);
             CollectionAssert.AreEquivalent(
-                new[] { "SureHit", "CannotBeBlocked", "CannotBeCovered" },
+                new[] { "Ranged", "CannotBeCovered" },
                 preemptive.Tags);
 
             var counter = queued.Single(a => a.SourcePassiveId == "pas_wide_counter");
@@ -1891,6 +2041,39 @@ namespace BattleKing.Tests
                 stealthBlade.Effects.Select(effect => effect.EffectType).ToList());
             CollectionAssert.Contains(enemy.Ailments, StatusAilment.BlockSeal);
             Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("BlockSeal"));
+        }
+
+        [Test]
+        public void BattleEngine_RealPassiveJsonStealthBlade_CanMissAndDoesNotApplySeals()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var preemptiveUser = new BattleUnit(CreateCharacter("preemptiveUser", null, hp: 200, str: 100, def: 10, spd: 20, hit: 0), repository, true)
+            {
+                Position = 1,
+                CurrentPp = 1
+            };
+            var enemy = new BattleUnit(CreateCharacter("enemy", null, hp: 200, str: 10, def: 0, spd: 10, eva: 1000), repository, false)
+            {
+                Position = 1
+            };
+            preemptiveUser.EquippedPassiveSkillIds.Add("pas_stealth_blade");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { preemptiveUser },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+
+            CollectionAssert.DoesNotContain(enemy.Ailments, StatusAilment.BlockSeal);
+            CollectionAssert.DoesNotContain(enemy.Ailments, StatusAilment.PassiveSeal);
+            ClassicAssert.AreEqual(200, enemy.CurrentHp);
+            Assert.That(logs, Has.None.Contains("post effects:").And.Contains("BlockSeal"));
         }
 
         [Test]

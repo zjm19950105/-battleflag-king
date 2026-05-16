@@ -5,7 +5,7 @@
     "unitClasses": ["infantry"],
     "mainRoles": [
       "高速物理输出",
-      "斥候/飞行系特攻（必中技）",
+      "{class:scout}/{class:flying}系特攻（必中技）",
       "会心特化",
       "HP/物防低，生存力差"
     ],
@@ -33,22 +33,24 @@
     "mainRoles": [
       "全能型前线战士",
       "自我恢复+格挡掩护的混合坦克",
-      "转职后成为全能骑兵，可列攻击"
+      "转职后成为全能{class:cavalry}，可列攻击"
     ],
     "characteristics": [
       "利刃斩提供稳定自我恢复，续航能力强",
       "贵族守护在低血量时可反复使用（HP50%以下PP+1）",
       "光辉掩护可保护后排脆皮队友",
-      "步兵怕{char:knight}特攻（被伤害2倍）",
-      "没有必中技能，对{char:snow_ranger}/{char:thief}系命中不稳定",
-      "重装系也是苦手（伤害刮痧）",
-      "【CC后】转骑兵后对步兵系伤害2倍",
-      "【CC后】旋转利刃（无视50%物防列攻击）可有效打击重装系",
+      "{class:infantry}怕{class:cavalry}特攻（被伤害2倍）",
+      "没有必中技能，对{class:flying}/{class:scout}系命中不稳定",
+      "{class:heavy}系也是苦手（伤害刮痧）",
+      "【CC后】转{class:cavalry}后对{class:infantry}系伤害2倍",
+      "【CC后】旋转利刃（无视50%物防列攻击）可有效打击{class:heavy}系",
       "【CC后】快速命令开局全队提速，战略价值极高",
-      "【CC后】不再怕{char:knight}特攻（自己变骑兵了），但怕{char:griffin_knight}特攻（被伤害2倍）"
+      "【CC后】不再怕{class:cavalry}特攻（自己变{class:cavalry}了）",
+      "【CC后】但变成怕{class:flying}系特攻（被伤害2倍）",
+      "【CC后】特性+技能使{class:heavy}不再是苦手"
     ],
-    "referencedCharacterIds": ["knight", "snow_ranger", "thief", "griffin_knight"],
-    "referencedClassIds": ["infantry", "cavalry", "heavy", "flying"]
+    "referencedCharacterIds": [],
+    "referencedClassIds": ["cavalry", "infantry", "flying", "scout", "heavy"]
   },
   {
     "characterId": "fighter",
@@ -83,7 +85,7 @@
     "unitClasses": ["infantry"],
     "mainRoles": [
       "高物攻+中速",
-      "防御debuff手",
+      "防御debuffer",
       "反击手",
       "HP/物防较低"
     ],
@@ -121,10 +123,10 @@
   },
   {
     "characterId": "warrior",
-    "displayName": "勇士 / 破坏者 (Warrior / Breaker)",
+    "displayName": "战士 / 破坏者 (Warrior / Breaker)",
     "unitClasses": ["infantry"],
     "mainRoles": [
-      "重装特攻手（所有攻击技附带不可格挡）",
+      "{class:heavy}特攻手，所有攻击技附带不可格挡",
       "单体高火力物理输出",
       "命中较低（140）"
     ],
@@ -151,19 +153,19 @@
     "displayName": "射手 / 盾射手 (Shooter / Shield Shooter)",
     "unitClasses": ["infantry"],
     "mainRoles": [
-      "高单体火力弩兵（弓兵系中最高物攻）",
-      "{class:flying}系特攻（2倍伤害）",
-      "CC后前列坦克（大盾装备+掩护技）",
+      "高单体火力弩兵",
+      "{class:flying}系特攻",
+      "转职后坦克",
       "战后回复辅助"
     ],
     "characteristics": [
-      "物攻59为弓兵系最高，对高物防{char:wyvern_knight}、{char:feather_sword}等也能造成大伤害",
+      "物攻59为{class:archer}系最高，对高物防{class:flying}系（{char:wyvern_knight}、{char:feather_sword}等）也能造成大伤害",
       "命中162低于{char:hunter}（182），无必中buff，对高回避敌人需命中补强",
       "行动速度慢（21），不适合先手击杀",
       "CC后可装备大盾，格挡率30%，可前列运用"
     ],
     "referencedCharacterIds": ["wyvern_knight", "feather_sword", "hunter"],
-    "referencedClassIds": ["flying"]
+    "referencedClassIds": ["flying", "archer"]
   },
   {
     "characterId": "thief",
@@ -172,7 +174,7 @@
     "mainRoles": [
       "回避型坦克",
       "状态异常妨害",
-      "斥候系特攻"
+      "{class:scout}系特攻"
     ],
     "characteristics": [],
     "referencedCharacterIds": [],
@@ -223,7 +225,7 @@
     "displayName": "狮鹫骑士 / 狮鹫统治者 (Griffin Knight / Griffin Lord)",
     "unitClasses": ["flying"],
     "mainRoles": [
-      "对回避型、骑马型特效攻击",
+      "对回避型、{class:cavalry}型特效攻击",
       "可无视前后列限制",
       "回避较高"
     ],
@@ -239,11 +241,11 @@
       "减益(debuff)专家",
       "攻防两面强力援护",
       "提高友方行动效率的辅助角色",
-      "术师系中较高的生命力，魔防极高"
+      "{class:mage}系中较高的生命力，魔防极高"
     ],
     "characteristics": [],
     "referencedCharacterIds": [],
-    "referencedClassIds": []
+    "referencedClassIds": ["mage"]
   },
   {
     "characterId": "elf_sibyl",

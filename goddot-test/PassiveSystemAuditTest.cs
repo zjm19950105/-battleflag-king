@@ -131,8 +131,9 @@ namespace BattleKing.Tests
                 Assert.That(passiveLog.Flags, Does.Contain("Hit"));
                 Assert.That(passiveLog.Flags, Does.Contain("ForceHit"));
                 Assert.That(passiveLog.Flags, Does.Contain("SureHit"));
-                Assert.That(passiveLog.Text, Does.Contain("passive="));
-                Assert.That(passiveLog.Text, Does.Contain("damage="));
+                Assert.That(passiveLog.Text, Does.Contain("快速打击"));
+                Assert.That(passiveLog.Text, Does.Contain("先制攻击"));
+                Assert.That(passiveLog.Text, Does.Contain("伤害:"));
             });
         }
 
@@ -293,6 +294,10 @@ namespace BattleKing.Tests
                     { "kind", "Buff" }
                 },
                 "RemoveDebuff" or "CleanseDebuff" => new()
+                {
+                    { "target", "Target" }
+                },
+                "CleanseAilment" => new()
                 {
                     { "target", "Target" }
                 },

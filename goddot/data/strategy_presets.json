@@ -45,6 +45,7 @@
     "id": "char_default_swordsman",
     "name": "剑士 默认策略",
     "strategies": [
+      { "skillId": "act_meteor_slash", "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
       { "skillId": "act_sharp_slash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_pierce",     "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_sharp_slash", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Scout" }, "mode1": "Priority" },
@@ -56,6 +57,7 @@
     "id": "char_default_mercenary",
     "name": "佣兵 默认策略",
     "strategies": [
+      { "skillId": "act_bastard_cross", "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
       { "skillId": "act_kill_chain", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_mega_slash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_mega_slash", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Heavy" }, "mode1": "Priority" },
@@ -69,6 +71,7 @@
     "strategies": [
       { "skillId": "act_cavalry_bane", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Cavalry" }, "mode1": "Only" },
       { "skillId": "act_lord_slash",    "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
+      { "skillId": "act_spiral_blade",  "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
       { "skillId": "act_lord_slash",    "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_cavalry_bane", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_lord_slash" }
@@ -78,6 +81,7 @@
     "id": "char_default_fighter",
     "name": "战士 默认策略",
     "strategies": [
+      { "skillId": "act_attract_attention" },
       { "skillId": "act_shield_bash", "condition1": { "category": "Status", "operator": "equals", "value": "buff" }, "mode1": "Priority" },
       { "skillId": "act_arrow_cover", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
       { "skillId": "act_shield_bash", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
@@ -89,6 +93,7 @@
     "id": "char_default_soldier",
     "name": "士兵 默认策略",
     "strategies": [
+      { "skillId": "act_throwing_spear" },
       { "skillId": "act_enhanced_spear", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Cavalry" }, "mode1": "Only" },
       { "skillId": "act_spear_pierce",   "condition1": { "category": "UnitClass", "operator": "equals", "value": "Flying" }, "mode1": "Only" },
       { "skillId": "act_enhanced_spear", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
@@ -100,6 +105,7 @@
     "id": "char_default_huskarl",
     "name": "家臣 默认策略",
     "strategies": [
+      { "skillId": "act_break_formation" },
       { "skillId": "act_whirlwind_slash", "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
       { "skillId": "act_smash",           "condition1": { "category": "Status", "operator": "equals", "value": "buff" }, "mode1": "Priority" },
       { "skillId": "act_smash",           "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
@@ -111,6 +117,8 @@
     "id": "char_default_hoplite",
     "name": "重装步兵 默认策略",
     "strategies": [
+      { "skillId": "act_great_shield", "condition1": { "category": "SelfApPp", "operator": "less_or_equal", "value": "PP:2" }, "mode1": "Only" },
+      { "skillId": "act_line_defense", "condition1": { "category": "SelfApPp", "operator": "greater_or_equal", "value": "AP:2" }, "mode1": "Only" },
       { "skillId": "act_spike", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
       { "skillId": "act_spike", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_spike", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Heavy" }, "mode1": "Priority" },
@@ -122,6 +130,7 @@
     "name": "角斗士 默认策略",
     "strategies": [
       { "skillId": "act_formation_breaker", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
+      { "skillId": "act_accumulate",        "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:4" }, "mode1": "Only" },
       { "skillId": "act_full_assault",      "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
       { "skillId": "act_full_assault",      "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_formation_breaker", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
@@ -132,6 +141,7 @@
     "id": "char_default_warrior",
     "name": "勇士 默认策略",
     "strategies": [
+      { "skillId": "act_line_destruction", "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
       { "skillId": "act_heavy_slayer",  "condition1": { "category": "UnitClass", "operator": "equals", "value": "Heavy" }, "mode1": "Only" },
       { "skillId": "act_charge_strike", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_heavy_slayer",  "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
@@ -175,10 +185,10 @@
     "id": "char_default_wizard",
     "name": "巫师 默认策略",
     "strategies": [
-      { "skillId": "act_thunderstorm", "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
       { "skillId": "act_fireball",     "condition1": { "category": "Status", "operator": "equals", "value": "not:Burn" }, "mode1": "Only" },
-      { "skillId": "act_thunderstorm", "condition1": { "category": "Status", "operator": "equals", "value": "not:Stun" }, "mode1": "Only" },
-      { "skillId": "act_fireball",     "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_thunderstorm", "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
+      { "skillId": "act_volcano",      "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
+      { "skillId": "act_thunderstorm", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
       { "skillId": "act_fireball" }
     ]
   },
@@ -186,20 +196,21 @@
     "id": "char_default_witch",
     "name": "女巫 默认策略",
     "strategies": [
-      { "skillId": "act_ice_arrow",     "condition1": { "category": "Status", "operator": "equals", "value": "not:Freeze" }, "mode1": "Only" },
+      { "skillId": "act_ice_coffin",    "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
       { "skillId": "act_magic_missile", "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
-      { "skillId": "act_ice_arrow",     "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
-      { "skillId": "act_magic_missile" },
-      { "skillId": "act_ice_arrow" }
+      { "skillId": "act_freeze_arrow",  "condition1": { "category": "Status", "operator": "equals", "value": "not:Freeze" }, "mode1": "Only" },
+      { "skillId": "act_magic_missile", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_freeze_arrow" }
     ]
   },
   {
     "id": "char_default_white_knight",
     "name": "白骑士 默认策略",
     "strategies": [
-      { "skillId": "act_row_heal", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.75 }, "mode1": "Only" },
+      { "skillId": "act_row_heal", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
+      { "skillId": "act_holy_blade", "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
       { "skillId": "act_hache",    "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
-      { "skillId": "act_row_heal", "condition1": { "category": "SelfHp", "operator": "less_than", "value": 0.5 }, "mode1": "Only" },
+      { "skillId": "act_row_heal" },
       { "skillId": "act_hache" }
     ]
   },
@@ -207,11 +218,9 @@
     "id": "char_default_griffin_knight",
     "name": "狮鹫骑士 默认策略",
     "strategies": [
-      { "skillId": "act_dive_strike", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Cavalry" }, "mode1": "Only" },
-      { "skillId": "act_wing_gust",   "condition1": { "category": "TeamSize", "operator": "greater_or_equal", "value": "enemy:2" }, "mode1": "Only" },
-      { "skillId": "act_dive_strike", "condition1": { "category": "Hp", "operator": "lowest" }, "mode1": "Priority" },
-      { "skillId": "act_wing_gust" },
-      { "skillId": "act_dive_strike" }
+      { "skillId": "act_griffin_storm", "condition1": { "category": "UnitClass", "operator": "equals", "value": "Cavalry" }, "mode1": "Priority" },
+      { "skillId": "act_griffin_quick_action", "condition1": { "category": "Hp", "operator": "highest" }, "mode1": "Priority" },
+      { "skillId": "act_griffin_slash" }
     ]
   },
   {

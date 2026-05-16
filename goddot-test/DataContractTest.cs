@@ -55,6 +55,13 @@ namespace BattleKing.Tests
             "all"
         };
 
+        private static readonly Regex RoleDescriptionTokenRegex = new(@"\{(char|class):([A-Za-z0-9_]+)\}", RegexOptions.Compiled);
+
+        private static readonly HashSet<string> UnitClassTokenIds = Enum
+            .GetNames<UnitClass>()
+            .Select(name => name.ToLowerInvariant())
+            .ToHashSet();
+
         // These are legacy Phase 1 skill records that still carry behavior in Tags
         // without structured Effects. Keep this list explicit so new tag-only combat
         // logic cannot enter data quietly; remove entries as effects are migrated.
@@ -77,15 +84,15 @@ namespace BattleKing.Tests
             Assert.Multiple(() =>
             {
                 Assert.That(characters, Has.Count.EqualTo(18));
-                Assert.That(activeSkills, Has.Count.EqualTo(55));
-                Assert.That(passiveSkills, Has.Count.EqualTo(50));
+                Assert.That(activeSkills, Has.Count.EqualTo(56));
+                Assert.That(passiveSkills, Has.Count.EqualTo(54));
                 Assert.That(equipments, Has.Count.EqualTo(80));
                 Assert.That(enemyFormations, Has.Count.EqualTo(5));
                 Assert.That(strategyPresets, Has.Count.EqualTo(21));
 
                 Assert.That(repository.Characters, Has.Count.EqualTo(18));
-                Assert.That(repository.ActiveSkills, Has.Count.EqualTo(55));
-                Assert.That(repository.PassiveSkills, Has.Count.EqualTo(50));
+                Assert.That(repository.ActiveSkills, Has.Count.EqualTo(56));
+                Assert.That(repository.PassiveSkills, Has.Count.EqualTo(54));
                 Assert.That(repository.Equipments, Has.Count.EqualTo(80));
                 Assert.That(repository.EnemyFormations, Has.Count.EqualTo(5));
                 Assert.That(repository.StrategyPresets, Has.Count.EqualTo(21));
@@ -106,6 +113,103 @@ namespace BattleKing.Tests
                 AssertIdsAreUnique(LoadList<EnemyFormationData>("enemy_formations.json"), x => x.Id, "enemy_formations");
                 AssertIdsAreUnique(LoadList<StrategyPresetData>("strategy_presets.json"), x => x.Id, "strategy_presets");
                 AssertIdsAreUnique(LoadList<CharacterRoleDescriptionData>("character_role_descriptions.json"), x => x.CharacterId, "character_role_descriptions");
+            });
+        }
+
+        [Test]
+        public void RealData_CharacterRoleDescriptions_MatchCharactersAndResolveTokens()
+        {
+            var repository = LoadRepository();
+            var descriptions = LoadList<CharacterRoleDescriptionData>("character_role_descriptions.json");
+            var descriptionIds = descriptions.Select(description => description.CharacterId).ToHashSet();
+            var characterIds = repository.Characters.Keys.ToHashSet();
+            var failures = new List<string>();
+
+            AddSetDifferenceFailures(failures, "character_role_descriptions.characterId", descriptionIds, characterIds);
+
+            foreach (var description in descriptions)
+            {
+                var textItems = (description.MainRoles ?? new List<string>())
+                    .Concat(description.Characteristics ?? new List<string>())
+                    .ToList();
+                var referencedCharacterIds = new HashSet<string>();
+                var referencedClassIds = new HashSet<string>();
+
+                if (string.IsNullOrWhiteSpace(description.DisplayName))
+                {
+                    failures.Add($"{description.CharacterId}.displayName is required");
+                }
+
+                if ((description.UnitClasses ?? new List<string>()).Count == 0)
+                {
+                    failures.Add($"{description.CharacterId}.unitClasses must not be empty");
+                }
+
+                if ((description.MainRoles ?? new List<string>()).Count == 0)
+                {
+                    failures.Add($"{description.CharacterId}.mainRoles must not be empty");
+                }
+
+                foreach (var text in textItems)
+                {
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        failures.Add($"{description.CharacterId} contains blank role description text");
+                        continue;
+                    }
+
+                    foreach (Match match in RoleDescriptionTokenRegex.Matches(text))
+                    {
+                        var kind = match.Groups[1].Value;
+                        var id = match.Groups[2].Value;
+
+                        if (kind == "char")
+                        {
+                            referencedCharacterIds.Add(id);
+                            if (!repository.Characters.ContainsKey(id) && !repository.ClassDisplayNames.ContainsKey(id))
+                            {
+                                failures.Add($"{description.CharacterId} references unknown character token {match.Value}");
+                            }
+                        }
+                        else if (kind == "class")
+                        {
+                            referencedClassIds.Add(id);
+                            if (!repository.ClassDisplayNames.ContainsKey(id) && !UnitClassTokenIds.Contains(id))
+                            {
+                                failures.Add($"{description.CharacterId} references unknown class token {match.Value}");
+                            }
+                        }
+
+                        if (!repository.TryResolveDisplayToken(kind, id, out _))
+                        {
+                            failures.Add($"{description.CharacterId} cannot resolve token {match.Value}");
+                        }
+                    }
+
+                    var resolvedText = repository.ResolveDisplayTokens(text);
+                    if (RoleDescriptionTokenRegex.IsMatch(resolvedText))
+                    {
+                        failures.Add($"{description.CharacterId} leaves raw token after resolving: {resolvedText}");
+                    }
+                }
+
+                AddSetDifferenceFailures(
+                    failures,
+                    $"{description.CharacterId}.referencedCharacterIds",
+                    (description.ReferencedCharacterIds ?? new List<string>()).ToHashSet(),
+                    referencedCharacterIds);
+                AddSetDifferenceFailures(
+                    failures,
+                    $"{description.CharacterId}.referencedClassIds",
+                    (description.ReferencedClassIds ?? new List<string>()).ToHashSet(),
+                    referencedClassIds);
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(descriptions, Has.Count.EqualTo(repository.Characters.Count));
+                Assert.That(descriptions, Has.Count.EqualTo(18));
+                Assert.That(failures, Is.Empty);
             });
         }
 
@@ -311,6 +415,32 @@ namespace BattleKing.Tests
                 .ToList();
 
             Assert.That(duplicateIds, Is.Empty, $"{label} contains duplicate ids");
+        }
+
+        private static void AddSetDifferenceFailures(
+            ICollection<string> failures,
+            string label,
+            ISet<string> actual,
+            ISet<string> expected)
+        {
+            var missing = expected
+                .Where(id => !actual.Contains(id))
+                .OrderBy(id => id)
+                .ToList();
+            var extra = actual
+                .Where(id => !expected.Contains(id))
+                .OrderBy(id => id)
+                .ToList();
+
+            if (missing.Count > 0)
+            {
+                failures.Add($"{label} missing: {string.Join(", ", missing)}");
+            }
+
+            if (extra.Count > 0)
+            {
+                failures.Add($"{label} extra: {string.Join(", ", extra)}");
+            }
         }
 
         private static void ValidateConditionValue(Condition? condition, string path, List<string> failures)

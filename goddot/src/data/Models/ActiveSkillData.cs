@@ -10,6 +10,8 @@ namespace BattleKing.Data
         public SkillType Type { get; set; }
         public AttackType AttackType { get; set; }
         public int Power { get; set; }
+        public int? PhysicalPower { get; set; }
+        public int? MagicalPower { get; set; }
         public int? HitRate { get; set; }
         public TargetType TargetType { get; set; }
         public string EffectDescription { get; set; }

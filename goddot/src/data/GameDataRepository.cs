@@ -2,11 +2,29 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace BattleKing.Data
 {
     public class GameDataRepository
     {
+        private static readonly Regex DisplayTokenRegex = new(@"\{(char|class):([A-Za-z0-9_]+)\}", RegexOptions.Compiled);
+
+        private static readonly Dictionary<string, string> BuiltInUnitClassDisplayNames = new()
+        {
+            ["infantry"] = "步兵",
+            ["cavalry"] = "骑兵",
+            ["flying"] = "飞行",
+            ["heavy"] = "重装",
+            ["scout"] = "斥候",
+            ["archer"] = "弓兵",
+            ["mage"] = "术师",
+            ["elf"] = "精灵",
+            ["beastman"] = "兽人",
+            ["winged"] = "翼人",
+            ["undead"] = "不死"
+        };
+
         public Dictionary<string, CharacterData> Characters { get; private set; }
         public Dictionary<string, ActiveSkillData> ActiveSkills { get; private set; }
         public Dictionary<string, PassiveSkillData> PassiveSkills { get; private set; }
@@ -59,5 +77,56 @@ namespace BattleKing.Data
         public List<EquipmentData> GetAllEquipment() => Equipments.Values.ToList();
         public EnemyFormationData GetEnemyFormation(string id) => EnemyFormations.TryGetValue(id, out var v) ? v : null;
         public StrategyPresetData GetStrategyPreset(string id) => StrategyPresets.TryGetValue(id, out var v) ? v : null;
+
+        public string ResolveDisplayTokens(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            return DisplayTokenRegex.Replace(text, match =>
+                TryResolveDisplayToken(match.Groups[1].Value, match.Groups[2].Value, out var displayName)
+                    ? displayName
+                    : match.Value);
+        }
+
+        public bool TryResolveDisplayToken(string tokenKind, string id, out string displayName)
+        {
+            displayName = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(tokenKind) || string.IsNullOrWhiteSpace(id))
+            {
+                return false;
+            }
+
+            if (tokenKind == "char")
+            {
+                if (ClassDisplayNames != null && ClassDisplayNames.TryGetValue(id, out displayName))
+                {
+                    return true;
+                }
+
+                if (Characters != null && Characters.TryGetValue(id, out var character) && !string.IsNullOrWhiteSpace(character.Name))
+                {
+                    displayName = character.Name;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (tokenKind == "class")
+            {
+                if (ClassDisplayNames != null && ClassDisplayNames.TryGetValue(id, out displayName))
+                {
+                    return true;
+                }
+
+                return BuiltInUnitClassDisplayNames.TryGetValue(id, out displayName);
+            }
+
+            return false;
+        }
     }
 }

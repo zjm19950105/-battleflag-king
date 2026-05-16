@@ -63,11 +63,11 @@ namespace BattleKing.Ai
 
 			var aliveUnits = pool.Where(u => u != null && u.IsAlive).ToList();
 
-			// Ranged, Magic, Piercing, and Flying-unit attacks hit any row
+			// Ranged, Magic, Column, and Flying-unit attacks hit any row
 			// (Original game: flying unit attacks are treated as ranged)
 			if (skill.AttackType == AttackType.Ranged || skill.AttackType == AttackType.Magic
 				|| caster.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true
-				|| skill.TargetType == TargetType.FrontAndBack || skill.TargetType == TargetType.Column)
+				|| skill.TargetType == TargetType.Column)
 			{
 				return aliveUnits.OrderBy(u => u.Position).ToList();
 			}
@@ -93,8 +93,17 @@ namespace BattleKing.Ai
 
 			return defaultCandidates
 				.Where(u => u.TemporalStates.Any(s =>
-					s.RemainingCount != 0 && s.Key == "ForcedTarget"))
+					s.RemainingCount != 0 && s.Key == "ForcedTarget" && ForcedTargetAppliesToCaster(s, caster)))
 				.ToList();
+		}
+
+		private static bool ForcedTargetAppliesToCaster(TemporalState state, BattleUnit caster)
+		{
+			if (state?.AffectedUnitIds == null || state.AffectedUnitIds.Count == 0)
+				return true;
+
+			var casterId = caster?.Data?.Id;
+			return !string.IsNullOrWhiteSpace(casterId) && state.AffectedUnitIds.Contains(casterId);
 		}
 
 		private static bool IsEnemyTargetingSkill(ActiveSkillData skill)

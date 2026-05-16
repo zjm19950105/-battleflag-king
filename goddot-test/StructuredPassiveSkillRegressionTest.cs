@@ -29,12 +29,18 @@ namespace BattleKing.Tests
         {
             var repository = LoadRepository();
 
+            AssertFirstThreeCharacterPassiveSkillSourceData(repository);
             AssertIronGuardShape(repository.PassiveSkills["pas_iron_guard"]);
             AssertFluorescentCoverShape(repository.PassiveSkills["pas_fluorescent_cover"]);
             AssertNobleBlockShape(repository.PassiveSkills["pas_noble_block"]);
+            AssertShooterAndThiefPassiveSourceData(repository);
+            AssertDodgeStepShape(repository.PassiveSkills["pas_dodge_step"]);
+            AssertQuickActionShape(repository.PassiveSkills["pas_quick_action"]);
+            AssertShadowStepShape(repository.PassiveSkills["pas_shadow_step"]);
             AssertStealthBladeShape(repository.PassiveSkills["pas_stealth_blade"]);
             AssertHolyGuardShape(repository.PassiveSkills["pas_holy_guard"]);
             AssertFirstAidShape(repository.PassiveSkills["pas_give_ap"]);
+            AssertChargeActionShape(repository.PassiveSkills["pas_charge_action"]);
             Assert.That(Enum.IsDefined(typeof(StatusAilment), nameof(StatusAilment.PassiveSeal)), Is.True);
             Assert.That(Enum.IsDefined(typeof(UnitState), nameof(UnitState.PassiveSeal)), Is.True);
         }
@@ -72,6 +78,94 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(0.5f, calc.ForcedBlockReduction ?? -1f, 0.001f);
             ClassicAssert.AreEqual(120, defender.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(0, coverUser.CurrentPp);
+        }
+
+        [Test]
+        public void RealPassiveJson_LineCover_RequiresSameRowBeforePayingPp()
+        {
+            var repository = LoadRepository();
+            var eventBus = new EventBus();
+            var logs = new List<string>();
+            var processor = new PassiveSkillProcessor(eventBus, repository, logs.Add);
+            processor.SubscribeAll();
+            var defender = CreateUnit(repository, "defender", true, 1, hp: 300, def: 100, pp: 0);
+            var sameRowCover = CreateUnit(repository, "same_row_cover", true, 2, hp: 300, def: 100, pp: 2);
+            var otherRowCover = CreateUnit(repository, "other_row_cover", true, 4, hp: 300, def: 100, pp: 2);
+            var attacker = CreateUnit(repository, "attacker", false, 1, hp: 300, str: 80, pp: 0);
+            sameRowCover.EquippedPassiveSkillIds.Add("pas_pursuit");
+            otherRowCover.EquippedPassiveSkillIds.Add("pas_pursuit");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { defender, sameRowCover, otherRowCover },
+                EnemyUnits = new List<BattleUnit> { attacker }
+            };
+            var calc = CreateIncomingCalc(attacker, defender, SkillType.Physical, AttackType.Melee);
+
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = defender,
+                Skill = calc.Skill,
+                Context = context,
+                Calc = calc
+            });
+
+            var lineCover = repository.PassiveSkills["pas_pursuit"];
+            ClassicAssert.AreEqual(2, lineCover.PpCost);
+            ClassicAssert.AreEqual(SkillType.Physical, lineCover.Type);
+            ClassicAssert.AreSame(sameRowCover, calc.CoverTarget);
+            ClassicAssert.AreEqual(true, calc.ForceBlock);
+            ClassicAssert.AreEqual(0.5f, calc.ForcedBlockReduction ?? -1f, 0.001f);
+            ClassicAssert.AreEqual(0, sameRowCover.CurrentPp);
+            ClassicAssert.AreEqual(2, otherRowCover.CurrentPp);
+        }
+
+        [Test]
+        public void BattleEngine_RealPassiveJson_LineCover_CoversSameRowTargetsForOneAction()
+        {
+            var repository = LoadRepository();
+            repository.ActiveSkills["act_line_cover_probe"] = new ActiveSkillData
+            {
+                Id = "act_line_cover_probe",
+                Name = "Line Cover Probe",
+                ApCost = 1,
+                Type = SkillType.Physical,
+                AttackType = AttackType.Melee,
+                Power = 50,
+                HitRate = 100,
+                TargetType = TargetType.TwoEnemies,
+                Effects = new List<SkillEffectData>()
+            };
+            var attacker = CreateUnit(repository, "attacker", false, 1, "act_line_cover_probe", hp: 300, str: 100, def: 10, spd: 100, ap: 1, pp: 0);
+            attacker.Strategies.Add(new Strategy { SkillId = "act_line_cover_probe" });
+            var defenderA = CreateUnit(repository, "defender_a", true, 1, hp: 300, def: 10, pp: 0);
+            var defenderB = CreateUnit(repository, "defender_b", true, 2, hp: 300, def: 10, pp: 0);
+            var cover = CreateUnit(repository, "line_cover", true, 3, hp: 300, def: 10, pp: 2);
+            cover.EquippedPassiveSkillIds.Add("pas_pursuit");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { defenderA, defenderB, cover },
+                EnemyUnits = new List<BattleUnit> { attacker }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            var result = engine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            var attackEntries = engine.BattleLogEntries
+                .Where(entry => entry.SkillId == "act_line_cover_probe")
+                .ToList();
+            ClassicAssert.AreEqual(2, attackEntries.Count);
+            foreach (var entry in attackEntries)
+                CollectionAssert.AreEqual(new[] { "line_cover" }, entry.TargetIds);
+            ClassicAssert.AreEqual(0, cover.CurrentPp);
+            ClassicAssert.AreEqual(300, defenderA.CurrentHp);
+            ClassicAssert.AreEqual(300, defenderB.CurrentHp);
+            ClassicAssert.Less(cover.CurrentHp, 300);
+            ClassicAssert.AreEqual(1, logs.Count(log => log.Contains("列掩护", StringComparison.Ordinal)));
         }
 
         [Test]
@@ -156,7 +250,7 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
             ClassicAssert.AreEqual(85, attacker.GetCurrentStat("Def"));
             ClassicAssert.AreEqual(0, guard.CurrentPp);
-            Assert.That(logs, Has.Some.Contains("Counter queued").And.Contains("pas_iron_guard"));
+            Assert.That(logs, Has.Some.Contains("准备反击").And.Contains("威力50"));
             Assert.That(logs, Has.Some.Contains("post effects:").And.Contains("attacker.Def 100->85"));
         }
 
@@ -246,6 +340,10 @@ namespace BattleKing.Tests
                 skill.Effects.Select(effect => effect.EffectType).ToArray());
             ClassicAssert.AreEqual(50, IntParam(skill.Effects[0], "power"));
             ClassicAssert.AreEqual(100, IntParam(skill.Effects[0], "hitRate"));
+            ClassicAssert.AreEqual(1, IntParam(skill.Effects[0], "HitCount"));
+            ClassicAssert.AreEqual("Physical", StringParam(skill.Effects[0], "damageType"));
+            ClassicAssert.AreEqual("Melee", StringParam(skill.Effects[0], "attackType"));
+            ClassicAssert.AreEqual("SingleEnemy", StringParam(skill.Effects[0], "targetType"));
             var debuff = NestedEffects(skill.Effects[1]).Single();
             ClassicAssert.AreEqual("AddDebuff", debuff.EffectType);
             ClassicAssert.AreEqual("Target", StringParam(debuff, "target"));
@@ -256,6 +354,9 @@ namespace BattleKing.Tests
 
         private static void AssertFluorescentCoverShape(PassiveSkillData skill)
         {
+            ClassicAssert.IsTrue(skill.HasSimultaneousLimit);
+            ClassicAssert.AreEqual(5, skill.UnlockLevel);
+            CollectionAssert.Contains(skill.Tags, "SimultaneousLimit");
             CollectionAssert.AreEqual(
                 new[] { "CoverAlly", "ModifyDamageCalc", "AddBuff" },
                 skill.Effects.Select(effect => effect.EffectType).ToArray());
@@ -281,16 +382,56 @@ namespace BattleKing.Tests
 
         private static void AssertStealthBladeShape(PassiveSkillData skill)
         {
+            ClassicAssert.IsTrue(skill.HasSimultaneousLimit);
+            CollectionAssert.Contains(skill.Tags, "Ranged");
+            CollectionAssert.Contains(skill.Tags, "CannotBeCovered");
+            CollectionAssert.DoesNotContain(skill.Tags, "SureHit");
             CollectionAssert.AreEqual(
                 new[] { "PreemptiveAttack", "OnHitEffect" },
                 skill.Effects.Select(effect => effect.EffectType).ToArray());
             ClassicAssert.AreEqual(50, IntParam(skill.Effects[0], "power"));
-            ClassicAssert.AreEqual(100, IntParam(skill.Effects[0], "hitRate"));
-            ClassicAssert.AreEqual(2, IntParam(skill.Effects[0], "HitCount"));
+            ClassicAssert.IsFalse(skill.Effects[0].Parameters.ContainsKey("hitRate"));
+            ClassicAssert.IsFalse(skill.Effects[0].Parameters.ContainsKey("HitCount"));
+            ClassicAssert.AreEqual("Physical", StringParam(skill.Effects[0], "damageType"));
+            ClassicAssert.AreEqual("Ranged", StringParam(skill.Effects[0], "attackType"));
+            ClassicAssert.AreEqual("SingleEnemy", StringParam(skill.Effects[0], "targetType"));
+            CollectionAssert.AreEquivalent(new[] { "Ranged", "CannotBeCovered" }, StringListParam(skill.Effects[0], "tags"));
             var ailments = NestedEffects(skill.Effects[1])
                 .Select(effect => StringParam(effect, "ailment"))
                 .ToArray();
             CollectionAssert.AreEqual(new[] { "BlockSeal", "PassiveSeal" }, ailments);
+        }
+
+        private static void AssertDodgeStepShape(PassiveSkillData skill)
+        {
+            ClassicAssert.AreEqual(1, skill.PpCost);
+            ClassicAssert.AreEqual(PassiveTriggerTiming.SelfBeforeHit, skill.TriggerTiming);
+            CollectionAssert.Contains(skill.Tags, "EvasionSkill");
+            CollectionAssert.DoesNotContain(skill.Tags, "ApPlus1");
+            CollectionAssert.AreEqual(
+                new[] { "ModifyDamageCalc" },
+                skill.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual(true, BoolParam(skill.Effects[0], "ForceEvasion"));
+        }
+
+        private static void AssertQuickActionShape(PassiveSkillData skill)
+        {
+            ClassicAssert.AreEqual(1, skill.PpCost);
+            ClassicAssert.AreEqual(PassiveTriggerTiming.AllyOnActiveUse, skill.TriggerTiming);
+            ClassicAssert.IsFalse(skill.HasSimultaneousLimit);
+            CollectionAssert.AreEqual(new[] { "RecoverAp" }, skill.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual("Attacker", StringParam(skill.Effects[0], "target"));
+            ClassicAssert.AreEqual(1, IntParam(skill.Effects[0], "amount"));
+        }
+
+        private static void AssertShadowStepShape(PassiveSkillData skill)
+        {
+            ClassicAssert.AreEqual(2, skill.PpCost);
+            ClassicAssert.AreEqual(PassiveTriggerTiming.SelfBeforeAttack, skill.TriggerTiming);
+            ClassicAssert.IsFalse(skill.HasSimultaneousLimit);
+            CollectionAssert.AreEqual(new[] { "AddBuff", "AddBuff" }, skill.Effects.Select(effect => effect.EffectType).ToArray());
+            AssertFlatSelfBuff(skill.Effects, "Spd", 30);
+            AssertFlatSelfBuff(skill.Effects, "Eva", 30);
         }
 
         private static void AssertHolyGuardShape(PassiveSkillData skill)
@@ -310,9 +451,101 @@ namespace BattleKing.Tests
             CollectionAssert.AreEqual(
                 new[] { "RecoverHp" },
                 skill.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual(1, skill.PpCost);
             ClassicAssert.AreEqual("LowestHpAlly", StringParam(skill.Effects[0], "target"));
             ClassicAssert.AreEqual(true, BoolParam(skill.Effects[0], "excludeSelf"));
             ClassicAssert.AreEqual(25, IntParam(skill.Effects[0], "amount"));
+        }
+
+        private static void AssertChargeActionShape(PassiveSkillData skill)
+        {
+            CollectionAssert.AreEqual(
+                new[] { "RecoverAp", "AddBuff" },
+                skill.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual("Self", StringParam(skill.Effects[0], "target"));
+            ClassicAssert.AreEqual(1, IntParam(skill.Effects[0], "amount"));
+            ClassicAssert.AreEqual("Self", StringParam(skill.Effects[1], "target"));
+            ClassicAssert.AreEqual("CritDmg", StringParam(skill.Effects[1], "stat"));
+            ClassicAssert.AreEqual(0.5d, DoubleParam(skill.Effects[1], "ratio"), 0.0001d);
+            ClassicAssert.AreEqual(1, IntParam(skill.Effects[1], "turns"));
+            ClassicAssert.AreEqual(true, BoolParam(skill.Effects[1], "oneTime"));
+        }
+
+        private static void AssertShooterAndThiefPassiveSourceData(GameDataRepository repository)
+        {
+            var battleHorn = repository.PassiveSkills["pas_battle_horn"];
+            ClassicAssert.IsFalse(battleHorn.HasSimultaneousLimit);
+
+            var thief = repository.Characters["thief"];
+            CollectionAssert.AreEqual(new[] { "pas_dodge_step" }, thief.InnatePassiveSkillIds);
+            CollectionAssert.DoesNotContain(thief.InnatePassiveSkillIds, "pas_quick_action");
+            CollectionAssert.DoesNotContain(thief.CcInnatePassiveSkillIds, "pas_shadow_step");
+            CollectionAssert.Contains(thief.CcInnatePassiveSkillIds, "pas_stealth_blade");
+        }
+
+        private static void AssertFlatSelfBuff(IEnumerable<SkillEffectData> effects, string stat, int amount)
+        {
+            var buff = effects.Single(effect => effect.EffectType == "AddBuff" && StringParam(effect, "stat") == stat);
+            ClassicAssert.AreEqual("Self", StringParam(buff, "target"));
+            ClassicAssert.AreEqual(amount, IntParam(buff, "amount"));
+            ClassicAssert.IsFalse(buff.Parameters.ContainsKey("ratio"));
+            ClassicAssert.AreEqual(-1, IntParam(buff, "turns"));
+        }
+
+        private static void AssertFirstThreeCharacterPassiveSkillSourceData(GameDataRepository repository)
+        {
+            var quickStrike = repository.PassiveSkills["pas_quick_strike"];
+            ClassicAssert.AreEqual(150, quickStrike.Power);
+            CollectionAssert.Contains(quickStrike.Tags, "SureHit");
+            ClassicAssert.IsTrue(quickStrike.HasSimultaneousLimit);
+            ClassicAssert.AreEqual(150, IntParam(quickStrike.Effects[0], "power"));
+            ClassicAssert.AreEqual(100, IntParam(quickStrike.Effects[0], "hitRate"));
+
+            var parry = repository.PassiveSkills["pas_parry"];
+            CollectionAssert.AreEqual(
+                new[] { "TemporalMark", "RecoverAp" },
+                parry.Effects.Select(effect => effect.EffectType).ToArray());
+            ClassicAssert.AreEqual("MeleeHitNullify", StringParam(parry.Effects[0], "key"));
+            ClassicAssert.AreEqual(1, IntParam(parry.Effects[0], "count"));
+            ClassicAssert.AreEqual(1, IntParam(parry.Effects[1], "amount"));
+
+            AssertChargeActionShape(repository.PassiveSkills["pas_charge_action"]);
+
+            var pursuitSlash = repository.PassiveSkills["pas_pursuit_slash"];
+            ClassicAssert.AreEqual(75, pursuitSlash.Power);
+            ClassicAssert.AreEqual(90, pursuitSlash.HitRate);
+            ClassicAssert.AreEqual(75, IntParam(pursuitSlash.Effects[0], "power"));
+            ClassicAssert.AreEqual(90, IntParam(pursuitSlash.Effects[0], "hitRate"));
+            ClassicAssert.AreEqual(1, IntParam(pursuitSlash.Effects[0], "HitCount"));
+            ClassicAssert.AreEqual("Physical", StringParam(pursuitSlash.Effects[0], "damageType"));
+            ClassicAssert.AreEqual("Melee", StringParam(pursuitSlash.Effects[0], "attackType"));
+            ClassicAssert.AreEqual("SingleEnemy", StringParam(pursuitSlash.Effects[0], "targetType"));
+            ClassicAssert.AreEqual("ActiveAttack", StringParam(pursuitSlash.Effects[0], "requiresSourceKind"));
+            var pursuitRecover = NestedEffects(pursuitSlash.Effects[1]).Single();
+            ClassicAssert.AreEqual("RecoverPp", pursuitRecover.EffectType);
+            ClassicAssert.AreEqual(1, IntParam(pursuitRecover, "amount"));
+
+            var vengeanceGuard = repository.PassiveSkills["pas_vengeance_guard"];
+            var vengeanceBuff = vengeanceGuard.Effects.Single(effect => effect.EffectType == "AddBuff");
+            ClassicAssert.AreEqual("Str", StringParam(vengeanceBuff, "stat"));
+            ClassicAssert.AreEqual(0.2d, DoubleParam(vengeanceBuff, "ratio"), 0.0001d);
+            ClassicAssert.AreEqual("Stack", StringParam(vengeanceBuff, "stackPolicy"));
+
+            var bruteForce = repository.PassiveSkills["pas_brute_force"];
+            var bruteSpeed = bruteForce.Effects.Single(effect =>
+                effect.EffectType == "AddBuff" && StringParam(effect, "stat") == "Spd");
+            ClassicAssert.AreEqual(20, IntParam(bruteSpeed, "amount"));
+            ClassicAssert.IsFalse(bruteSpeed.Parameters.ContainsKey("ratio"));
+
+            AssertNobleBlockShape(repository.PassiveSkills["pas_noble_block"]);
+            AssertFluorescentCoverShape(repository.PassiveSkills["pas_fluorescent_cover"]);
+
+            var rapidOrder = repository.PassiveSkills["pas_rapid_order"];
+            ClassicAssert.IsTrue(rapidOrder.HasSimultaneousLimit);
+            var speedAll = rapidOrder.Effects.Single();
+            ClassicAssert.AreEqual("AllAllies", StringParam(speedAll, "target"));
+            ClassicAssert.AreEqual("Spd", StringParam(speedAll, "stat"));
+            ClassicAssert.AreEqual(20, IntParam(speedAll, "amount"));
         }
 
         private static List<SkillEffectData> NestedEffects(SkillEffectData effect)
@@ -335,6 +568,18 @@ namespace BattleKing.Tests
                 JsonElement { ValueKind: JsonValueKind.String } json => json.GetString()!,
                 JsonElement json => json.ToString(),
                 _ => raw.ToString()!
+            };
+        }
+
+        private static List<string> StringListParam(SkillEffectData effect, string key)
+        {
+            var raw = effect.Parameters[key];
+            return raw switch
+            {
+                List<string> list => list,
+                JsonElement json => JsonSerializer.Deserialize<List<string>>(json.GetRawText(), JsonOptions)!,
+                IEnumerable<object> values => values.Select(value => value?.ToString() ?? string.Empty).ToList(),
+                _ => throw new AssertionException($"Unexpected string list value: {raw?.GetType().Name ?? "null"}")
             };
         }
 

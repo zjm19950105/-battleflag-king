@@ -11,6 +11,7 @@ namespace BattleKing.Data
         Mage,        // 术士
         Elf,         // 精灵
         Beastman,    // 兽人
-        Winged       // 有翼人
+        Winged,      // 有翼人
+        Undead       // 不死系
     }
 }
