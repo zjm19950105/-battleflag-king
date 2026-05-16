@@ -248,9 +248,107 @@ namespace BattleKing.Tests
             Assert.That(passiveLog.Text, Does.Contain(passive.Name));
             Assert.That(passiveLog.Text, Does.Contain("威力150"));
             Assert.That(passiveLog.Text, Does.Contain("命中率: 必中"));
+            Assert.That(passiveLog.Text, Does.Contain("基础计算:"));
+            Assert.That(passiveLog.Text, Does.Contain("x 技能命中倍率100%"));
+            Assert.That(passiveLog.Text, Does.Contain("判定数据:"));
             Assert.That(passiveLog.Text, Does.Contain("判定: 命中"));
             Assert.That(passiveLog.Text, Does.Contain("伤害:"));
+            Assert.That(passiveLog.Text, Does.Contain("Atk:"));
+            Assert.That(passiveLog.Text, Does.Contain("Damage:"));
             ClassicAssert.IsFalse(logs.Any(line => line.Trim() == "Preemptive queued"));
+        }
+
+        [Test]
+        public void InitBattle_RealPassiveJsonQuickStrike_RandomizesAmongLegalFrontRowTargets()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var random = new Random(1);
+            var selectedTargets = new HashSet<string>();
+
+            for (int i = 0; i < 20; i++)
+            {
+                var swordsman = new BattleUnit(CreateStructuredLogCharacter("swordsman", null, hp: 1000, str: 45, def: 10, spd: 30, ap: 0, pp: 1), repository, true)
+                {
+                    Position = 1
+                };
+                swordsman.EquippedPassiveSkillIds.Add("pas_quick_strike");
+
+                var frontLeft = new BattleUnit(CreateStructuredLogCharacter("front_left", null, hp: 1000, str: 10, def: 10, spd: 10, ap: 0, pp: 0), repository, false)
+                {
+                    Position = 1
+                };
+                var frontCenter = new BattleUnit(CreateStructuredLogCharacter("front_center", null, hp: 1000, str: 10, def: 10, spd: 10, ap: 0, pp: 0), repository, false)
+                {
+                    Position = 2
+                };
+                var frontRight = new BattleUnit(CreateStructuredLogCharacter("front_right", null, hp: 1000, str: 10, def: 10, spd: 10, ap: 0, pp: 0), repository, false)
+                {
+                    Position = 3
+                };
+                var back = new BattleUnit(CreateStructuredLogCharacter("back", null, hp: 1000, str: 10, def: 10, spd: 10, ap: 0, pp: 0), repository, false)
+                {
+                    Position = 4
+                };
+                var context = new BattleContext(repository)
+                {
+                    PlayerUnits = new List<BattleUnit> { swordsman },
+                    EnemyUnits = new List<BattleUnit> { frontLeft, frontCenter, frontRight, back }
+                };
+                var engine = new BattleEngine(context, random) { OnLog = _ => { } };
+                var processor = new PassiveSkillProcessor(engine.EventBus, repository, _ => { }, engine.EnqueueAction);
+                processor.SubscribeAll();
+
+                engine.InitBattle();
+
+                var passiveLog = engine.BattleLogEntries.Single(entry => entry.SkillId == "pas_quick_strike");
+                string targetId = passiveLog.TargetIds.Single();
+                selectedTargets.Add(targetId);
+                Assert.That(targetId, Is.Not.EqualTo("back"));
+            }
+
+            Assert.That(selectedTargets.Count, Is.GreaterThan(1));
+        }
+
+        [Test]
+        public void InitBattle_RealPassiveJsonQuickStrike_AgainstTwoLineCoverUsersResolvesOnlyOneAttack()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var swordsman = new BattleUnit(CreateStructuredLogCharacter("swordsman", null, hp: 1000, str: 45, def: 10, spd: 30, ap: 0, pp: 1), repository, true)
+            {
+                Position = 1
+            };
+            swordsman.EquippedPassiveSkillIds.Add("pas_quick_strike");
+            var firstHoplite = new BattleUnit(CreateStructuredLogCharacter("hoplite_a", null, hp: 1000, str: 10, def: 64, spd: 10, ap: 0, pp: 1), repository, false)
+            {
+                Position = 1
+            };
+            var secondHoplite = new BattleUnit(CreateStructuredLogCharacter("hoplite_b", null, hp: 1000, str: 10, def: 64, spd: 9, ap: 0, pp: 1), repository, false)
+            {
+                Position = 2
+            };
+            firstHoplite.EquippedPassiveSkillIds.Add("pas_line_cover");
+            secondHoplite.EquippedPassiveSkillIds.Add("pas_line_cover");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { swordsman },
+                EnemyUnits = new List<BattleUnit> { firstHoplite, secondHoplite }
+            };
+            var logs = new List<string>();
+            var engine = new BattleEngine(context, new Random(1)) { OnLog = logs.Add };
+            var processor = new PassiveSkillProcessor(engine.EventBus, repository, logs.Add, engine.EnqueueAction);
+            processor.SubscribeAll();
+
+            engine.InitBattle();
+
+            var quickStrikeEntries = engine.BattleLogEntries
+                .Where(entry => entry.SkillId == "pas_quick_strike")
+                .ToList();
+            Assert.That(quickStrikeEntries, Has.Count.EqualTo(1));
+            Assert.That(logs.Count(line => line.Contains("[快速打击]")), Is.EqualTo(1));
+            Assert.That(logs, Has.Some.Contains("最终1体"));
+            ClassicAssert.AreEqual(1, 2 - firstHoplite.CurrentPp - secondHoplite.CurrentPp);
         }
 
         [Test]
@@ -350,7 +448,11 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(1, attacker.CurrentPp);
             ClassicAssert.AreEqual(1, pursuitAlly.CurrentPp);
             Assert.That(wideLogs[0].Text, Does.Contain("gladiator反击merc_attacker"));
+            Assert.That(wideLogs[0].Text, Does.Contain("命中率: (gladiator命中"));
+            Assert.That(wideLogs[0].Text, Does.Contain("判定数据:"));
             Assert.That(wideLogs[0].Text, Does.Contain("判定: 命中"));
+            Assert.That(wideLogs[0].Text, Does.Contain("Atk:"));
+            Assert.That(wideLogs[0].Text, Does.Contain("Damage:"));
         }
 
         [Test]

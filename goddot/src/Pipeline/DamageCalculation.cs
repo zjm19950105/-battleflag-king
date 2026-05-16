@@ -10,6 +10,7 @@ namespace BattleKing.Pipeline
         public BattleUnit Attacker { get; set; }
         public BattleUnit Defender { get; set; }
         public ActiveSkill Skill { get; set; }
+        public List<BattleUnit> ActionTargets { get; set; } = new List<BattleUnit>();
 
         public int FinalAttackPower { get; set; }
         public int FinalDefense { get; set; }

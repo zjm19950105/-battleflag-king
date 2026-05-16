@@ -564,6 +564,65 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void RealPassiveJson_LineCover_DoesNotCoverAllyWhenCoverUserIsAlsoTargetedBySameAction()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var lineCover = repository.PassiveSkills["pas_line_cover"];
+            var logs = new List<string>();
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, logs.Add);
+            processor.SubscribeAll();
+            var attacker = new BattleUnit(CreatePassiveBattleCharacter(
+                "attacker", null, hp: 200, str: 50, def: 0, spd: 10, hit: 1000, eva: 0, ap: 0, pp: 0),
+                repository,
+                true)
+            {
+                Position = 1
+            };
+            var firstTarget = new BattleUnit(CreatePassiveBattleCharacter(
+                "firstTarget", null, hp: 200, str: 1, def: 0, spd: 1, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            var secondTargetCoverUser = new BattleUnit(CreatePassiveBattleCharacter(
+                "secondTargetCoverUser", null, hp: 200, str: 1, def: 0, spd: 20, hit: 0, eva: 0, ap: 0, pp: 1),
+                repository,
+                false)
+            {
+                Position = 2,
+                CurrentPp = 1
+            };
+            secondTargetCoverUser.EquippedPassiveSkillIds.Add("pas_line_cover");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { attacker },
+                EnemyUnits = new List<BattleUnit> { firstTarget, secondTargetCoverUser }
+            };
+            var skill = TestDataFactory.CreateSkill(type: SkillType.Physical, attackType: AttackType.Melee);
+            var calc = TestDataFactory.CreateCalc(attacker, firstTarget, skill);
+            calc.ActionTargets = new List<BattleUnit> { firstTarget, secondTargetCoverUser };
+
+            eventBus.Publish(new BeforeHitEvent
+            {
+                Attacker = attacker,
+                Defender = firstTarget,
+                Skill = skill,
+                Context = context,
+                Calc = calc
+            });
+
+            CollectionAssert.Contains(lineCover.Tags, "CoverAlly");
+            ClassicAssert.IsNull(calc.CoverTarget);
+            ClassicAssert.IsNull(calc.ForceBlock);
+            ClassicAssert.IsNull(calc.ForcedBlockReduction);
+            ClassicAssert.AreEqual(1, secondTargetCoverUser.CurrentPp);
+            Assert.That(logs, Has.None.Contains(lineCover.Name));
+        }
+
+        [Test]
         public void RealPassiveJson_QuickGuard_DoesNotTriggerWhenIncomingAttackCannotBeBlocked()
         {
             var repository = new GameDataRepository();

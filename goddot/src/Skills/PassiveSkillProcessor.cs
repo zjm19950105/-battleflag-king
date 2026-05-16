@@ -454,8 +454,18 @@ namespace BattleKing.Skills
                 return false;
             if (calc?.CoverTarget != null)
                 return false;
+            if (IsAlsoTargetedInSameAction(unit, calc))
+                return false;
 
             return coverEffects.Any(effect => CoverScopeMatches(unit, calc, effect.Parameters));
+        }
+
+        private static bool IsAlsoTargetedInSameAction(BattleUnit unit, DamageCalculation calc)
+        {
+            return unit != null
+                && calc?.Defender != null
+                && unit != calc.Defender
+                && calc.ActionTargets.Any(target => target == unit);
         }
 
         private static bool CoverScopeMatches(BattleUnit unit, DamageCalculation calc, Dictionary<string, object> parameters)
@@ -802,9 +812,20 @@ namespace BattleKing.Skills
             };
             var targetType = GetTargetType(effect.Parameters ?? new Dictionary<string, object>(), "target", defaultTarget);
             var selected = SelectPassiveTargets(owner, targetType, attacker, defender);
-            if (effect.Parameters != null && TryGetIntParam(effect.Parameters, "maxTargets", out int maxTargets))
+            if (effect.Parameters != null
+                && !IsDirectPendingAttackEffect(effect.EffectType)
+                && TryGetIntParam(effect.Parameters, "maxTargets", out int maxTargets))
                 selected = selected.Take(Math.Max(0, maxTargets)).ToList();
             return selected;
+        }
+
+        private static bool IsDirectPendingAttackEffect(string effectType)
+        {
+            return effectType == "CounterAttack"
+                || effectType == "PursuitAttack"
+                || effectType == "PreemptiveAttack"
+                || effectType == "BattleEndAttack"
+                || effectType == "PendingAttack";
         }
 
         // === Module 4: Target selection helpers ===

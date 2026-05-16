@@ -1166,12 +1166,24 @@ namespace BattleKing.Skills
         {
             if (calculation == null || calculation.CannotBeCovered)
                 return;
+            if (calculation.CoverTarget != null)
+                return;
+            if (IsAlsoTargetedInSameAction(caster, calculation))
+                return;
             if (!CoverScopeMatches(caster, calculation, parameters))
                 return;
 
             calculation.CoverTarget = caster;
             calculation.CoverScope = GetString(parameters, "scope", "");
             logs.Add($"Cover={caster.Data.Name}");
+        }
+
+        private static bool IsAlsoTargetedInSameAction(BattleUnit caster, DamageCalculation calculation)
+        {
+            return caster != null
+                && calculation?.Defender != null
+                && caster != calculation.Defender
+                && calculation.ActionTargets.Any(target => target == caster);
         }
 
         private static bool CoverScopeMatches(
@@ -1244,6 +1256,9 @@ namespace BattleKing.Skills
                 DamageType = ParseEnum(GetString(parameters, "damageType", "Physical"), SkillType.Physical),
                 AttackType = ParseEnum(GetString(parameters, "attackType", "Melee"), AttackType.Melee),
                 TargetType = ParseEnum(GetString(parameters, "targetType", "SingleEnemy"), TargetType.SingleEnemy),
+                MaxTargets = TryGetInt(parameters, "maxTargets", out int maxTargets)
+                    ? Math.Max(0, maxTargets)
+                    : null,
                 IgnoreDefenseRatio = Math.Clamp(
                     GetFloat(parameters, "ignoreDefenseRatio", GetFloat(parameters, "IgnoreDefenseRatio", 0f)),
                     0f,
@@ -1266,6 +1281,8 @@ namespace BattleKing.Skills
                 .ToList();
             string actorName = action.Actor?.Data?.Name ?? "";
             string targetNames = targets.Count == 0 ? "目标" : string.Join("、", targets);
+            if (action.MaxTargets.HasValue && action.MaxTargets.Value >= 0 && action.MaxTargets.Value < targets.Count)
+                targetNames = $"候选 {targetNames} / 最终{action.MaxTargets.Value}体";
             string verb = GetPendingActionQueuedVerb(action);
 
             return $"{verb}: {actorName} -> {targetNames}（{FormatPendingActionSpec(action)}）";

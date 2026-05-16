@@ -17,6 +17,7 @@ namespace BattleKing.Core
         private DamageCalculator _damageCalculator;
         private SkillEffectExecutor _skillEffectExecutor;
         private EventBus _eventBus = new EventBus();
+        private readonly Random _targetRandom;
 
         public Action<string> OnLog { get; set; }
         public Action<BattleLogEntry> OnBattleLogEntry { get; set; }
@@ -52,12 +53,13 @@ namespace BattleKing.Core
             public float? ForcedBlockReduction { get; set; }
         }
 
-        public BattleEngine(BattleContext ctx)
+        public BattleEngine(BattleContext ctx, Random targetRandom = null)
         {
             _ctx = ctx;
             _strategyEvaluator = new StrategyEvaluator(ctx);
             _damageCalculator = new DamageCalculator();
             _skillEffectExecutor = new SkillEffectExecutor(EnqueueAction);
+            _targetRandom = targetRandom ?? Random.Shared;
         }
 
         private void Log(string message)
@@ -453,6 +455,7 @@ namespace BattleKing.Core
                     Attacker = unit,
                     Defender = target,
                     Skill = skill,
+                    ActionTargets = targets.Where(t => t != null).ToList(),
                     HitCount = 1  // Default; multi-hit skills override this via effects
                 };
 
@@ -844,6 +847,7 @@ namespace BattleKing.Core
                         Attacker = action.Actor,
                         Defender = target,
                         Skill = tempSkill,
+                        ActionTargets = pendingTargets.Where(t => t != null).ToList(),
                         HitCount = Math.Max(1, action.HitCount)
                     };
 
@@ -991,20 +995,84 @@ namespace BattleKing.Core
             if (anchors.Count == 0)
                 return anchors;
 
+            if (action.TargetType == TargetType.SingleEnemy)
+                return SelectPendingSingleEnemyTargets(action, anchors);
+
             return action.TargetType switch
             {
-                TargetType.Row => anchors
-                    .SelectMany(anchor => _ctx.GetAliveUnits(anchor.IsPlayer)
-                        .Where(unit => unit.IsFrontRow == anchor.IsFrontRow))
-                    .Distinct()
-                    .ToList(),
-                TargetType.Column => anchors
-                    .SelectMany(anchor => _ctx.GetAliveUnits(anchor.IsPlayer)
-                        .Where(unit => IsSameColumn(unit.Position, anchor.Position)))
-                    .Distinct()
-                    .ToList(),
-                _ => anchors
+                TargetType.Row => ApplyPendingMaxTargets(action, ExpandPendingRowTargets(anchors)),
+                TargetType.Column => ApplyPendingMaxTargets(action, ExpandPendingColumnTargets(anchors)),
+                _ => ApplyPendingMaxTargets(action, anchors)
             };
+        }
+
+        private List<BattleUnit> ExpandPendingRowTargets(List<BattleUnit> anchors)
+        {
+            return anchors
+                .SelectMany(anchor => _ctx.GetAliveUnits(anchor.IsPlayer)
+                    .Where(unit => unit.IsFrontRow == anchor.IsFrontRow))
+                .Distinct()
+                .ToList();
+        }
+
+        private List<BattleUnit> ExpandPendingColumnTargets(List<BattleUnit> anchors)
+        {
+            return anchors
+                .SelectMany(anchor => _ctx.GetAliveUnits(anchor.IsPlayer)
+                    .Where(unit => IsSameColumn(unit.Position, anchor.Position)))
+                .Distinct()
+                .ToList();
+        }
+
+        private List<BattleUnit> SelectPendingSingleEnemyTargets(PendingAction action, List<BattleUnit> anchors)
+        {
+            if (IsAnchoredPendingAction(action))
+                return ApplyPendingMaxTargets(action, anchors);
+
+            var legalTargets = GetPendingLegalEnemyTargets(action, anchors);
+            int targetCount = Math.Min(action.MaxTargets ?? 1, legalTargets.Count);
+            if (targetCount <= 0)
+                return new List<BattleUnit>();
+
+            if (targetCount == 1)
+                return new List<BattleUnit> { legalTargets[_targetRandom.Next(legalTargets.Count)] };
+
+            return legalTargets
+                .OrderBy(_ => _targetRandom.Next())
+                .Take(targetCount)
+                .ToList();
+        }
+
+        private static bool IsAnchoredPendingAction(PendingAction action)
+        {
+            return action.Type == PendingActionType.Counter
+                || action.Type == PendingActionType.Pursuit;
+        }
+
+        private static List<BattleUnit> GetPendingLegalEnemyTargets(PendingAction action, List<BattleUnit> candidates)
+        {
+            var ordered = candidates.OrderBy(unit => unit.Position).ToList();
+            if (action?.Actor == null)
+                return ordered;
+
+            bool targetsEnemy = ordered.Any(unit => unit.IsPlayer != action.Actor.IsPlayer);
+            bool actorIsFlying = action.Actor.GetEffectiveClasses()?.Contains(UnitClass.Flying) == true;
+            if (targetsEnemy && action.AttackType == AttackType.Melee && !actorIsFlying)
+            {
+                var frontRow = ordered.Where(unit => unit.IsFrontRow).ToList();
+                if (frontRow.Count > 0)
+                    return frontRow;
+            }
+
+            return ordered;
+        }
+
+        private static List<BattleUnit> ApplyPendingMaxTargets(PendingAction action, List<BattleUnit> targets)
+        {
+            if (!action.MaxTargets.HasValue)
+                return targets;
+
+            return targets.Take(Math.Max(0, action.MaxTargets.Value)).ToList();
         }
 
         private static bool ShouldApplyPendingIgnoreDefense(PendingAction action, BattleUnit target)
@@ -1223,10 +1291,18 @@ namespace BattleKing.Core
             if (damageReceiver != declaredTarget)
                 lines.Add($"  掩护: {targetName} -> {receiverName}");
             lines.Add("  " + BuildPendingHitFormula(action.Actor, declaredTarget, calc));
+            lines.Add("  " + BuildPendingJudgementData(action.Actor, declaredTarget, damageReceiver, calc));
             lines.Add("  判定: " + BuildPendingJudgement(result, killed));
             if (result.IsHit)
+            {
                 lines.Add($"  伤害: {result.TotalDamage}");
-            lines.Add("  " + BuildPendingHpLine(receiverName, result));
+                lines.AddRange(BattleKing.Ui.BattleLogHelper.FormatDamageFormulaLines(
+                    calc.Skill,
+                    calc,
+                    result,
+                    BuildPendingDamageFormulaFlags(calc, result)));
+            }
+            lines.Add("  " + BuildPendingHpLine(receiverName, result, killed));
             if (result.AppliedAilments.Count > 0)
                 lines.Add("  异常: " + string.Join("、", result.AppliedAilments));
 
@@ -1250,14 +1326,20 @@ namespace BattleKing.Core
 
         private static string BuildPendingHitFormula(BattleUnit attacker, BattleUnit defender, DamageCalculation calc)
         {
-            if (calc.ForceHit)
-                return "命中率: 必中";
-
             var hitChance = HitChanceCalculator.Calculate(attacker, defender, calc.Skill);
+            string formula = BuildPendingHitChanceFormula(attacker, defender, hitChance);
+            if (calc.ForceHit)
+                return $"命中率: 必中（基础计算: {formula}）";
+
+            return "命中率: " + formula;
+        }
+
+        private static string BuildPendingHitChanceFormula(BattleUnit attacker, BattleUnit defender, HitChanceBreakdown hitChance)
+        {
             string baseFormula = $"({FormatReadableUnitName(attacker)}命中{hitChance.AttackerHit} - {FormatReadableUnitName(defender)}回避{hitChance.DefenderEvasion})";
             if (hitChance.FlyingPenaltyApplied)
                 baseFormula = $"({baseFormula} / 2(飞行防御))";
-            string formula = "命中率: " + baseFormula;
+            string formula = baseFormula;
             formula += $" x 技能命中倍率{hitChance.SkillHitRate}% = {FormatFloat(hitChance.RawChance)}%";
             if (hitChance.RawChance < 0f || hitChance.RawChance > 100f)
                 formula += $"，显示上限/下限后 {hitChance.FinalChance}%";
@@ -1266,6 +1348,18 @@ namespace BattleKing.Core
             else
                 formula += $"，最终 {hitChance.FinalChance}%";
             return formula;
+        }
+
+        private static string BuildPendingJudgementData(
+            BattleUnit attacker,
+            BattleUnit declaredTarget,
+            BattleUnit damageReceiver,
+            DamageCalculation calc)
+        {
+            var hitChance = HitChanceCalculator.Calculate(attacker, declaredTarget, calc.Skill);
+            return $"判定数据: {FormatReadableUnitName(declaredTarget)}回避 {hitChance.DefenderEvasion}% | "
+                + $"{FormatReadableUnitName(damageReceiver)}格挡 {damageReceiver.GetCurrentBlockRate()}% | "
+                + $"{FormatReadableUnitName(attacker)}暴击 {attacker.GetCurrentCritRate()}%";
         }
 
         private static string BuildPendingJudgement(DamageResult result, bool killed)
@@ -1287,7 +1381,7 @@ namespace BattleKing.Core
             return string.Join("，", parts);
         }
 
-        private static string BuildPendingHpLine(string receiverName, DamageResult result)
+        private static string BuildPendingHpLine(string receiverName, DamageResult result, bool killed)
         {
             if (!result.DamageReceiverHpBefore.HasValue || !result.DamageReceiverHpAfter.HasValue)
                 return $"{receiverName} HP: 未变化";
@@ -1295,7 +1389,22 @@ namespace BattleKing.Core
             string text = $"{receiverName} HP: {result.DamageReceiverHpBefore.Value} -> {result.DamageReceiverHpAfter.Value}(-{result.AppliedHpDamage})";
             if (result.LethalDamageResisted)
                 text += " [保留1HP]";
+            if (killed)
+                text += " [Knockdown]";
             return text;
+        }
+
+        private static string BuildPendingDamageFormulaFlags(DamageCalculation calc, DamageResult result)
+        {
+            var parts = new List<string>();
+            var hitResults = result.HitResults.Count > 0 ? result.HitResults : calc.HitResults;
+            if (calc.NullifiedHits > 0 || hitResults.Any(hit => hit.Nullified))
+                parts.Add("NULLIFY");
+            if (result.IsCritical)
+                parts.Add("CRIT(x" + calc.CritMultiplier.ToString("F1") + ")");
+            if (result.IsBlocked)
+                parts.Add("BLOCK(-" + (calc.BlockReduction * 100).ToString("F0") + "%)");
+            return string.Join(" ", parts);
         }
 
         private static string FormatReadableUnitName(BattleUnit unit)

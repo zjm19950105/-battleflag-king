@@ -77,6 +77,28 @@ namespace BattleKing.Ui
             if (result.IsCritical) flags += "CRIT(x" + calc.CritMultiplier.ToString("F1") + ") ";
             if (result.IsBlocked) flags += "BLOCK(-" + (calc.BlockReduction * 100).ToString("F0") + "%) ";
 
+            lines.AddRange(FormatDamageFormulaLines(skill, calc, result, flags.Trim()));
+
+            bool hasRecordedHp = result.DamageReceiverHpBefore.HasValue && result.DamageReceiverHpAfter.HasValue;
+            int hpBefore = hasRecordedHp
+                ? result.DamageReceiverHpBefore.Value
+                : damageReceiver.CurrentHp;
+            int hpAfter = hasRecordedHp
+                ? result.DamageReceiverHpAfter.Value
+                : damageReceiver.CurrentHp;
+            int hpLost = hasRecordedHp ? result.AppliedHpDamage : 0;
+            string killStr = killed ? " [Knockdown]" : "";
+            string deathResistStr = result.LethalDamageResisted ? " [DeathResist]" : "";
+            string ailStr = appliedAilments.Count > 0 ? " | Ailments:" + string.Join(",", appliedAilments) : "";
+            lines.Add("  * " + FormatUnitName(damageReceiver) + " HP:" + hpBefore + "->" + hpAfter + "(-" + hpLost + ")" + deathResistStr + killStr + ailStr);
+
+            return lines;
+        }
+
+        public static List<string> FormatDamageFormulaLines(ActiveSkill skill, DamageCalculation calc, DamageResult result, string flags = "")
+        {
+            var lines = new List<string>();
+            var hitResults = result.HitResults.Count > 0 ? result.HitResults : calc.HitResults;
             int diff = Math.Max(1, calc.FinalAttackPower - calc.FinalDefense);
             float powerRatio = calc.SkillPowerRatio;
             float classMult = calc.ClassTraitMultiplier;
@@ -101,22 +123,9 @@ namespace BattleKing.Ui
                 if (Math.Abs(calc.CharacterTraitMultiplier - 1f) > 0.01f) formula += " x 特性" + calc.CharacterTraitMultiplier.ToString("F1");
                 if (calc.MagicalDamage > 0) formula += " + " + calc.MagicalDamage;
                 formula += " = " + result.TotalDamage;
-                if (flags.Length > 0) formula += " [" + flags.Trim() + "]";
+                if (!string.IsNullOrWhiteSpace(flags)) formula += " [" + flags + "]";
                 lines.Add(formula);
             }
-
-            bool hasRecordedHp = result.DamageReceiverHpBefore.HasValue && result.DamageReceiverHpAfter.HasValue;
-            int hpBefore = hasRecordedHp
-                ? result.DamageReceiverHpBefore.Value
-                : damageReceiver.CurrentHp;
-            int hpAfter = hasRecordedHp
-                ? result.DamageReceiverHpAfter.Value
-                : damageReceiver.CurrentHp;
-            int hpLost = hasRecordedHp ? result.AppliedHpDamage : 0;
-            string killStr = killed ? " [Knockdown]" : "";
-            string deathResistStr = result.LethalDamageResisted ? " [DeathResist]" : "";
-            string ailStr = appliedAilments.Count > 0 ? " | Ailments:" + string.Join(",", appliedAilments) : "";
-            lines.Add("  * " + FormatUnitName(damageReceiver) + " HP:" + hpBefore + "->" + hpAfter + "(-" + hpLost + ")" + deathResistStr + killStr + ailStr);
 
             return lines;
         }

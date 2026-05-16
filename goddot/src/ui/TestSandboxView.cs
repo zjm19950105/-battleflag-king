@@ -162,7 +162,7 @@ namespace BattleKing.Ui
                 return;
             }
 
-            _detailPanel.AddChild(SandboxUnitHeaderView.Build(selectedUnit));
+            _detailPanel.AddChild(SandboxUnitHeaderView.Build(selectedUnit, _gameData));
 
             var tabs = new TabContainer
             {
@@ -177,7 +177,7 @@ namespace BattleKing.Ui
             tabs.AddChild(BuildSkillsTab(selectedUnit));
             tabs.SetTabTitle(1, "技能");
 
-            tabs.AddChild(BuildPlaceholderTab("信息", selectedUnit));
+            tabs.AddChild(BuildInfoTab(selectedUnit));
             tabs.SetTabTitle(2, "信息");
 
             tabs.AddChild(BuildPlaceholderTab("能力", selectedUnit));
@@ -271,6 +271,79 @@ namespace BattleKing.Ui
             AddPassiveSkillSection(list, "装备被动", unit.Equipment.GetGrantedPassiveSkillIds());
 
             return root;
+        }
+
+        private Control BuildInfoTab(BattleUnit unit)
+        {
+            var root = new VBoxContainer
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                SizeFlagsVertical = Control.SizeFlags.ExpandFill
+            };
+            root.AddThemeConstantOverride("separation", 8);
+
+            var scroll = new ScrollContainer
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                SizeFlagsVertical = Control.SizeFlags.ExpandFill
+            };
+            root.AddChild(scroll);
+
+            var content = new VBoxContainer
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            };
+            content.AddThemeConstantOverride("separation", 8);
+            scroll.AddChild(content);
+
+            if (unit?.Data == null
+                || _gameData?.CharacterRoleDescriptions == null
+                || !_gameData.CharacterRoleDescriptions.TryGetValue(unit.Data.Id, out var description))
+            {
+                content.AddChild(CreateTitle("角色定位"));
+                content.AddChild(CreateLabel("暂无角色描述。", BodyFontSize));
+                return root;
+            }
+
+            content.AddChild(CreateTitle("角色定位"));
+            content.AddChild(CreateLabel(description.DisplayName, BodyFontSize));
+            AddInfoLine(content, "兵种", FormatRoleUnitClasses(description.UnitClasses));
+            AddDescriptionSection(content, "主要角色", description.MainRoles);
+            AddDescriptionSection(content, "特点", description.Characteristics);
+
+            return root;
+        }
+
+        private void AddInfoLine(VBoxContainer content, string label, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            content.AddChild(CreateLabel($"{label}：{value}", BodyFontSize));
+        }
+
+        private void AddDescriptionSection(VBoxContainer content, string title, IEnumerable<string> items)
+        {
+            var lines = items?
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(_gameData.ResolveDisplayTokens)
+                .ToList() ?? new List<string>();
+            if (lines.Count == 0)
+                return;
+
+            content.AddChild(CreateLabel(title, BodyFontSize));
+            foreach (var line in lines)
+                content.AddChild(CreateLabel("· " + line, CompactFontSize));
+        }
+
+        private string FormatRoleUnitClasses(IEnumerable<string> unitClasses)
+        {
+            var names = unitClasses?
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => _gameData.TryResolveDisplayToken("class", id, out var displayName) ? displayName : id)
+                .ToList() ?? new List<string>();
+
+            return names.Count == 0 ? string.Empty : string.Join(" / ", names);
         }
 
         private void AddActiveSkillSection(VBoxContainer list, string title, IEnumerable<string> skillIds)

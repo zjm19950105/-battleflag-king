@@ -12,7 +12,7 @@ namespace BattleKing.Ui
         private static int BodyFontSize => Math.Max(12, TestSandboxView.CurrentBodyFontSize - 2);
         private static int TitleFontSize => TestSandboxView.CurrentBodyFontSize;
 
-        public static Control Build(BattleUnit unit)
+        public static Control Build(BattleUnit unit, GameDataRepository gameData = null)
         {
             var root = new PanelContainer
             {
@@ -33,18 +33,18 @@ namespace BattleKing.Ui
             margin.AddChild(row);
 
             row.AddChild(BuildAvatar());
-            row.AddChild(BuildMainInfo(unit));
+            row.AddChild(BuildMainInfo(unit, gameData));
             row.AddChild(BuildResourceInfo(unit));
 
             return root;
         }
 
-        public static void Render(Container parent, BattleUnit unit)
+        public static void Render(Container parent, BattleUnit unit, GameDataRepository gameData = null)
         {
             if (parent == null)
                 return;
 
-            parent.AddChild(Build(unit));
+            parent.AddChild(Build(unit, gameData));
         }
 
         private static Control BuildAvatar()
@@ -66,7 +66,7 @@ namespace BattleKing.Ui
             return frame;
         }
 
-        private static Control BuildMainInfo(BattleUnit unit)
+        private static Control BuildMainInfo(BattleUnit unit, GameDataRepository gameData)
         {
             var box = new VBoxContainer
             {
@@ -77,6 +77,9 @@ namespace BattleKing.Ui
             box.AddChild(BuildNameRow(unit));
             box.AddChild(BuildClassRow(unit));
             box.AddChild(BuildMetaRow(unit));
+            var roleSummary = BuildRoleSummary(unit, gameData);
+            if (roleSummary != null)
+                box.AddChild(roleSummary);
 
             return box;
         }
@@ -176,6 +179,30 @@ namespace BattleKing.Ui
             row.AddChild(label);
 
             return row;
+        }
+
+        private static Control BuildRoleSummary(BattleUnit unit, GameDataRepository gameData)
+        {
+            if (unit?.Data == null
+                || gameData?.CharacterRoleDescriptions == null
+                || !gameData.CharacterRoleDescriptions.TryGetValue(unit.Data.Id, out var description)
+                || description.MainRoles == null
+                || description.MainRoles.Count == 0)
+            {
+                return null;
+            }
+
+            var roles = description.MainRoles
+                .Where(role => !string.IsNullOrWhiteSpace(role))
+                .Select(gameData.ResolveDisplayTokens)
+                .ToList();
+            if (roles.Count == 0)
+                return null;
+
+            var label = CreateLabel("定位 " + string.Join(" / ", roles), Math.Max(11, BodyFontSize - 2), new Color(0.72f, 0.78f, 0.84f));
+            label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            return label;
         }
 
         private static Control BuildClassIcon(UnitClass? unitClass)

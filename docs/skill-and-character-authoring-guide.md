@@ -57,6 +57,8 @@
 - `ppCost`、`triggerTiming`、`type`、`hasSimultaneousLimit` 必须来自资料。
 - “友方主动技能时”用 `AllyOnActiveUse` / 当前主动行动增强；“友方被攻击时”才是受击/命中相关事件。追击类不能因为友方被动 pending 攻击而触发，必要时用 `requiresSourceKind: "ActiveAttack"`。
 - 先制、追击、反击这类被动攻击必须在 pending action 参数里写齐 `power`、`hitRate`、`HitCount`、`damageType`、`attackType`、`targetType`、`tags`。
+- BattleStart/先制/战斗结束这类没有指定具体敌人的单体 pending attack，写 `target: "AllEnemies"`、`targetType: "SingleEnemy"`、`maxTargets: 1`；引擎会按主动技能同样的合法候选、近战前排阻挡和随机单体语义选目标。反击、追击这类有锚点的技能用 `target: "Attacker"` 或当前主动目标入队，不要写成 `AllEnemies`。
+- 掩护类 `CoverAlly` 只保护本次攻击没有被显式点名的友方；如果掩护者也在同一批目标里，不能替另一个同批目标挡刀，避免多目标攻击下互相掩护。
 - 攻击前给当前主动追加必中、会心、追击、魔法附加等效果时，优先使用 `AugmentCurrentAction`，不要在还没有 `DamageCalculation` 的阶段直接写 `ModifyDamageCalc`。例如魔法剑刃写 `requiresCurrentSkillType: "Physical"`，并在 `calculationEffects` 里放 `AdditionalMagicalPower: 50`。
 - 被主动攻击前/命中前类反击必须检查 `BattleActionSourceKind`。只有资料写“主动技能”时，pending action 不应递归触发。
 
