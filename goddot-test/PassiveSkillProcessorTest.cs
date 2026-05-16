@@ -1439,7 +1439,12 @@ namespace BattleKing.Tests
             };
             playerHunter.EquippedPassiveSkillIds.Add("pas_fervor");
             enemySniper.EquippedPassiveSkillIds.Add("pas_fervor");
-            enemyAttacker.Strategies.Add(new Strategy { SkillId = "act_fervor_pending_probe" });
+            enemyAttacker.Strategies.Add(new Strategy
+            {
+                SkillId = "act_fervor_pending_probe",
+                Condition1 = new Condition { Category = ConditionCategory.Position, Operator = "equals", Value = "front" },
+                Mode1 = ConditionMode.Priority
+            });
             var logs = new List<string>();
             var engine = new BattleEngine(new BattleContext(repository)
             {
@@ -1460,7 +1465,7 @@ namespace BattleKing.Tests
         }
 
         [Test]
-        public void AllyOnAttackedPassives_TriggerWhenOwnerIsTheDefender()
+        public void AllyOnAttackedPassives_TriggerOnlyWhenAnotherAllyIsDefender()
         {
             var repository = new GameDataRepository();
             repository.LoadAll(DataPath);
@@ -1501,9 +1506,8 @@ namespace BattleKing.Tests
                 SourceKind = BattleActionSourceKind.ActiveAttack
             });
 
-            ClassicAssert.AreEqual(0, breaker.CurrentPp);
-            ClassicAssert.AreEqual(1, breaker.Buffs.Count(buff => buff.SkillId == "pas_emergency_cover" && buff.TargetStat == "Str"));
-            ClassicAssert.AreEqual(1, breaker.Buffs.Count(buff => buff.SkillId == "pas_emergency_cover" && buff.TargetStat == "Hit"));
+            ClassicAssert.AreEqual(1, breaker.CurrentPp);
+            ClassicAssert.AreEqual(0, breaker.Buffs.Count(buff => buff.SkillId == "pas_emergency_cover"));
             queued.Clear();
 
             eventBus.Publish(new AfterHitEvent
@@ -1517,12 +1521,74 @@ namespace BattleKing.Tests
                 SourceKind = BattleActionSourceKind.ActiveAttack
             });
 
-            var action = queued.Single(action => action.SourcePassiveId == "pas_fervor");
-            ClassicAssert.AreSame(sniper, action.Actor);
+            ClassicAssert.AreEqual(0, breaker.CurrentPp);
+            ClassicAssert.AreEqual(1, breaker.Buffs.Count(buff => buff.SkillId == "pas_emergency_cover" && buff.TargetStat == "Str"));
+            ClassicAssert.AreEqual(1, breaker.Buffs.Count(buff => buff.SkillId == "pas_emergency_cover" && buff.TargetStat == "Hit"));
+            ClassicAssert.IsEmpty(queued);
+            ClassicAssert.AreEqual(1, sniper.CurrentPp);
+        }
+
+        [Test]
+        public void RealPassiveJson_PursuitSlash_DoesNotTriggerWhenOwnerIsDefender()
+        {
+            var repository = new GameDataRepository();
+            repository.LoadAll(DataPath);
+            var logs = new List<string>();
+            var queued = new List<PendingAction>();
+            var eventBus = new EventBus();
+            var processor = new PassiveSkillProcessor(eventBus, repository, logs.Add, queued.Add);
+            processor.SubscribeAll();
+            var mercenary = new BattleUnit(CreatePassiveBattleCharacter(
+                "mercenary", null, hp: 200, str: 60, def: 0, spd: 50, hit: 100, eva: 0, ap: 0, pp: 1),
+                repository,
+                true);
+            var ally = new BattleUnit(CreatePassiveBattleCharacter(
+                "ally", null, hp: 200, str: 10, def: 0, spd: 40, hit: 100, eva: 0, ap: 0, pp: 0),
+                repository,
+                true);
+            var enemy = new BattleUnit(CreatePassiveBattleCharacter(
+                "enemy", null, hp: 200, str: 10, def: 0, spd: 10, hit: 100, eva: 0, ap: 0, pp: 0),
+                repository,
+                false);
+            mercenary.EquippedPassiveSkillIds.Add("pas_pursuit_slash");
+            var context = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { mercenary, ally },
+                EnemyUnits = new List<BattleUnit> { enemy }
+            };
+            var skill = TestDataFactory.CreateSkill(power: 10, attackType: AttackType.Melee);
+
+            eventBus.Publish(new AfterHitEvent
+            {
+                Attacker = enemy,
+                Defender = mercenary,
+                Skill = skill,
+                Context = context,
+                DamageDealt = 1,
+                IsHit = true,
+                SourceKind = BattleActionSourceKind.ActiveAttack
+            });
+
+            ClassicAssert.IsEmpty(queued);
+            ClassicAssert.AreEqual(1, mercenary.CurrentPp);
+
+            eventBus.Publish(new AfterHitEvent
+            {
+                Attacker = enemy,
+                Defender = ally,
+                Skill = skill,
+                Context = context,
+                DamageDealt = 1,
+                IsHit = true,
+                SourceKind = BattleActionSourceKind.ActiveAttack
+            });
+
+            var action = queued.Single(action => action.SourcePassiveId == "pas_pursuit_slash");
+            ClassicAssert.AreSame(mercenary, action.Actor);
             CollectionAssert.AreEqual(new[] { enemy }, action.Targets);
-            ClassicAssert.AreEqual(50, action.Power);
+            ClassicAssert.AreEqual(75, action.Power);
             ClassicAssert.AreEqual(1, action.SourcePpCost);
-            ClassicAssert.AreEqual(1, sniper.CurrentPp, "Counter PP is still deferred until the pending action resolves.");
+            ClassicAssert.AreEqual(1, mercenary.CurrentPp, "Counter PP is still deferred until the pending action resolves.");
         }
 
         [Test]
@@ -1668,6 +1734,19 @@ namespace BattleKing.Tests
                 TargetType = TargetType.SingleEnemy,
                 Effects = new List<SkillEffectData>()
             };
+            repository.ActiveSkills["act_magic_blade_magic_weapon_probe"] = new ActiveSkillData
+            {
+                Id = "act_magic_blade_magic_weapon_probe",
+                Name = "Magic Blade Magic Weapon Probe",
+                ApCost = 1,
+                Type = SkillType.Physical,
+                DamageType = SkillType.Magical,
+                AttackType = AttackType.Melee,
+                Power = 10,
+                HitRate = 100,
+                TargetType = TargetType.SingleEnemy,
+                Effects = new List<SkillEffectData>()
+            };
             var magicBlade = repository.PassiveSkills["pas_magic_blade"];
             magicBlade.Tags.Clear();
             var attacker = new BattleUnit(CreatePassiveBattleCharacter(
@@ -1705,12 +1784,14 @@ namespace BattleKing.Tests
             processor.SubscribeAll();
             float additionalMagicalPowerDuringCurrentActiveSkill = -1;
             bool hasMixedDamageDuringCurrentActiveSkill = false;
+            BattleUnit? additionalMagicalSourceDuringCurrentActiveSkill = null;
             engine.EventBus.Subscribe<BeforeHitEvent>(evt =>
             {
                 if (evt.Attacker == attacker)
                 {
                     additionalMagicalPowerDuringCurrentActiveSkill = evt.Calc.AdditionalMagicalPower;
                     hasMixedDamageDuringCurrentActiveSkill = evt.Calc.HasMixedDamage;
+                    additionalMagicalSourceDuringCurrentActiveSkill = evt.Calc.AdditionalMagicalComponents.SingleOrDefault()?.Source;
                 }
             });
 
@@ -1721,9 +1802,52 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(0, wizard.CurrentPp);
             ClassicAssert.AreEqual(50, additionalMagicalPowerDuringCurrentActiveSkill);
             ClassicAssert.IsTrue(hasMixedDamageDuringCurrentActiveSkill);
-            ClassicAssert.AreEqual(170, enemy.CurrentHp);
+            ClassicAssert.AreSame(wizard, additionalMagicalSourceDuringCurrentActiveSkill);
+            ClassicAssert.AreEqual(155, enemy.CurrentHp);
             ClassicAssert.AreEqual(50, attacker.GetCurrentStat("Mag"));
+            var magicWeaponAttacker = new BattleUnit(CreatePassiveBattleCharacter(
+                "magicWeaponAttacker", "act_magic_blade_magic_weapon_probe", hp: 200, str: 999, def: 0, spd: 100, hit: 1000, eva: 0, ap: 1, pp: 0, mag: 50),
+                repository,
+                true)
+            {
+                Position = 1,
+                CurrentAp = 1
+            };
+            var magicWeaponWizard = new BattleUnit(CreatePassiveBattleCharacter(
+                "magicWeaponWizard", null, hp: 200, str: 1, def: 0, spd: 50, hit: 1000, eva: 0, ap: 0, pp: 1, mag: 80),
+                repository,
+                true)
+            {
+                Position = 4
+            };
+            var magicWeaponEnemy = new BattleUnit(CreatePassiveBattleCharacter(
+                "magicWeaponEnemy", null, hp: 200, str: 1, def: 0, spd: 1, hit: 0, eva: 0, ap: 0, pp: 0),
+                repository,
+                false)
+            {
+                Position = 1
+            };
+            magicWeaponAttacker.Strategies.Add(new Strategy { SkillId = "act_magic_blade_magic_weapon_probe" });
+            magicWeaponWizard.EquippedPassiveSkillIds.Add("pas_magic_blade");
+            var magicWeaponContext = new BattleContext(repository)
+            {
+                PlayerUnits = new List<BattleUnit> { magicWeaponAttacker, magicWeaponWizard },
+                EnemyUnits = new List<BattleUnit> { magicWeaponEnemy }
+            };
+            var magicWeaponLogs = new List<string>();
+            var magicWeaponEngine = new BattleEngine(magicWeaponContext) { OnLog = magicWeaponLogs.Add };
+            var magicWeaponProcessor = new PassiveSkillProcessor(magicWeaponEngine.EventBus, repository, magicWeaponLogs.Add, magicWeaponEngine.EnqueueAction);
+            magicWeaponProcessor.SubscribeAll();
+
+            result = magicWeaponEngine.StepOneAction();
+
+            ClassicAssert.AreEqual(SingleActionResult.ActionDone, result);
+            ClassicAssert.AreEqual(0, magicWeaponWizard.CurrentPp);
+            ClassicAssert.AreEqual(155, magicWeaponEnemy.CurrentHp);
+            Assert.That(magicWeaponEngine.BattleLogEntries, Has.Some.Matches<BattleLogEntry>(entry =>
+                entry.Flags.Contains("Augment:pas_magic_blade")));
             Assert.That(logs, Has.Some.Contains("魔法剑刃").And.Contains("友方攻击前"));
+            Assert.That(logs, Has.Some.Contains("追加魔法").And.Contains("wizard").And.Contains("Mag:80"));
 
             var magicAttacker = new BattleUnit(CreatePassiveBattleCharacter(
                 "magicAttacker", "act_magic_blade_magical_probe", hp: 200, str: 1, def: 0, spd: 100, hit: 1000, eva: 0, ap: 1, pp: 0, mag: 50),

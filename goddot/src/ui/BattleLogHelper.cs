@@ -108,6 +108,15 @@ namespace BattleKing.Ui
                 lines.Add(BuildPowerBonusLine(skill, calc));
             if (calc.MagicalDamage > 0)
                 lines.Add("  MagicDamage:" + calc.MagicalDamage);
+            foreach (var breakdown in calc.AdditionalMagicalBreakdowns)
+            {
+                var sourceName = FormatUnitName(breakdown.Source);
+                lines.Add("  追加魔法: " + sourceName
+                    + " Mag:" + breakdown.MagicalAttackPower
+                    + " | MDef:" + breakdown.MagicalDefense
+                    + " | 威力" + FormatPercent(breakdown.SkillPowerRatio)
+                    + " = " + FormatNumber(breakdown.BaseDamagePerHit));
+            }
 
             if (calc.HitCount > 1 && hitResults.Count > 0)
             {

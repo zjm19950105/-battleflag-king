@@ -1410,7 +1410,7 @@
           "target": "Defender",
           "key": "MagicDamageNullify",
           "count": 1,
-          "requiresIncomingSkillType": "Magical"
+          "requiresIncomingDamageType": "Magical"
         }
       },
       {
@@ -1419,7 +1419,7 @@
           "target": "Defender",
           "key": "AilmentNullify",
           "count": 1,
-          "requiresIncomingSkillType": "Magical"
+          "requiresIncomingDamageType": "Magical"
         }
       }
     ],
@@ -1484,7 +1484,7 @@
           "key": "MagicDamageNullify",
           "count": 1,
           "activationScope": "Action",
-          "requiresIncomingSkillType": "Magical"
+          "requiresIncomingDamageType": "Magical"
         }
       },
       {
@@ -1494,7 +1494,7 @@
           "key": "AilmentNullify",
           "count": 1,
           "activationScope": "Action",
-          "requiresIncomingSkillType": "Magical"
+          "requiresIncomingDamageType": "Magical"
         }
       }
     ],

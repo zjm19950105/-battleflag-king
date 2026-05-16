@@ -126,8 +126,8 @@ namespace BattleKing.Skills
             ProcessForUnit(evt.Defender, PassiveTriggerTiming.OnBeingHit, "被攻击后", limitSimultaneous: false,
                 attacker: evt.Attacker, activeSkill: evt.Skill, sourceKind: evt.SourceKind);
 
-            // 原版“友方被攻击时”与“其他友方被攻击时”是不同语义；AllyOnAttacked 表达前者，包含受击者自身。
-            var allies = GetAllies(evt.Defender, evt.Context).ToList();
+            // AllyOnAttacked means another ally was attacked; self reactions use OnBeingHit.
+            var allies = GetAllies(evt.Defender, evt.Context).Where(u => u != evt.Defender).ToList();
             ProcessTiming(allies, PassiveTriggerTiming.AllyOnAttacked, "友方被攻击后",
                 limitSimultaneous: false, attacker: evt.Attacker, defender: evt.Defender,
                 activeSkill: evt.Skill, sourceKind: evt.SourceKind);
@@ -506,6 +506,8 @@ namespace BattleKing.Skills
 
             return !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "requiresCurrentSkillType", ""))
                 || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "currentSkillType", ""))
+                || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "requiresCurrentDamageType", ""))
+                || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "currentDamageType", ""))
                 || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "requiresCurrentAttackType", ""))
                 || !string.IsNullOrWhiteSpace(SkillEffectExecutor.GetString(parameters, "currentAttackType", ""));
         }

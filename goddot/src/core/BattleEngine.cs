@@ -637,7 +637,7 @@ namespace BattleKing.Core
 
                 var effectLogs = _skillEffectExecutor.ExecuteCalculationEffects(
                     _ctx,
-                    unit,
+                    augment.Actor ?? unit,
                     new List<BattleUnit> { target },
                     augment.CalculationEffects,
                     augment.SourcePassiveId,
@@ -962,7 +962,8 @@ namespace BattleKing.Core
                 Id = $"temp_{action.SourcePassiveId}",
                 Name = GetPassiveDisplayName(action.SourcePassiveId),
                 ApCost = 0,
-                Type = action.DamageType,
+                Type = action.SkillType,
+                DamageType = action.DamageType,
                 AttackType = action.AttackType,
                 Power = action.Power,
                 HitRate = action.HitRate,
@@ -1287,7 +1288,7 @@ namespace BattleKing.Core
             string receiverName = FormatReadableUnitName(damageReceiver);
 
             lines.Add($"[{skillName}] {attackerName}{verb}{targetName}");
-            lines.Add($"  威力{action.Power} / 命中倍率{FormatHitRate(action.HitRate)} / {SkillTypeLabel(action.DamageType)}{AttackTypeLabel(action.AttackType)} / {Math.Max(1, action.HitCount)}hit");
+            lines.Add($"  威力{action.Power} / 命中倍率{FormatHitRate(action.HitRate)} / {FormatPendingDamageType(action)}{AttackTypeLabel(action.AttackType)} / {Math.Max(1, action.HitCount)}hit");
             if (damageReceiver != declaredTarget)
                 lines.Add($"  掩护: {targetName} -> {receiverName}");
             lines.Add("  " + BuildPendingHitFormula(action.Actor, declaredTarget, calc));
@@ -1405,6 +1406,15 @@ namespace BattleKing.Core
             if (result.IsBlocked)
                 parts.Add("BLOCK(-" + (calc.BlockReduction * 100).ToString("F0") + "%)");
             return string.Join(" ", parts);
+        }
+
+        private static string FormatPendingDamageType(PendingAction action)
+        {
+            string skillType = SkillTypeLabel(action.SkillType);
+            string damageType = SkillTypeLabel(action.DamageType);
+            return action.SkillType == action.DamageType
+                ? damageType
+                : $"{skillType}/伤害:{damageType}";
         }
 
         private static string FormatReadableUnitName(BattleUnit unit)

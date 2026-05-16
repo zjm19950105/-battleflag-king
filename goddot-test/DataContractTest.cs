@@ -266,6 +266,19 @@ namespace BattleKing.Tests
         }
 
         [Test]
+        public void RealData_ActiveSkillDamageType_WhenPresentIsDamageOnly()
+        {
+            var invalid = LoadList<ActiveSkillData>("active_skills.json")
+                .Where(skill => skill.DamageType.HasValue
+                    && skill.DamageType.Value != SkillType.Physical
+                    && skill.DamageType.Value != SkillType.Magical)
+                .Select(skill => $"{skill.Id}.damageType={skill.DamageType}")
+                .ToList();
+
+            Assert.That(invalid, Is.Empty);
+        }
+
+        [Test]
         public void RealData_EnemyFormationReferences_Exist()
         {
             var repository = LoadRepository();

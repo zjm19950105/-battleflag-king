@@ -13,6 +13,7 @@ namespace BattleKing.Skills
         public int Power { get; set; }
         public int HitCount { get; set; } = 1;
         public int? HitRate { get; set; }
+        public SkillType SkillType { get; set; } = SkillType.Physical;
         public SkillType DamageType { get; set; }
         public AttackType AttackType { get; set; }
         public TargetType TargetType { get; set; }

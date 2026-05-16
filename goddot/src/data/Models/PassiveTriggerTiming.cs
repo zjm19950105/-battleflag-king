@@ -9,7 +9,7 @@ namespace BattleKing.Data
         SelfBeforeHit,         // 自身被攻击直前
         SelfBeforeMeleeHit,    // 自身被近接攻击直前（招架等）
         SelfBeforePhysicalHit, // 自身被物理攻击直前（格挡/复仇守护等）
-        AllyOnAttacked,        // 友方被攻击时（追击斩等）
+        AllyOnAttacked,        // 其他友方被攻击时（追击斩等，不含自己）
         SelfOnActiveUse,       // 自身使用主动技能时（蓄力行动/蛮力等）
         AllyOnActiveUse,       // 友方使用主动技能时（主动礼物等）
         EnemyOnActiveUse,      // 敌方使用主动技能时（魔力吸收等）

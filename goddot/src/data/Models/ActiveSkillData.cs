@@ -8,6 +8,7 @@ namespace BattleKing.Data
         public string Name { get; set; }
         public int ApCost { get; set; }
         public SkillType Type { get; set; }
+        public SkillType? DamageType { get; set; }
         public AttackType AttackType { get; set; }
         public int Power { get; set; }
         public int? PhysicalPower { get; set; }

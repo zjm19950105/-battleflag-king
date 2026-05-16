@@ -118,11 +118,16 @@ namespace BattleKing.Pipeline
         /// <summary>Additional magical component power appended to the current action.</summary>
         public float AdditionalMagicalPower { get; set; } = 0f;
 
+        /// <summary>Independent magical damage components appended by support passives such as Magic Blade.</summary>
+        public List<AdditionalMagicalDamageComponent> AdditionalMagicalComponents { get; } = new List<AdditionalMagicalDamageComponent>();
+
+        public List<AdditionalMagicalDamageBreakdown> AdditionalMagicalBreakdowns { get; } = new List<AdditionalMagicalDamageBreakdown>();
+
         public List<string> SkillPowerBonusNotes { get; } = new List<string>();
 
         public bool HasPhysicalComponent => Skill?.HasPhysicalComponent == true;
 
-        public bool HasAdditionalMagicalComponent => AdditionalMagicalPower > 0f;
+        public bool HasAdditionalMagicalComponent => AdditionalMagicalPower > 0f || AdditionalMagicalComponents.Count > 0;
 
         public bool HasMagicalComponent => Skill?.HasMagicalComponent == true || HasAdditionalMagicalComponent;
 
@@ -138,9 +143,40 @@ namespace BattleKing.Pipeline
 
         public float EffectiveMagicalPower
             => (Skill.MagicalPower ?? (Skill.HasMagicalComponent ? Skill.Power : 0))
-                + AdditionalMagicalPower
                 + SkillPowerBonus
                 + CounterPowerBonus;
+
+        public void AddAdditionalMagicalComponent(BattleUnit source, float power, string sourceSkillId = "")
+        {
+            if (power <= 0f)
+                return;
+
+            AdditionalMagicalComponents.Add(new AdditionalMagicalDamageComponent
+            {
+                Source = source,
+                Power = power,
+                SourceSkillId = sourceSkillId ?? string.Empty
+            });
+            AdditionalMagicalPower += power;
+        }
+    }
+
+    public class AdditionalMagicalDamageComponent
+    {
+        public BattleUnit Source { get; set; }
+        public float Power { get; set; }
+        public string SourceSkillId { get; set; } = string.Empty;
+    }
+
+    public class AdditionalMagicalDamageBreakdown
+    {
+        public BattleUnit Source { get; set; }
+        public float Power { get; set; }
+        public int MagicalAttackPower { get; set; }
+        public int MagicalDefense { get; set; }
+        public float SkillPowerRatio { get; set; }
+        public float BaseDamagePerHit { get; set; }
+        public string SourceSkillId { get; set; } = string.Empty;
     }
 
     public class DamageHitResult
@@ -154,6 +190,8 @@ namespace BattleKing.Pipeline
         public bool Blocked { get; set; }
         public float CritMultiplier { get; set; } = 1.0f;
         public float BlockReduction { get; set; } = 0f;
+        public bool AdditionalMagicalDamageApplied { get; set; }
+        public float AdditionalMagicalBaseDamage { get; set; }
         public float BasePhysicalDamage { get; set; }
         public float BaseMagicalDamage { get; set; }
         public float RawPhysicalDamage { get; set; }

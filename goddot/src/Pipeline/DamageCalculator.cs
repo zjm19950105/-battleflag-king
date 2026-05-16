@@ -25,17 +25,23 @@ namespace BattleKing.Pipeline
             float defMult = 1.0f - calc.IgnoreDefenseRatio;
             float physicalBaseDmgPerHit = 0f;
             float magicalBaseDmgPerHit = 0f;
+            float additionalMagicalBaseDamage = 0f;
+            var additionalMagicalComponents = GetAdditionalMagicalComponents(calc, attacker);
             bool hasPhysicalComponent = calc.HasPhysicalComponent;
-            bool hasMagicalComponent = calc.HasMagicalComponent;
+            bool hasSkillMagicalComponent = skill.HasMagicalComponent;
+            bool hasMagicalComponent = hasSkillMagicalComponent || additionalMagicalComponents.Count > 0;
+            var primaryDamageType = skill.DamageType;
 
             if (calc.HasMixedDamage)
             {
                 calc.PhysicalAttackPower = attacker.GetCurrentAttackPower(SkillType.Physical);
                 calc.PhysicalDefense = (int)(resolvedDefender.GetCurrentDefense(SkillType.Physical) * defMult);
-                calc.MagicalAttackPower = attacker.GetCurrentAttackPower(SkillType.Magical);
                 calc.MagicalDefense = (int)(resolvedDefender.GetCurrentDefense(SkillType.Magical) * defMult);
+                calc.MagicalAttackPower = hasSkillMagicalComponent
+                    ? attacker.GetCurrentAttackPower(SkillType.Magical)
+                    : GetPrimaryAdditionalMagicalAttackPower(additionalMagicalComponents);
 
-                if (skill.Type == SkillType.Magical)
+                if (primaryDamageType == SkillType.Magical)
                 {
                     calc.FinalAttackPower = calc.MagicalAttackPower;
                     calc.FinalDefense = calc.MagicalDefense;
@@ -47,17 +53,19 @@ namespace BattleKing.Pipeline
                 }
 
                 calc.PhysicalSkillPowerRatio = calc.EffectivePhysicalPower / 100f;
-                calc.MagicalSkillPowerRatio = calc.EffectiveMagicalPower / 100f;
-                calc.SkillPowerRatio = skill.Type == SkillType.Magical
+                calc.MagicalSkillPowerRatio = hasSkillMagicalComponent ? calc.EffectiveMagicalPower / 100f : 0f;
+                calc.SkillPowerRatio = primaryDamageType == SkillType.Magical
                     ? calc.MagicalSkillPowerRatio
                     : calc.PhysicalSkillPowerRatio;
                 physicalBaseDmgPerHit = calc.PhysicalBaseDifference * calc.PhysicalSkillPowerRatio;
-                magicalBaseDmgPerHit = calc.MagicalBaseDifference * calc.MagicalSkillPowerRatio;
+                magicalBaseDmgPerHit = hasSkillMagicalComponent
+                    ? calc.MagicalBaseDifference * calc.MagicalSkillPowerRatio
+                    : 0f;
             }
             else
             {
-                calc.FinalAttackPower = attacker.GetCurrentAttackPower(skill.Type);
-                calc.FinalDefense = (int)(resolvedDefender.GetCurrentDefense(skill.Type) * defMult);
+                calc.FinalAttackPower = attacker.GetCurrentAttackPower(primaryDamageType);
+                calc.FinalDefense = (int)(resolvedDefender.GetCurrentDefense(primaryDamageType) * defMult);
                 calc.PhysicalAttackPower = hasMagicalComponent && !hasPhysicalComponent ? 0 : calc.FinalAttackPower;
                 calc.PhysicalDefense = hasMagicalComponent && !hasPhysicalComponent ? 0 : calc.FinalDefense;
                 calc.MagicalAttackPower = hasMagicalComponent && !hasPhysicalComponent ? calc.FinalAttackPower : 0;
@@ -75,15 +83,20 @@ namespace BattleKing.Pipeline
                     physicalBaseDmgPerHit = baseDmgPerHit;
             }
 
+            additionalMagicalBaseDamage = CalculateAdditionalMagicalBaseDamage(calc, additionalMagicalComponents, resolvedDefender, defMult);
+
             calc.ClassTraitMultiplier = GetClassTraitMultiplier(attacker, resolvedDefender);
             Equipment.TraitApplier.ApplyTraitsToDamage(calc);  // CC traits (PhysAtkVsInfantry2x, BowVsFlying, etc.)
 
             physicalBaseDmgPerHit *= calc.SkillPowerMultiplier;
             magicalBaseDmgPerHit *= calc.SkillPowerMultiplier;
+            additionalMagicalBaseDamage *= calc.SkillPowerMultiplier;
             physicalBaseDmgPerHit *= calc.ClassTraitMultiplier;
             magicalBaseDmgPerHit *= calc.ClassTraitMultiplier;
+            additionalMagicalBaseDamage *= calc.ClassTraitMultiplier;
             physicalBaseDmgPerHit *= calc.CharacterTraitMultiplier;
             magicalBaseDmgPerHit *= calc.CharacterTraitMultiplier;
+            additionalMagicalBaseDamage *= calc.CharacterTraitMultiplier;
 
             if (calc.FixedPhysicalDamagePerHit.HasValue)
             {
@@ -102,6 +115,7 @@ namespace BattleKing.Pipeline
             int hitsMissed = 0;
             int hitsEvaded = 0;
             int hitsNullified = 0;
+            bool additionalMagicalApplied = false;
             calc.HitResults.Clear();
 
             for (int hit = 0; hit < calc.HitCount; hit++)
@@ -110,6 +124,7 @@ namespace BattleKing.Pipeline
                 float hitMagical = magicalBaseDmgPerHit;
                 float baseHitPhysical = hitPhysical;
                 float baseHitMagical = hitMagical;
+                float hitAdditionalMagicalBaseDamage = 0f;
 
                 // Stage 7: Hit check. ForceHit bypasses accuracy, but Darkness still forces a miss.
                 if (attacker.Ailments.Contains(StatusAilment.Darkness)
@@ -142,6 +157,14 @@ namespace BattleKing.Pipeline
                         BaseMagicalDamage = baseHitMagical
                     });
                     continue;  // this hit evaded, try next hit
+                }
+
+                if (!additionalMagicalApplied && additionalMagicalBaseDamage > 0f)
+                {
+                    hitAdditionalMagicalBaseDamage = additionalMagicalBaseDamage;
+                    hitMagical += hitAdditionalMagicalBaseDamage;
+                    baseHitMagical = hitMagical;
+                    additionalMagicalApplied = true;
                 }
 
                 bool criticalThisHit = false;
@@ -229,6 +252,8 @@ namespace BattleKing.Pipeline
                     Blocked = blockThisHit,
                     BlockReduction = blockThisHit ? calc.BlockReduction : 0f,
                     Nullified = nullifiedThisHit,
+                    AdditionalMagicalDamageApplied = hitAdditionalMagicalBaseDamage > 0f,
+                    AdditionalMagicalBaseDamage = hitAdditionalMagicalBaseDamage,
                     BasePhysicalDamage = baseHitPhysical,
                     BaseMagicalDamage = baseHitMagical,
                     RawPhysicalDamage = hitPhysical,
@@ -281,6 +306,73 @@ namespace BattleKing.Pipeline
         private static int RoundHitDamage(float value)
         {
             return (int)Math.Round(value, MidpointRounding.AwayFromZero);
+        }
+
+        private static List<AdditionalMagicalDamageComponent> GetAdditionalMagicalComponents(
+            DamageCalculation calc,
+            BattleUnit fallbackSource)
+        {
+            if (calc.AdditionalMagicalComponents.Count > 0)
+                return calc.AdditionalMagicalComponents;
+
+            if (calc.AdditionalMagicalPower <= 0f)
+                return new List<AdditionalMagicalDamageComponent>();
+
+            return new List<AdditionalMagicalDamageComponent>
+            {
+                new AdditionalMagicalDamageComponent
+                {
+                    Source = fallbackSource,
+                    Power = calc.AdditionalMagicalPower
+                }
+            };
+        }
+
+        private static int GetPrimaryAdditionalMagicalAttackPower(
+            IReadOnlyList<AdditionalMagicalDamageComponent> components)
+        {
+            return components
+                .Select(component => GetPanelMagicalAttackPower(component.Source))
+                .FirstOrDefault();
+        }
+
+        private static float CalculateAdditionalMagicalBaseDamage(
+            DamageCalculation calc,
+            IReadOnlyList<AdditionalMagicalDamageComponent> components,
+            BattleUnit resolvedDefender,
+            float defenseMultiplier)
+        {
+            calc.AdditionalMagicalBreakdowns.Clear();
+            if (components.Count == 0)
+                return 0f;
+
+            int magicalDefense = (int)(resolvedDefender.GetCurrentDefense(SkillType.Magical) * defenseMultiplier);
+            float total = 0f;
+            foreach (var component in components)
+            {
+                var source = component.Source ?? calc.Attacker;
+                int magicalAttack = GetPanelMagicalAttackPower(source);
+                float powerRatio = component.Power / 100f;
+                float baseDamage = Math.Max(1, magicalAttack - magicalDefense) * powerRatio;
+                total += baseDamage;
+                calc.AdditionalMagicalBreakdowns.Add(new AdditionalMagicalDamageBreakdown
+                {
+                    Source = source,
+                    Power = component.Power,
+                    MagicalAttackPower = magicalAttack,
+                    MagicalDefense = magicalDefense,
+                    SkillPowerRatio = powerRatio,
+                    BaseDamagePerHit = baseDamage,
+                    SourceSkillId = component.SourceSkillId
+                });
+            }
+
+            return total;
+        }
+
+        private static int GetPanelMagicalAttackPower(BattleUnit source)
+        {
+            return Math.Max(0, source?.GetStatBreakdown("Mag").EquippedBaseline ?? 0);
         }
 
         private float GetClassTraitMultiplier(BattleUnit attacker, BattleUnit defender)

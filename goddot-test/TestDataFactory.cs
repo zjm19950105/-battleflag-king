@@ -35,7 +35,8 @@ namespace BattleKing.Tests
             AttackType attackType = AttackType.Melee, TargetType targetType = TargetType.SingleEnemy,
             int? hitRate = 100, int apCost = 1, string name = "TestSkill",
             List<string> tags = null, List<SkillEffectData> effects = null,
-            int? physicalPower = null, int? magicalPower = null)
+            int? physicalPower = null, int? magicalPower = null,
+            SkillType? damageType = null)
         {
             var data = new ActiveSkillData
             {
@@ -43,6 +44,7 @@ namespace BattleKing.Tests
                 Name = name,
                 ApCost = apCost,
                 Type = type,
+                DamageType = damageType,
                 AttackType = attackType,
                 Power = power,
                 PhysicalPower = physicalPower,

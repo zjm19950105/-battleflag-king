@@ -321,8 +321,9 @@ namespace BattleKing.Skills
             if (TryGetFloat(parameters, "AdditionalMagicalPower", out float additionalMagicalPower)
                 || TryGetFloat(parameters, "additionalMagicalPower", out additionalMagicalPower))
             {
-                calculation.AdditionalMagicalPower += Math.Max(0f, additionalMagicalPower);
-                logs.Add($"AdditionalMagicalPower={calculation.AdditionalMagicalPower:0.##}");
+                calculation.AddAdditionalMagicalComponent(caster, additionalMagicalPower);
+                var sourceName = caster?.Data?.Name ?? "caster";
+                logs.Add($"AdditionalMagicalPower={calculation.AdditionalMagicalPower:0.##}({sourceName})");
             }
 
             if (TryGetFloat(parameters, "SkillPowerBonusFromTargetHpRatio", out float targetHpRatioMaxBonus))
@@ -1253,6 +1254,11 @@ namespace BattleKing.Skills
                 Power = GetInt(parameters, "power", 75),
                 HitCount = Math.Max(1, GetInt(parameters, "HitCount", GetInt(parameters, "hitCount", 1))),
                 HitRate = parameters.ContainsKey("hitRate") ? GetInt(parameters, "hitRate", 100) : null,
+                SkillType = ParseEnum(
+                    GetString(parameters, "skillType",
+                        GetString(parameters, "attackSkillType",
+                            GetString(parameters, "damageType", "Physical"))),
+                    SkillType.Physical),
                 DamageType = ParseEnum(GetString(parameters, "damageType", "Physical"), SkillType.Physical),
                 AttackType = ParseEnum(GetString(parameters, "attackType", "Melee"), AttackType.Melee),
                 TargetType = ParseEnum(GetString(parameters, "targetType", "SingleEnemy"), TargetType.SingleEnemy),
@@ -1316,7 +1322,16 @@ namespace BattleKing.Skills
         private static string FormatPendingActionSpec(PendingAction action)
         {
             string hitRate = action.HitRate.HasValue ? $"{action.HitRate.Value}%" : "100%";
-            return $"威力{action.Power} / 命中倍率{hitRate} / {SkillTypeLabel(action.DamageType)}{AttackTypeLabel(action.AttackType)} / {Math.Max(1, action.HitCount)}hit";
+            return $"威力{action.Power} / 命中倍率{hitRate} / {FormatPendingDamageType(action)}{AttackTypeLabel(action.AttackType)} / {Math.Max(1, action.HitCount)}hit";
+        }
+
+        private static string FormatPendingDamageType(PendingAction action)
+        {
+            string skillType = SkillTypeLabel(action.SkillType);
+            string damageType = SkillTypeLabel(action.DamageType);
+            return action.SkillType == action.DamageType
+                ? damageType
+                : $"{skillType}/伤害:{damageType}";
         }
 
         private static string SkillTypeLabel(SkillType type) => type switch
@@ -1419,8 +1434,15 @@ namespace BattleKing.Skills
                 requiredAttackType = null;
             }
 
+            if (!TryGetString(parameters, "requiresCurrentDamageType", out string requiredDamageType)
+                && !TryGetString(parameters, "currentDamageType", out requiredDamageType))
+            {
+                requiredDamageType = null;
+            }
+
             if (string.IsNullOrWhiteSpace(requiredSkillType)
-                && string.IsNullOrWhiteSpace(requiredAttackType))
+                && string.IsNullOrWhiteSpace(requiredAttackType)
+                && string.IsNullOrWhiteSpace(requiredDamageType))
             {
                 return true;
             }
@@ -1429,13 +1451,19 @@ namespace BattleKing.Skills
                 return false;
 
             if (!string.IsNullOrWhiteSpace(requiredSkillType)
-                && !SkillTypeRequirementMatches(requiredSkillType, currentActionSkill))
+                && !EnumRequirementMatches(requiredSkillType, currentActionSkill.Data.Type))
             {
                 return false;
             }
 
             if (!string.IsNullOrWhiteSpace(requiredAttackType)
                 && !EnumRequirementMatches(requiredAttackType, currentActionSkill.Data.AttackType))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requiredDamageType)
+                && !DamageTypeRequirementMatches(requiredDamageType, currentActionSkill))
             {
                 return false;
             }
@@ -1471,10 +1499,14 @@ namespace BattleKing.Skills
             ActiveSkill incomingSkill,
             DamageCalculation calculation = null)
         {
-            if (!TryGetIncomingRequirement(parameters, "SkillType", out string requiredSkillType)
-                && !TryGetIncomingRequirement(parameters, "DamageType", out requiredSkillType))
+            if (!TryGetIncomingRequirement(parameters, "SkillType", out string requiredSkillType))
             {
                 requiredSkillType = null;
+            }
+
+            if (!TryGetIncomingRequirement(parameters, "DamageType", out string requiredDamageType))
+            {
+                requiredDamageType = null;
             }
 
             if (!TryGetIncomingRequirement(parameters, "AttackType", out string requiredAttackType))
@@ -1483,6 +1515,7 @@ namespace BattleKing.Skills
             }
 
             if (string.IsNullOrWhiteSpace(requiredSkillType)
+                && string.IsNullOrWhiteSpace(requiredDamageType)
                 && string.IsNullOrWhiteSpace(requiredAttackType))
             {
                 return true;
@@ -1492,20 +1525,19 @@ namespace BattleKing.Skills
                 return false;
 
             if (!string.IsNullOrWhiteSpace(requiredSkillType)
-                && !SkillTypeRequirementMatches(requiredSkillType, incomingSkill, calculation))
+                && !EnumRequirementMatches(requiredSkillType, incomingSkill.Data.Type))
             {
                 return false;
             }
 
-            AttackType attackType = default;
-            if (!string.IsNullOrWhiteSpace(requiredAttackType)
-                && !Enum.TryParse(requiredAttackType, true, out attackType))
+            if (!string.IsNullOrWhiteSpace(requiredDamageType)
+                && !DamageTypeRequirementMatches(requiredDamageType, incomingSkill, calculation))
             {
                 return false;
             }
 
             if (!string.IsNullOrWhiteSpace(requiredAttackType)
-                && incomingSkill.Data.AttackType != attackType)
+                && !EnumRequirementMatches(requiredAttackType, incomingSkill.Data.AttackType))
             {
                 return false;
             }
@@ -1513,7 +1545,7 @@ namespace BattleKing.Skills
             return true;
         }
 
-        private static bool SkillTypeRequirementMatches(
+        private static bool DamageTypeRequirementMatches(
             string requiredValues,
             ActiveSkill skill,
             DamageCalculation calculation = null)
@@ -1531,14 +1563,14 @@ namespace BattleKing.Skills
             {
                 if (!Enum.TryParse(part, true, out SkillType parsed))
                     return false;
-                if (SkillTypeRequirementMatches(parsed, skill, calculation))
+                if (DamageTypeRequirementMatches(parsed, skill, calculation))
                     return true;
             }
 
             return false;
         }
 
-        private static bool SkillTypeRequirementMatches(
+        private static bool DamageTypeRequirementMatches(
             SkillType required,
             ActiveSkill skill,
             DamageCalculation calculation = null)

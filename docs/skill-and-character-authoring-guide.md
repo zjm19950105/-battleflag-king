@@ -1,6 +1,6 @@
 # 角色与技能录入规范
 
-最后更新：2026-05-15
+最后更新：2026-05-16
 
 用途：给接手的新 AI 录入角色、主动技能、被动技能时使用。先读本文件，再改 `characters.json`、`active_skills.json`、`passive_skills.json`。本规范解决的核心问题是：不要凭印象补技能，不要漏威力/命中倍率/攻击次数，不要把百分比和固定值写反。
 
@@ -40,26 +40,26 @@
 每个主动技能都要从资料逐项搬运：
 
 - `apCost`：资料 AP，不要沿用同职业旧技能。
-- `type` / `attackType`：物理、魔法、辅助、妨害；近接、远隔、魔法。不要把“前后贯通”误写成远隔，远隔必须来自技能标签或资料。
+- `type` / `damageType` / `attackType`：`type` 表示攻击/技能类别，用于“友方物理攻击前”“被物理攻击后”这类触发条件；`damageType` 表示单一伤害段按哪套攻防结算，未写时默认跟随 `type`（物理走 `Str/Def`，魔法走 `Mag/MDef`）；`attackType` 表示攻击形态（近接、远隔、魔法），用于近战阻挡、飞行命中惩罚、远程掩护等。魔法兵器这类“近接/远隔的物理攻击形态，但造成魔法伤害”应写 `type: "Physical"`、`damageType: "Magical"`、`attackType: "Melee"` 或 `"Ranged"`。
 - `targetType`：单体、一列、一排、前后贯通、全体等。前后贯通只描述命中锚点前后两个格，不等于无视近战前排阻挡。
-- `power`、`physicalPower`、`magicalPower`：普通单段用 `power`；混合伤害必须分别写物理/魔法威力，物理段走 `Str/Def`，魔法段走 `Mag/MDef`。攻击前追加魔法伤害不要写成魔攻 buff，用 `AugmentCurrentAction` + `ModifyDamageCalc.AdditionalMagicalPower`。
+- `power`、`physicalPower`、`magicalPower`：普通单段用 `power`，实际结算由 `damageType` 决定；混合伤害必须分别写 `physicalPower` / `magicalPower`，物理段走 `Str/Def`，魔法段走 `Mag/MDef`。攻击前追加魔法伤害不要写成魔攻 buff，用 `AugmentCurrentAction` + `ModifyDamageCalc.AdditionalMagicalPower`；通过被动 augment 追加时，魔法段使用触发被动者的面板 `Mag` 对目标 `MDef` 独立结算，不使用当前攻击者魔攻，也不把每个 hit 都加一遍。
 - `hitRate`：技能命中倍率。资料写 90% 就是 `hitRate: 90`，不是命中 buff，也不是 0.9。
 - `hitCount` / `HitCount`：多段攻击必须显式写，不能靠技能名或 legacy tag 推断。
 - `tags`：只写资料明确存在的标签，如 SureHit、Charge、Limited、Ranged 等。不要用 tag 代替已支持的结构化 effect。
 - `effects`：只表达资料写明的附加效果。例：Mega Slash 资料只有威力 150，就不能附加骑兵特攻、封印或偷 AP。
 
-远隔战斗语义由 `attackType: "Ranged"` 驱动，不由普通 `Ranged` tag 驱动。当前目标选择、远程掩护、飞行命中惩罚和攻击属性条件都读取 `attackType`；`Ranged` tag 只作为资料标签/日志标记保留，不能替代 `attackType`，也不需要为每个远隔主动技额外补齐。飞行特攻不由远隔 tag 触发，而是由角色 trait（例如 `BowVsFlying`）和 `attackType: "Ranged"` 共同决定；没有该 trait 的远隔技能不会自动对飞行双倍伤害。不要录入没有执行语义或资料来源的补丁 tag，例如 `FlyingNoHitPenalty`。
+远隔战斗语义由 `attackType: "Ranged"` 驱动，不由普通 `Ranged` tag 驱动。当前目标选择、远程掩护、飞行命中惩罚和攻击属性条件都读取 `attackType`；`Ranged` tag 只作为资料标签/日志标记保留，不能替代 `attackType`，也不需要为每个远隔主动技额外补齐。飞行特攻不由远隔 tag 触发，而是由角色 trait（例如 `BowVsFlying`）和 `attackType: "Ranged"` 共同决定；没有该 trait 的远隔技能不会自动对飞行双倍伤害。伤害结算只看 `damageType` 或 `physicalPower` / `magicalPower`，所以“物理攻击形态造成魔法伤害”不是写成 `type: "Magical"`，而是保持 `type: "Physical"` 并补 `damageType: "Magical"`。不要录入没有执行语义或资料来源的补丁 tag，例如 `FlyingNoHitPenalty`。
 
 ## 被动技能字段清单
 
 每个被动技能要先确定触发事件，再写效果：
 
 - `ppCost`、`triggerTiming`、`type`、`hasSimultaneousLimit` 必须来自资料。
-- “友方主动技能时”用 `AllyOnActiveUse` / 当前主动行动增强；“友方被攻击时”才是受击/命中相关事件。追击类不能因为友方被动 pending 攻击而触发，必要时用 `requiresSourceKind: "ActiveAttack"`。
-- 先制、追击、反击这类被动攻击必须在 pending action 参数里写齐 `power`、`hitRate`、`HitCount`、`damageType`、`attackType`、`targetType`、`tags`。
+- “友方主动技能时”用 `AllyOnActiveUse` / 当前主动行动增强；“友方被攻击时”才是受击/命中相关事件。`AllyOnAttacked` 表示其他友方被攻击，不含自己；自己被命中用 `OnBeingHit`。追击类不能因为自己被打或友方被动 pending 攻击而触发，必要时用 `requiresSourceKind: "ActiveAttack"`。
+- 先制、追击、反击这类被动攻击必须在 pending action 参数里写齐 `power`、`hitRate`、`HitCount`、`skillType`、`damageType`、`attackType`、`targetType`、`tags`。未写 `skillType` 时会兼容旧数据回退到 `damageType`，新数据不要依赖这个回退。
 - BattleStart/先制/战斗结束这类没有指定具体敌人的单体 pending attack，写 `target: "AllEnemies"`、`targetType: "SingleEnemy"`、`maxTargets: 1`；引擎会按主动技能同样的合法候选、近战前排阻挡和随机单体语义选目标。反击、追击这类有锚点的技能用 `target: "Attacker"` 或当前主动目标入队，不要写成 `AllEnemies`。
 - 掩护类 `CoverAlly` 只保护本次攻击没有被显式点名的友方；如果掩护者也在同一批目标里，不能替另一个同批目标挡刀，避免多目标攻击下互相掩护。
-- 攻击前给当前主动追加必中、会心、追击、魔法附加等效果时，优先使用 `AugmentCurrentAction`，不要在还没有 `DamageCalculation` 的阶段直接写 `ModifyDamageCalc`。例如魔法剑刃写 `requiresCurrentSkillType: "Physical"`，并在 `calculationEffects` 里放 `AdditionalMagicalPower: 50`。
+- 攻击前给当前主动追加必中、会心、追击、魔法附加等效果时，优先使用 `AugmentCurrentAction`，不要在还没有 `DamageCalculation` 的阶段直接写 `ModifyDamageCalc`。例如魔法剑刃/附魔剑刃写 `requiresCurrentSkillType: "Physical"`，因为它看的是当前行动是不是物理攻击类别；如果当前行动是魔法兵器导致 `damageType: "Magical"`，仍然可以触发。`calculationEffects` 里放 `AdditionalMagicalPower: 50`；实际总伤害是当前攻击者原本伤害段 + 触发被动者额外魔法段，额外魔法段每个目标/每次行动只追加 1 hit，不是物攻转魔攻，也不是使用当前攻击者魔攻。
 - 被主动攻击前/命中前类反击必须检查 `BattleActionSourceKind`。只有资料写“主动技能”时，pending action 不应递归触发。
 
 ## 数值语义

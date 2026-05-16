@@ -453,6 +453,31 @@ namespace BattleKing.Tests
             ClassicAssert.AreEqual(50f, result.HitResults[0].BasePhysicalDamage, 0.001f);
             ClassicAssert.AreEqual(60f, result.HitResults[0].BaseMagicalDamage, 0.001f);
         }
+
+        [Test]
+        public void PhysicalAttack_WithMagicalDamageType_UsesMagicalDamageFormula()
+        {
+            var attacker = TestDataFactory.CreateUnit(str: 150, mag: 80, hit: 1000, crit: 0);
+            var defender = TestDataFactory.CreateUnit(def: 10, mdef: 20, eva: 0, block: 0);
+            var skill = TestDataFactory.CreateSkill(
+                power: 100,
+                type: SkillType.Physical,
+                attackType: AttackType.Melee,
+                damageType: SkillType.Magical);
+            var calc = TestDataFactory.CreateCalc(attacker, defender, skill);
+
+            var result = _calc.Calculate(calc);
+
+            ClassicAssert.AreEqual(SkillType.Physical, skill.Type);
+            ClassicAssert.AreEqual(SkillType.Magical, skill.DamageType);
+            ClassicAssert.IsFalse(skill.HasPhysicalComponent);
+            ClassicAssert.IsTrue(skill.HasMagicalComponent);
+            ClassicAssert.AreEqual(80, calc.FinalAttackPower);
+            ClassicAssert.AreEqual(20, calc.FinalDefense);
+            ClassicAssert.AreEqual(0, result.PhysicalDamage);
+            ClassicAssert.AreEqual(60, result.MagicalDamage);
+            ClassicAssert.AreEqual(60, result.TotalDamage);
+        }
         // ────────── 兵种克制 ──────────
 
         [Test]
